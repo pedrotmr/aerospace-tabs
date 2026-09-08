@@ -4,6 +4,32 @@ import XCTest
 @testable import AerospaceTabs
 
 final class AerospaceClientTests: XCTestCase {
+    func testSocketConfigurationSetsIOTimeouts() throws {
+        let sockets = try makeSocketPair()
+        defer {
+            Darwin.close(sockets.reader)
+            Darwin.close(sockets.writer)
+        }
+
+        try AerospaceClient.configureSocket(sockets.writer)
+
+        var receiveTimeout = timeval()
+        var receiveTimeoutLength = socklen_t(MemoryLayout.size(ofValue: receiveTimeout))
+        XCTAssertEqual(
+            getsockopt(sockets.writer, SOL_SOCKET, SO_RCVTIMEO, &receiveTimeout, &receiveTimeoutLength),
+            0
+        )
+        XCTAssertTrue(receiveTimeout.tv_sec > 0 || receiveTimeout.tv_usec > 0)
+
+        var sendTimeout = timeval()
+        var sendTimeoutLength = socklen_t(MemoryLayout.size(ofValue: sendTimeout))
+        XCTAssertEqual(
+            getsockopt(sockets.writer, SOL_SOCKET, SO_SNDTIMEO, &sendTimeout, &sendTimeoutLength),
+            0
+        )
+        XCTAssertTrue(sendTimeout.tv_sec > 0 || sendTimeout.tv_usec > 0)
+    }
+
     func testReadExactReportsEOFWithPartialByteCount() throws {
         let sockets = try makeSocketPair()
         defer { Darwin.close(sockets.reader) }
