@@ -36,7 +36,7 @@ If a force-quit left gaps boosted: right-click the strip → **Restore AeroSpace
 ```bash
 make restore-gaps
 # or
-AerospaceTabs --restore-gaps
+./.build/release/AerospaceTabs --restore-gaps
 ```
 
 ## License
