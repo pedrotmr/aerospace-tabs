@@ -205,16 +205,52 @@ final class GapBoost {
     static func shiftNumbers(in block: String, by delta: CGFloat) -> String {
         var result = ""
         var i = block.startIndex
-        var inQuote = false
+        var quote: Character?
+        var escaped = false
+        var inComment = false
         while i < block.endIndex {
             let ch = block[i]
-            if ch == "\"" {
-                inQuote.toggle()
+
+            if ch == "\n" {
+                inComment = false
                 result.append(ch)
                 i = block.index(after: i)
                 continue
             }
-            if !inQuote, ch.isNumber || ch == "." {
+
+            if inComment {
+                result.append(ch)
+                i = block.index(after: i)
+                continue
+            }
+
+            if let currentQuote = quote {
+                result.append(ch)
+                if currentQuote == "\"" && ch == "\\" && !escaped {
+                    escaped = true
+                } else {
+                    if ch == currentQuote && !escaped {
+                        quote = nil
+                    }
+                    escaped = false
+                }
+                i = block.index(after: i)
+                continue
+            }
+
+            if ch == "\"" || ch == "'" {
+                quote = ch
+                result.append(ch)
+                i = block.index(after: i)
+                continue
+            }
+            if ch == "#" {
+                inComment = true
+                result.append(ch)
+                i = block.index(after: i)
+                continue
+            }
+            if ch.isNumber || ch == "." {
                 var j = i
                 while j < block.endIndex {
                     let c = block[j]
@@ -225,7 +261,14 @@ final class GapBoost {
                     }
                 }
                 let token = String(block[i..<j])
-                if let value = Double(token), token.contains(where: \.isNumber) {
+                let before = i > block.startIndex ? block[block.index(before: i)] : nil
+                let after = j < block.endIndex ? block[j] : nil
+                let attachedToIdentifier = before.map(Self.isIdentifierCharacter) == true
+                    || after.map(Self.isIdentifierCharacter) == true
+                if !attachedToIdentifier,
+                   let value = Double(token),
+                   token.contains(where: \.isNumber)
+                {
                     let shifted = max(0, value + Double(delta))
                     if shifted == floor(shifted) {
                         result += String(Int(shifted))
@@ -242,5 +285,9 @@ final class GapBoost {
             i = block.index(after: i)
         }
         return result
+    }
+
+    private static func isIdentifierCharacter(_ character: Character) -> Bool {
+        character.isLetter || character.isNumber || character == "_" || character == "-"
     }
 }

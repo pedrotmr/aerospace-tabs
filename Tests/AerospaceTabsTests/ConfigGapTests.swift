@@ -28,6 +28,22 @@ final class ConfigGapTests: XCTestCase {
         XCTAssertTrue(range.map { text[$0].hasPrefix("gaps.outer.top = 20") } == true)
     }
 
+    func testShiftNumbersLeavesIdentifierQuotedAndCommentDigitsAlone() {
+        let block = #"""
+        outer.top = [
+            { monitor.main2 = 10 },
+            { monitor."Side 3" = 20 },
+            4, # keep 99 in this comment
+        ]
+        """#
+
+        let shifted = GapBoost.shiftNumbers(in: block, by: 34)
+
+        XCTAssertTrue(shifted.contains("monitor.main2 = 44"))
+        XCTAssertTrue(shifted.contains(#"monitor."Side 3" = 54"#))
+        XCTAssertTrue(shifted.contains("38, # keep 99 in this comment"))
+    }
+
     func testBoostWritesResolvedTargetWithoutReplacingSymlink() throws {
         let fixture = try Fixture(useSymlink: true)
         defer { fixture.remove() }
