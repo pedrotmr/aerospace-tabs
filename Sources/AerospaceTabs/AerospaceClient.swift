@@ -138,6 +138,14 @@ final class AerospaceClient {
     }
 
     static func configureSocket(_ sock: Int32) throws {
+        var enabled: Int32 = 1
+        try setSocketOption(
+            sock,
+            name: SO_NOSIGPIPE,
+            value: &enabled,
+            operation: "setsockopt(SO_NOSIGPIPE)"
+        )
+
         let wholeSeconds = Int(Self.socketTimeout)
         let microseconds = Int32((Self.socketTimeout - Double(wholeSeconds)) * 1_000_000)
         var timeout = timeval(tv_sec: wholeSeconds, tv_usec: microseconds)
@@ -263,7 +271,7 @@ enum AerospaceSocketIOError: Error, Equatable {
     case unexpectedEOF(expected: Int, received: Int)
 }
 
-private func writeAll(_ fd: Int32, _ buffer: UnsafeRawBufferPointer) throws {
+func writeAll(_ fd: Int32, _ buffer: UnsafeRawBufferPointer) throws {
     var written = 0
     while written < buffer.count {
         let n = Darwin.write(fd, buffer.baseAddress!.advanced(by: written), buffer.count - written)

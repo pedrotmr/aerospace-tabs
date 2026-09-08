@@ -4,6 +4,24 @@ import XCTest
 @testable import AerospaceTabs
 
 final class AerospaceClientTests: XCTestCase {
+    func testSocketConfigurationSuppressesSIGPIPE() throws {
+        let sockets = try makeSocketPair()
+        defer {
+            Darwin.close(sockets.reader)
+            Darwin.close(sockets.writer)
+        }
+
+        try AerospaceClient.configureSocket(sockets.writer)
+
+        var noSIGPIPE: Int32 = 0
+        var noSIGPIPELength = socklen_t(MemoryLayout.size(ofValue: noSIGPIPE))
+        XCTAssertEqual(
+            getsockopt(sockets.writer, SOL_SOCKET, SO_NOSIGPIPE, &noSIGPIPE, &noSIGPIPELength),
+            0
+        )
+        XCTAssertEqual(noSIGPIPE, 1)
+    }
+
     func testSocketConfigurationSetsIOTimeouts() throws {
         let sockets = try makeSocketPair()
         defer {
@@ -47,6 +65,21 @@ final class AerospaceClientTests: XCTestCase {
                 error as? AerospaceSocketIOError,
                 .unexpectedEOF(expected: destination.count, received: prefix.count)
             )
+        }
+    }
+
+    func testWriteAllReturnsBrokenPipeInsteadOfRaisingSIGPIPE() throws {
+        let sockets = try makeSocketPair()
+        defer { Darwin.close(sockets.writer) }
+
+        try AerospaceClient.configureSocket(sockets.writer)
+        XCTAssertEqual(Darwin.close(sockets.reader), 0)
+
+        var byte: UInt8 = 0x01
+        XCTAssertThrowsError(try withUnsafeBytes(of: &byte) { try writeAll(sockets.writer, $0) }) { error in
+            let error = error as NSError
+            XCTAssertEqual(error.domain, NSPOSIXErrorDomain)
+            XCTAssertEqual(error.code, Int(EPIPE))
         }
     }
 
