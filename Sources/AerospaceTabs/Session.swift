@@ -159,11 +159,8 @@ final class Session {
             guard let self else { return }
             switch result {
             case .failure:
-                if !self.windows.isEmpty {
-                    self.windows = []
-                    self.focusedID = nil
-                    self.onChange?()
-                }
+                // Keep the last good snapshot so a socket blip does not blank the strip.
+                return
             case .success(let snapshot):
                 let sorted = self.order.apply(snapshot.windows)
                 if sorted != self.windows || snapshot.focused != self.focusedID {
@@ -198,7 +195,15 @@ final class SubscribePump {
     }
 
     private func connect() {
-        process?.terminate()
+        if let existing = process {
+            if let pipe = existing.standardOutput as? Pipe {
+                pipe.fileHandleForReading.readabilityHandler = nil
+            }
+            existing.terminationHandler = nil
+            existing.terminate()
+            process = nil
+        }
+
         let process = Process()
         process.executableURL = AerospaceClient.binaryURL
         process.arguments = [
@@ -213,7 +218,10 @@ final class SubscribePump {
         process.standardError = Pipe()
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let chunk = handle.availableData
-            if chunk.isEmpty { return }
+            if chunk.isEmpty {
+                handle.readabilityHandler = nil
+                return
+            }
             DispatchQueue.main.async {
                 self?.consume(chunk)
             }

@@ -4,10 +4,15 @@ import Foundation
 /// AeroSpace `gaps.outer.top` so windows clear the bar — then restores on quit.
 ///
 /// Backup lives on disk next to the AeroSpace config so a force-quit still
-/// leaves a recoverable original, and the next launch always restores first.
+/// leaves a recoverable original. All file access is serialized.
+///
+/// `sync(shouldBoost:)` ties the boost to strip visibility so hidden spaces
+/// do not keep a phantom top gap.
 final class GapBoost {
     static let shared = GapBoost()
     static let stripHeight: CGFloat = 34
+
+    private let queue = DispatchQueue(label: "aerospace-tabs.gap-boost")
 
     private var configPath: String {
         let home = NSHomeDirectory()
@@ -34,9 +39,41 @@ final class GapBoost {
         FileManager.default.fileExists(atPath: activeURL.path)
     }
 
-    /// Call once at launch. Always undoes a leftover boost before applying a new one.
-    func activate() {
-        restoreBackup(reload: false)
+    /// Undo any leftover boost from a previous crash, then wait for `sync`.
+    func prepareAtLaunch() {
+        queue.sync {
+            _ = restoreBackup(reload: true)
+        }
+    }
+
+    /// Keep boost aligned with whether any strip should be visible.
+    func sync(shouldBoost: Bool) {
+        queue.sync {
+            if shouldBoost {
+                applyBoostIfNeeded()
+            } else {
+                _ = restoreBackup(reload: true)
+            }
+        }
+    }
+
+    /// Call on quit / SIGTERM. Restores the user's original `outer.top`.
+    func deactivate() {
+        queue.sync {
+            _ = restoreBackup(reload: true)
+        }
+    }
+
+    /// Manual recovery (menu item / CLI). Safe if nothing was boosted.
+    @discardableResult
+    func restoreIfNeeded() -> Bool {
+        queue.sync {
+            restoreBackup(reload: true)
+        }
+    }
+
+    private func applyBoostIfNeeded() {
+        if isActive { return }
         guard var text = try? String(contentsOfFile: configPath, encoding: .utf8),
               let range = Self.outerTopBlockRange(in: text)
         else { return }
@@ -60,31 +97,43 @@ final class GapBoost {
         }
     }
 
-    /// Call on quit / SIGTERM. Restores the user's original `outer.top`.
-    func deactivate() {
-        restoreBackup(reload: true)
-    }
-
-    /// Manual recovery (menu item / CLI). Safe if nothing was boosted.
-    @discardableResult
-    func restoreIfNeeded() -> Bool {
-        restoreBackup(reload: true)
-    }
-
     @discardableResult
     private func restoreBackup(reload: Bool) -> Bool {
         let fm = FileManager.default
-        guard fm.fileExists(atPath: backupURL.path),
-              let backup = try? String(contentsOf: backupURL, encoding: .utf8),
-              var text = try? String(contentsOfFile: configPath, encoding: .utf8),
-              let range = Self.outerTopBlockRange(in: text)
-        else {
-            // No backup — still clear a stale active marker.
+        guard fm.fileExists(atPath: backupURL.path) || isActive else {
             try? fm.removeItem(at: activeURL)
             return false
         }
 
-        text.replaceSubrange(range, with: backup)
+        guard var text = try? String(contentsOfFile: configPath, encoding: .utf8),
+              let range = Self.outerTopBlockRange(in: text)
+        else {
+            try? fm.removeItem(at: activeURL)
+            try? fm.removeItem(at: backupURL)
+            return false
+        }
+
+        let current = String(text[range])
+        let restored: String
+        if let backup = try? String(contentsOf: backupURL, encoding: .utf8) {
+            let expectedBoosted = Self.shiftNumbers(in: backup, by: Self.stripHeight)
+            // Prefer exact undo when the user did not edit outer.top mid-session.
+            // Otherwise subtract our delta from the live block so we do not clobber edits.
+            if current == expectedBoosted {
+                restored = backup
+            } else if isActive {
+                restored = Self.shiftNumbers(in: current, by: -Self.stripHeight)
+            } else {
+                restored = backup
+            }
+        } else if isActive {
+            restored = Self.shiftNumbers(in: current, by: -Self.stripHeight)
+        } else {
+            try? fm.removeItem(at: activeURL)
+            return false
+        }
+
+        text.replaceSubrange(range, with: restored)
         do {
             try text.write(toFile: configPath, atomically: true, encoding: .utf8)
             try? fm.removeItem(at: backupURL)
@@ -94,7 +143,6 @@ final class GapBoost {
             }
             return true
         } catch {
-            // Keep backup + active marker so a later attempt can still recover.
             return false
         }
     }

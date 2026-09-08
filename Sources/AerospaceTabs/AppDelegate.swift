@@ -25,7 +25,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var strips: [CGDirectDisplayID: TabStrip] = [:]
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        GapBoost.shared.activate()
+        // Clear a leftover boost from a previous crash; live boost follows strip visibility in render().
+        GapBoost.shared.prepareAtLaunch()
         GapsConfig.shared.start()
         session.onChange = { [weak self] in
             self?.render()
@@ -36,8 +37,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeys.onCommit = { [weak self] in
             self?.session.commitCycle()
         }
-        missionControl.onChange = { [weak self] active in
-            self?.applyMissionControl(hidden: active)
+        missionControl.onChange = { [weak self] _ in
+            self?.render()
         }
         hotkeys.install()
         session.start()
@@ -65,16 +66,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         render()
     }
 
-    private func applyMissionControl(hidden: Bool) {
-        for strip in strips.values {
-            strip.setHidden(hidden)
-        }
-    }
-
     private func render() {
         let grouped = Dictionary(grouping: session.windows, by: \.screenIndex)
         var seen: Set<CGDirectDisplayID> = []
         let hidden = missionControl.isActive
+        var anyStripVisible = false
 
         for screen in NSScreen.screens {
             let displayID = screen.displayID
@@ -90,7 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         self?.session.reorder(ids: ids, workspace: workspace)
                     },
                     onQuit: {
-                        GapBoost.shared.deactivate()
+                        // applicationWillTerminate restores gaps once.
                         NSApp.terminate(nil)
                     }
                 )
@@ -98,9 +94,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return created
             }()
             let gaps = GapsConfig.shared.gaps(for: screen)
-            // Only show for accordion stacks with 2+ windows (one visible at a time).
-            // Hide for empty spaces, single windows, and tiles (side-by-side / both visible).
+            // Charter: show for any 2+ windows (tiles or accordion).
             let showTabs = Self.shouldShowTabs(windows)
+            if showTabs { anyStripVisible = true }
             strip.update(
                 screen: screen,
                 windows: windows,
@@ -114,13 +110,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             strip.close()
             strips.removeValue(forKey: id)
         }
+
+        // Boost only while at least one strip should show (and MC is not hiding us).
+        GapBoost.shared.sync(shouldBoost: anyStripVisible && !hidden)
     }
 
-    /// Accordion = stacked, one window visible. Tiles = side-by-side / both visible.
+    /// Strip visibility: two or more windows on the workspace (tiles or accordion).
     private static func shouldShowTabs(_ windows: [Win]) -> Bool {
-        guard windows.count >= 2 else { return false }
-        if windows.contains(where: \.isTiles) { return false }
-        return windows.contains(where: \.isAccordion)
+        windows.count >= 2
     }
 }
 
