@@ -162,15 +162,17 @@ final class Session {
                 // Keep the last good snapshot so a socket blip does not blank the strip.
                 return
             case .success(let snapshot):
-                let sorted = self.order.apply(snapshot.windows)
-                if sorted != self.windows || snapshot.focused != self.focusedID {
-                    self.windows = sorted
-                    if let focused = snapshot.focused {
-                        self.focusedID = focused
-                    }
-                    self.onChange?()
-                }
+                self.apply(snapshot)
             }
+        }
+    }
+
+    func apply(_ snapshot: Snapshot) {
+        let sorted = order.apply(snapshot.windows)
+        if sorted != windows || snapshot.focused != focusedID {
+            windows = sorted
+            focusedID = snapshot.focused
+            onChange?()
         }
     }
 }
