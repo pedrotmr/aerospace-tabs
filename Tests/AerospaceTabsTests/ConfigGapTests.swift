@@ -133,18 +133,35 @@ final class ConfigGapTests: XCTestCase {
             atomically: true,
             encoding: .utf8
         )
+        let release = fixture.root.appendingPathComponent("release-reload")
+        defer { try? "".write(to: release, atomically: true, encoding: .utf8) }
         let executable = fixture.root.appendingPathComponent("slow-reload")
-        try "#!/bin/sh\nsleep 1\n".write(to: executable, atomically: true, encoding: .utf8)
+        let script = "#!/bin/sh\nwhile [ ! -e '\(release.path)' ]; do sleep 0.01; done\n"
+        try script.write(to: executable, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes(
             [.posixPermissions: 0o755],
             ofItemAtPath: executable.path
         )
-        let boost = GapBoost(locator: fixture.locator, reloadExecutableURL: executable)
-        let startedAt = Date()
+        let childExited = DispatchSemaphore(value: 0)
+        let boost = GapBoost(
+            locator: fixture.locator,
+            reloadExecutableURL: executable,
+            reloadDidTerminate: { childExited.signal() }
+        )
+        let returned = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async {
+            boost.sync(shouldBoost: true)
+            returned.signal()
+        }
 
-        boost.sync(shouldBoost: true)
+        let result = returned.wait(timeout: .now() + 2)
+        try "".write(to: release, atomically: true, encoding: .utf8)
+        if result == .timedOut {
+            _ = returned.wait(timeout: .now() + 2)
+        }
 
-        XCTAssertLessThan(Date().timeIntervalSince(startedAt), 0.5)
+        XCTAssertEqual(result, .success, "sync waited for the reload child to exit")
+        XCTAssertEqual(childExited.wait(timeout: .now() + 2), .success)
     }
 
     func testBoostWritesResolvedTargetWithoutReplacingSymlink() throws {
@@ -156,7 +173,7 @@ final class ConfigGapTests: XCTestCase {
             encoding: .utf8
         )
         var reloads = 0
-        let boost = GapBoost(locator: fixture.locator) { reloads += 1 }
+        let boost = GapBoost(locator: fixture.locator, reloadHandler: { reloads += 1 })
 
         boost.sync(shouldBoost: true)
 

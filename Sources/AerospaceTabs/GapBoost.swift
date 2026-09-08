@@ -16,16 +16,19 @@ final class GapBoost {
     private let locator: AerospaceConfigLocator
     private let reloadHandler: (() -> Void)?
     private let reloadExecutableURL: URL?
+    private let reloadDidTerminate: (() -> Void)?
     private var reloadProcesses: [Process] = []
 
     init(
         locator: AerospaceConfigLocator = .shared,
         reloadHandler: (() -> Void)? = nil,
-        reloadExecutableURL: URL? = nil
+        reloadExecutableURL: URL? = nil,
+        reloadDidTerminate: (() -> Void)? = nil
     ) {
         self.locator = locator
         self.reloadHandler = reloadHandler
         self.reloadExecutableURL = reloadExecutableURL
+        self.reloadDidTerminate = reloadDidTerminate
     }
 
     /// Undo any leftover boost from a previous crash, then wait for `sync`.
@@ -181,6 +184,7 @@ final class GapBoost {
             guard let self, let process else { return }
             self.queue.async {
                 self.reloadProcesses.removeAll { $0 === process }
+                self.reloadDidTerminate?()
             }
         }
         do {
