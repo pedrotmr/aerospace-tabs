@@ -291,11 +291,11 @@ final class GapBoost {
                 i = block.index(after: i)
                 continue
             }
-            if ch.isNumber || ch == "." {
+            if AerospaceConfigSyntax.isGapNumberStart(ch) {
                 var j = i
                 while j < block.endIndex {
                     let c = block[j]
-                    if c.isNumber || c == "." {
+                    if AerospaceConfigSyntax.isGapNumberCharacter(c) {
                         j = block.index(after: j)
                     } else {
                         break
@@ -307,8 +307,7 @@ final class GapBoost {
                 let attachedToIdentifier = before.map(Self.isIdentifierCharacter) == true
                     || after.map(Self.isIdentifierCharacter) == true
                 if !attachedToIdentifier,
-                   let value = Double(token),
-                   token.contains(where: \.isNumber)
+                   let value = AerospaceConfigSyntax.parseGapNumber(token)
                 {
                     let shifted = max(0, value + Double(delta))
                     if shifted == floor(shifted) {

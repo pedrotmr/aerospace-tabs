@@ -127,6 +127,42 @@ final class AerospaceConfigLocator {
 }
 
 enum AerospaceConfigSyntax {
+    static func parseGapNumber(_ literal: String) -> Double? {
+        let components = literal.split(separator: ".", omittingEmptySubsequences: false)
+        guard !components.isEmpty, components.count <= 2 else { return nil }
+        for component in components {
+            guard let first = component.first,
+                  let last = component.last,
+                  isASCIIDigit(first),
+                  isASCIIDigit(last)
+            else { return nil }
+
+            var previousWasDigit = false
+            for character in component {
+                if character == "_" {
+                    guard previousWasDigit else { return nil }
+                    previousWasDigit = false
+                } else {
+                    guard isASCIIDigit(character) else { return nil }
+                    previousWasDigit = true
+                }
+            }
+        }
+        return Double(literal.replacingOccurrences(of: "_", with: ""))
+    }
+
+    static func isGapNumberCharacter(_ character: Character) -> Bool {
+        isASCIIDigit(character) || character == "." || character == "_"
+    }
+
+    static func isGapNumberStart(_ character: Character) -> Bool {
+        isASCIIDigit(character) || character == "."
+    }
+
+    private static func isASCIIDigit(_ character: Character) -> Bool {
+        character >= "0" && character <= "9"
+    }
+
     static func isAssignment(_ line: String, key: String) -> Bool {
         let content = strippingInlineComment(from: line)
             .trimmingCharacters(in: .whitespaces)

@@ -61,6 +61,35 @@ final class ConfigGapTests: XCTestCase {
         XCTAssertEqual(parsed.top.resolve(monitorName: "Other"), 20)
     }
 
+    func testUnderscoredGapNumbersParseBoostAndRestore() throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let original = """
+        [gaps]
+        outer.top = [
+            { monitor.main_2 = 1_000 },
+            2_000,
+        ]
+        outer.left = 1_234.5_0
+
+        """
+        try original.write(to: fixture.target, atomically: true, encoding: .utf8)
+        let parsed = try XCTUnwrap(GapsConfig.parse(original))
+
+        XCTAssertEqual(parsed.top.resolve(monitorName: "main_2"), 1_000)
+        XCTAssertEqual(parsed.top.resolve(monitorName: "other"), 2_000)
+        XCTAssertEqual(parsed.left.resolve(monitorName: "other"), 1_234.50)
+
+        let boost = GapBoost(locator: fixture.locator, reloadHandler: {})
+        boost.sync(shouldBoost: true)
+        let boosted = try String(contentsOf: fixture.target, encoding: .utf8)
+        XCTAssertTrue(boosted.contains("monitor.main_2 = 1034"))
+        XCTAssertTrue(boosted.contains("2034,"))
+
+        boost.sync(shouldBoost: false)
+        XCTAssertEqual(try String(contentsOf: fixture.target, encoding: .utf8), original)
+    }
+
     func testRestoreRecognizesAlreadyRestoredBlockAndOnlyCleansState() throws {
         let fixture = try Fixture()
         defer { fixture.remove() }
