@@ -61,6 +61,41 @@ final class ConfigGapTests: XCTestCase {
         XCTAssertEqual(parsed.top.resolve(monitorName: "Other"), 20)
     }
 
+    func testRestoreRecognizesAlreadyRestoredBlockAndOnlyCleansState() throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let original = "[gaps]\nouter.top = 10\n"
+        try original.write(to: fixture.target, atomically: true, encoding: .utf8)
+        let location = fixture.locator.location()
+        let range = try XCTUnwrap(GapBoost.outerTopBlockRange(in: original))
+        try String(original[range]).write(to: location.backupURL, atomically: true, encoding: .utf8)
+        try fixture.target.path.write(to: location.activeURL, atomically: true, encoding: .utf8)
+        let boost = GapBoost(locator: fixture.locator, reloadHandler: {})
+
+        XCTAssertTrue(boost.restoreIfNeeded(reload: false))
+        XCTAssertEqual(try String(contentsOf: fixture.target, encoding: .utf8), original)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: location.backupURL.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: location.activeURL.path))
+    }
+
+    func testFailedRestoreKeepsRecoveryState() throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        try "[gaps]\nouter.left = 10\n".write(
+            to: fixture.target,
+            atomically: true,
+            encoding: .utf8
+        )
+        let location = fixture.locator.location()
+        try "outer.top = 10\n".write(to: location.backupURL, atomically: true, encoding: .utf8)
+        try fixture.target.path.write(to: location.activeURL, atomically: true, encoding: .utf8)
+        let boost = GapBoost(locator: fixture.locator, reloadHandler: {})
+
+        XCTAssertFalse(boost.restoreIfNeeded(reload: false))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: location.backupURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: location.activeURL.path))
+    }
+
     func testReloadDoesNotWaitForChildProcessExit() throws {
         let fixture = try Fixture()
         defer { fixture.remove() }

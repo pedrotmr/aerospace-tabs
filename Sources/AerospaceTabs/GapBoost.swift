@@ -55,9 +55,9 @@ final class GapBoost {
 
     /// Manual recovery (menu item / CLI). Safe if nothing was boosted.
     @discardableResult
-    func restoreIfNeeded() -> Bool {
+    func restoreIfNeeded(reload: Bool = true) -> Bool {
         queue.sync {
-            restoreBackup(reload: true)
+            restoreBackup(reload: reload)
         }
     }
 
@@ -69,73 +69,94 @@ final class GapBoost {
         else { return }
 
         let original = String(text[range])
-        do {
-            try original.write(to: location.backupURL, atomically: true, encoding: .utf8)
-        } catch {
-            return
-        }
+        guard writeVerified(original, to: location.backupURL) else { return }
+
+        // Persist the resolved target before changing it. Recovery remains tied
+        // to this file even if a higher-priority candidate appears or a symlink
+        // is retargeted while the app is running.
+        guard writeVerified(location.configURL.path, to: location.activeURL) else { return }
 
         let boosted = Self.shiftNumbers(in: original, by: Self.stripHeight)
         text.replaceSubrange(range, with: boosted)
-        do {
-            try text.write(to: location.configURL, atomically: true, encoding: .utf8)
-            try? location.configURL.path.write(to: location.activeURL, atomically: true, encoding: .utf8)
-            reloadAerospace()
-        } catch {
-            try? FileManager.default.removeItem(at: location.backupURL)
-            try? FileManager.default.removeItem(at: location.activeURL)
-        }
+        guard writeVerified(text, to: location.configURL) else { return }
+        reloadAerospace()
     }
 
     @discardableResult
     private func restoreBackup(reload: Bool) -> Bool {
         let fm = FileManager.default
         let location = locator.location()
-        let isActive = fm.fileExists(atPath: location.activeURL.path)
-        guard fm.fileExists(atPath: location.backupURL.path) || isActive else {
-            try? fm.removeItem(at: location.activeURL)
-            return false
-        }
+        let backupExists = fm.fileExists(atPath: location.backupURL.path)
+        let activeExists = fm.fileExists(atPath: location.activeURL.path)
+        guard backupExists || activeExists else { return false }
 
         guard var text = try? String(contentsOf: location.configURL, encoding: .utf8),
               let range = Self.outerTopBlockRange(in: text)
-        else {
-            try? fm.removeItem(at: location.activeURL)
-            try? fm.removeItem(at: location.backupURL)
-            return false
-        }
+        else { return false }
 
         let current = String(text[range])
         let restored: String
-        if let backup = try? String(contentsOf: location.backupURL, encoding: .utf8) {
+        if backupExists {
+            guard let backup = try? String(contentsOf: location.backupURL, encoding: .utf8) else {
+                return false
+            }
+
+            // The restore write may have completed before recovery state was
+            // removed. In that case, only clean up; subtracting again would
+            // corrupt the user's original gap.
+            if current == backup {
+                finishRecovery(at: location, reload: reload)
+                return true
+            }
+
             let expectedBoosted = Self.shiftNumbers(in: backup, by: Self.stripHeight)
             // Prefer exact undo when the user did not edit outer.top mid-session.
             // Otherwise subtract our delta from the live block so we do not clobber edits.
             if current == expectedBoosted {
                 restored = backup
-            } else if isActive {
+            } else if activeExists {
                 restored = Self.shiftNumbers(in: current, by: -Self.stripHeight)
             } else {
                 restored = backup
             }
-        } else if isActive {
+        } else if activeExists {
             restored = Self.shiftNumbers(in: current, by: -Self.stripHeight)
         } else {
-            try? fm.removeItem(at: location.activeURL)
             return false
         }
 
         text.replaceSubrange(range, with: restored)
+        guard writeVerified(text, to: location.configURL) else { return false }
+        finishRecovery(at: location, reload: reload)
+        return true
+    }
+
+    private func writeVerified(_ text: String, to url: URL) -> Bool {
         do {
-            try text.write(to: location.configURL, atomically: true, encoding: .utf8)
-            try? fm.removeItem(at: location.backupURL)
-            try? fm.removeItem(at: location.activeURL)
-            if reload {
-                reloadAerospace()
-            }
-            return true
+            try text.write(to: url, atomically: true, encoding: .utf8)
+            return try String(contentsOf: url, encoding: .utf8) == text
         } catch {
+            NSLog("AerospaceTabs could not write %@: %@", url.path, error.localizedDescription)
             return false
+        }
+    }
+
+    private func finishRecovery(at location: AerospaceConfigLocation, reload: Bool) {
+        let fm = FileManager.default
+        do {
+            // Remove the marker first. If that fails, retain the backup so a
+            // later recovery can recognize an already-restored config safely.
+            if fm.fileExists(atPath: location.activeURL.path) {
+                try fm.removeItem(at: location.activeURL)
+            }
+            if fm.fileExists(atPath: location.backupURL.path) {
+                try fm.removeItem(at: location.backupURL)
+            }
+        } catch {
+            NSLog("AerospaceTabs could not clean gap recovery state: %@", error.localizedDescription)
+        }
+        if reload {
+            reloadAerospace()
         }
     }
 
