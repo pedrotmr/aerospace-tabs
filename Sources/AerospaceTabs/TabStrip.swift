@@ -291,9 +291,8 @@ final class TabStripView: NSView {
             if let pendingModel {
                 self.pendingModel = nil
                 apply(windows: pendingModel.windows, focused: pendingModel.focused)
-            } else {
-                needsDisplay = true
             }
+            needsDisplay = true
         }
 
         if dragging {

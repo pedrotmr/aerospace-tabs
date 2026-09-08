@@ -92,6 +92,29 @@ final class TabStripTests: XCTestCase {
         XCTAssertEqual(picked, 2)
     }
 
+    func testDragFinalizationAlwaysRequestsRedraw() {
+        let view = makeView()
+        let window = NSWindow(
+            contentRect: view.frame,
+            styleMask: .borderless,
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = view
+        let first = makeWindow(id: 1)
+        let second = makeWindow(id: 2)
+        view.set(windows: [first, second], focused: 1)
+        view.beginPress(at: CGPoint(x: 50, y: 17))
+        view.continuePress(to: CGPoint(x: 170, y: 17))
+        view.set(windows: [second, first], focused: 1)
+        view.needsDisplay = false
+
+        view.endPress(at: CGPoint(x: 170, y: 17))
+
+        XCTAssertTrue(view.needsDisplay)
+        withExtendedLifetime(window) {}
+    }
+
     private func makeView() -> TabStripView {
         TabStripView(frame: CGRect(x: 0, y: 0, width: 200, height: 34))
     }
