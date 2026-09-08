@@ -55,6 +55,47 @@ final class TabStripTests: XCTestCase {
         XCTAssertEqual(Set(reorderedIDs), Set(1...100))
     }
 
+    func testModelUpdateFromReorderCallbackIsAppliedAfterDrag() {
+        let view = makeView()
+        view.set(windows: [makeWindow(id: 1), makeWindow(id: 2)], focused: 1)
+        view.beginPress(at: CGPoint(x: 50, y: 17))
+        view.continuePress(to: CGPoint(x: 170, y: 17))
+        view.onReorder = { _, _ in
+            view.set(windows: [self.makeWindow(id: 3)], focused: 3)
+        }
+
+        view.endPress(at: CGPoint(x: 170, y: 17))
+
+        var picked: Int?
+        view.onPick = { picked = $0 }
+        view.beginPress(at: CGPoint(x: 50, y: 17))
+        view.endPress(at: CGPoint(x: 50, y: 17))
+        XCTAssertEqual(picked, 3)
+    }
+
+    func testVanishedDraggedWindowIsNotSentToReorderCallback() {
+        let view = makeView()
+        view.set(windows: [makeWindow(id: 1), makeWindow(id: 2)], focused: 1)
+        view.beginPress(at: CGPoint(x: 50, y: 17))
+        view.continuePress(to: CGPoint(x: 170, y: 17))
+        view.set(windows: [makeWindow(id: 2)], focused: 2)
+
+        var reorderedIDs: [[Int]] = []
+        view.onReorder = { ids, _ in reorderedIDs.append(ids) }
+        view.endPress(at: CGPoint(x: 170, y: 17))
+
+        XCTAssertTrue(reorderedIDs.isEmpty)
+        var picked: Int?
+        view.onPick = { picked = $0 }
+        view.beginPress(at: CGPoint(x: 50, y: 17))
+        view.endPress(at: CGPoint(x: 50, y: 17))
+        XCTAssertEqual(picked, 2)
+    }
+
+    private func makeView() -> TabStripView {
+        TabStripView(frame: CGRect(x: 0, y: 0, width: 200, height: 34))
+    }
+
     private func makeWindow(id: Int) -> Win {
         Win(
             id: id,

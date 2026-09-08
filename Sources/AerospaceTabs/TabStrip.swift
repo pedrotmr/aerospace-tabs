@@ -167,15 +167,24 @@ final class TabStripView: NSView {
     private var pressPoint: CGPoint = .zero
     private var dragging = false
     private var dragIndex: Int?
+    private var draggedWindowID: Int?
     private var dragOffsetX: CGFloat = 0
     private var dragX: CGFloat = 0
+    private var pendingModel: (windows: [Win], focused: Int?)?
 
     override var isOpaque: Bool { false }
     override var isFlipped: Bool { true }
     override var mouseDownCanMoveWindow: Bool { false }
 
     func set(windows: [Win], focused: Int?) {
-        if dragging { return }
+        if dragging {
+            pendingModel = (windows, focused)
+            return
+        }
+        apply(windows: windows, focused: focused)
+    }
+
+    private func apply(windows: [Win], focused: Int?) {
         if self.windows == windows && self.focused == focused { return }
         self.windows = windows
         self.focused = focused
@@ -221,6 +230,7 @@ final class TabStripView: NSView {
         pressPoint = point
         dragging = false
         dragIndex = nil
+        draggedWindowID = windows[index].id
         dragOffsetX = point.x - frames[index].minX
         dragX = frames[index].minX
     }
@@ -277,7 +287,13 @@ final class TabStripView: NSView {
             pressIndex = nil
             dragging = false
             dragIndex = nil
-            needsDisplay = true
+            draggedWindowID = nil
+            if let pendingModel {
+                self.pendingModel = nil
+                apply(windows: pendingModel.windows, focused: pendingModel.focused)
+            } else {
+                needsDisplay = true
+            }
         }
 
         if dragging {
@@ -314,9 +330,29 @@ final class TabStripView: NSView {
     }
 
     private func commitReorder() {
-        guard let first = windows.first else { return }
+        var ordered = windows
+        if let pendingModel {
+            if let draggedWindowID,
+                !pendingModel.windows.contains(where: { $0.id == draggedWindowID })
+            {
+                return
+            }
+
+            let latestByID = Dictionary(
+                uniqueKeysWithValues: pendingModel.windows.map { ($0.id, $0) }
+            )
+            var included = Set<Int>()
+            ordered = windows.compactMap { window in
+                guard let latest = latestByID[window.id] else { return nil }
+                included.insert(window.id)
+                return latest
+            }
+            ordered.append(contentsOf: pendingModel.windows.filter { !included.contains($0.id) })
+        }
+
+        guard let first = ordered.first else { return }
         let workspace = first.workspace
-        let byWS = Dictionary(grouping: windows, by: \.workspace)
+        let byWS = Dictionary(grouping: ordered, by: \.workspace)
         for (ws, members) in byWS {
             onReorder?(members.map(\.id), ws.isEmpty ? workspace : ws)
         }
