@@ -13,12 +13,17 @@ struct OuterGaps: Equatable {
 final class GapsConfig {
     static let shared = GapsConfig()
 
-    private var path: String?
+    private let locator: AerospaceConfigLocator
+    private var loadedConfigURL: URL?
     private var mtime: Date?
     private var top = GapValue.constant(28)
     private var left = GapValue.constant(20)
     private var right = GapValue.constant(20)
     private var timer: Timer?
+
+    init(locator: AerospaceConfigLocator = .shared) {
+        self.locator = locator
+    }
 
     enum GapValue {
         case constant(CGFloat)
@@ -63,13 +68,12 @@ final class GapsConfig {
         )
     }
 
-    private func reload(force: Bool) {
-        let configPath = path ?? defaultConfigPath()
-        path = configPath
-        let url = URL(fileURLWithPath: configPath)
+    func reload(force: Bool) {
+        let url = locator.location().configURL
         let values = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))
         let newMtime = values?.contentModificationDate
-        if !force, newMtime == mtime { return }
+        if !force, url == loadedConfigURL, newMtime == mtime { return }
+        loadedConfigURL = url
         mtime = newMtime
 
         guard let text = try? String(contentsOf: url, encoding: .utf8) else { return }
@@ -79,16 +83,6 @@ final class GapsConfig {
             right = parsed.right
             NotificationCenter.default.post(name: .aerospaceGapsDidChange, object: nil)
         }
-    }
-
-    private func defaultConfigPath() -> String {
-        let home = NSHomeDirectory()
-        let candidates = [
-            "\(home)/.aerospace.toml",
-            "\(home)/.config/aerospace/aerospace.toml",
-        ]
-        return candidates.first { FileManager.default.isReadableFile(atPath: $0) }
-            ?? candidates[1]
     }
 
     private static func parse(_ text: String) -> (top: GapValue, left: GapValue, right: GapValue)? {

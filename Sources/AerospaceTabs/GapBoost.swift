@@ -13,30 +13,15 @@ final class GapBoost {
     static let stripHeight: CGFloat = 34
 
     private let queue = DispatchQueue(label: "aerospace-tabs.gap-boost")
+    private let locator: AerospaceConfigLocator
+    private let reloadHandler: (() -> Void)?
 
-    private var configPath: String {
-        let home = NSHomeDirectory()
-        let candidates = [
-            "\(home)/.aerospace.toml",
-            "\(home)/.config/aerospace/aerospace.toml",
-        ]
-        return candidates.first { FileManager.default.isReadableFile(atPath: $0) } ?? candidates[1]
-    }
-
-    private var backupURL: URL {
-        URL(fileURLWithPath: configPath)
-            .deletingLastPathComponent()
-            .appendingPathComponent(".aerospace-tabs-outer-top.backup")
-    }
-
-    private var activeURL: URL {
-        URL(fileURLWithPath: configPath)
-            .deletingLastPathComponent()
-            .appendingPathComponent(".aerospace-tabs-gap-boost.active")
-    }
-
-    private var isActive: Bool {
-        FileManager.default.fileExists(atPath: activeURL.path)
+    init(
+        locator: AerospaceConfigLocator = .shared,
+        reloadHandler: (() -> Void)? = nil
+    ) {
+        self.locator = locator
+        self.reloadHandler = reloadHandler
     }
 
     /// Undo any leftover boost from a previous crash, then wait for `sync`.
@@ -73,14 +58,15 @@ final class GapBoost {
     }
 
     private func applyBoostIfNeeded() {
-        if isActive { return }
-        guard var text = try? String(contentsOfFile: configPath, encoding: .utf8),
+        let location = locator.location()
+        if location.hasRecoveryState() { return }
+        guard var text = try? String(contentsOf: location.configURL, encoding: .utf8),
               let range = Self.outerTopBlockRange(in: text)
         else { return }
 
         let original = String(text[range])
         do {
-            try original.write(to: backupURL, atomically: true, encoding: .utf8)
+            try original.write(to: location.backupURL, atomically: true, encoding: .utf8)
         } catch {
             return
         }
@@ -88,34 +74,36 @@ final class GapBoost {
         let boosted = Self.shiftNumbers(in: original, by: Self.stripHeight)
         text.replaceSubrange(range, with: boosted)
         do {
-            try text.write(toFile: configPath, atomically: true, encoding: .utf8)
-            try? "1".write(to: activeURL, atomically: true, encoding: .utf8)
+            try text.write(to: location.configURL, atomically: true, encoding: .utf8)
+            try? location.configURL.path.write(to: location.activeURL, atomically: true, encoding: .utf8)
             reloadAerospace()
         } catch {
-            try? FileManager.default.removeItem(at: backupURL)
-            try? FileManager.default.removeItem(at: activeURL)
+            try? FileManager.default.removeItem(at: location.backupURL)
+            try? FileManager.default.removeItem(at: location.activeURL)
         }
     }
 
     @discardableResult
     private func restoreBackup(reload: Bool) -> Bool {
         let fm = FileManager.default
-        guard fm.fileExists(atPath: backupURL.path) || isActive else {
-            try? fm.removeItem(at: activeURL)
+        let location = locator.location()
+        let isActive = fm.fileExists(atPath: location.activeURL.path)
+        guard fm.fileExists(atPath: location.backupURL.path) || isActive else {
+            try? fm.removeItem(at: location.activeURL)
             return false
         }
 
-        guard var text = try? String(contentsOfFile: configPath, encoding: .utf8),
+        guard var text = try? String(contentsOf: location.configURL, encoding: .utf8),
               let range = Self.outerTopBlockRange(in: text)
         else {
-            try? fm.removeItem(at: activeURL)
-            try? fm.removeItem(at: backupURL)
+            try? fm.removeItem(at: location.activeURL)
+            try? fm.removeItem(at: location.backupURL)
             return false
         }
 
         let current = String(text[range])
         let restored: String
-        if let backup = try? String(contentsOf: backupURL, encoding: .utf8) {
+        if let backup = try? String(contentsOf: location.backupURL, encoding: .utf8) {
             let expectedBoosted = Self.shiftNumbers(in: backup, by: Self.stripHeight)
             // Prefer exact undo when the user did not edit outer.top mid-session.
             // Otherwise subtract our delta from the live block so we do not clobber edits.
@@ -129,15 +117,15 @@ final class GapBoost {
         } else if isActive {
             restored = Self.shiftNumbers(in: current, by: -Self.stripHeight)
         } else {
-            try? fm.removeItem(at: activeURL)
+            try? fm.removeItem(at: location.activeURL)
             return false
         }
 
         text.replaceSubrange(range, with: restored)
         do {
-            try text.write(toFile: configPath, atomically: true, encoding: .utf8)
-            try? fm.removeItem(at: backupURL)
-            try? fm.removeItem(at: activeURL)
+            try text.write(to: location.configURL, atomically: true, encoding: .utf8)
+            try? fm.removeItem(at: location.backupURL)
+            try? fm.removeItem(at: location.activeURL)
             if reload {
                 reloadAerospace()
             }
@@ -148,6 +136,11 @@ final class GapBoost {
     }
 
     private func reloadAerospace() {
+        if let reloadHandler {
+            reloadHandler()
+            return
+        }
+
         let process = Process()
         process.executableURL = AerospaceClient.binaryURL
         process.arguments = ["reload-config"]
