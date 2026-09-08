@@ -1,5 +1,52 @@
 import AppKit
 
+struct TabStripLayout {
+    let bounds: CGRect
+    let count: Int
+    let inset: CGFloat
+    let gap: CGFloat
+    let tabWidth: CGFloat
+    let verticalPadding: CGFloat
+
+    init(bounds: CGRect, count: Int) {
+        self.bounds = bounds
+        self.count = max(0, count)
+
+        let slotCount = max(count, 1)
+        let stripWidth = max(0, bounds.width)
+        let stripHeight = max(0, bounds.height)
+        inset = min(6, stripWidth * 0.05)
+
+        let contentWidth = max(0, stripWidth - inset * 2)
+        gap = slotCount > 1
+            ? min(4, contentWidth / CGFloat(slotCount * 4))
+            : 0
+        let available = max(0, contentWidth - gap * CGFloat(slotCount - 1))
+        tabWidth = min(260, available / CGFloat(slotCount))
+        verticalPadding = min(4, stripHeight * 0.25)
+    }
+
+    var frames: [CGRect] {
+        var x = bounds.minX + inset
+        let rightEdge = bounds.maxX - inset
+        let height = max(0, bounds.height - verticalPadding * 2)
+        var result: [CGRect] = []
+        result.reserveCapacity(count)
+
+        for _ in 0..<count {
+            let width = min(tabWidth, max(0, rightEdge - x))
+            result.append(CGRect(
+                x: x,
+                y: bounds.minY + verticalPadding,
+                width: width,
+                height: height
+            ))
+            x += tabWidth + gap
+        }
+        return result
+    }
+}
+
 final class TabStrip {
     private let panel: NSPanel
     private let glass: NSVisualEffectView
@@ -132,6 +179,7 @@ final class TabStripView: NSView {
         if self.windows == windows && self.focused == focused { return }
         self.windows = windows
         self.focused = focused
+        recomputeFrames()
         needsDisplay = true
     }
 
@@ -161,6 +209,10 @@ final class TabStripView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
+        beginPress(at: point)
+    }
+
+    func beginPress(at point: CGPoint) {
         guard let index = index(at: point) else {
             pressIndex = nil
             return
@@ -174,8 +226,12 @@ final class TabStripView: NSView {
     }
 
     override func mouseDragged(with event: NSEvent) {
-        guard let from = pressIndex else { return }
         let point = convert(event.locationInWindow, from: nil)
+        continuePress(to: point)
+    }
+
+    func continuePress(to point: CGPoint) {
+        guard let from = pressIndex else { return }
 
         if !dragging {
             let dx = abs(point.x - pressPoint.x)
@@ -187,13 +243,17 @@ final class TabStripView: NSView {
         }
 
         guard let dragIndex else { return }
-        let m = layoutMetrics()
-        let minX = m.inset
-        let maxX = max(minX, bounds.width - m.inset - m.width)
+        let layout = tabLayout()
+        let m = (inset: layout.inset, gap: layout.gap, width: layout.tabWidth)
+        let minX = bounds.minX + m.inset
+        let maxX = max(minX, bounds.maxX - m.inset - m.width)
         dragX = min(max(point.x - dragOffsetX, minX), maxX)
 
         let centerX = dragX + m.width / 2
-        let slot = Int(((centerX - m.inset) / (m.width + m.gap)).rounded(.down))
+        let slotWidth = m.width + m.gap
+        let slot = slotWidth > 0
+            ? Int(((centerX - minX) / slotWidth).rounded(.down))
+            : dragIndex
         let target = min(max(slot, 0), windows.count - 1)
         if target != dragIndex {
             var next = windows
@@ -208,6 +268,11 @@ final class TabStripView: NSView {
     }
 
     override func mouseUp(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        endPress(at: point)
+    }
+
+    func endPress(at point: CGPoint) {
         defer {
             pressIndex = nil
             dragging = false
@@ -220,7 +285,6 @@ final class TabStripView: NSView {
             return
         }
 
-        let point = convert(event.locationInWindow, from: nil)
         if let index = index(at: point) ?? pressIndex, windows.indices.contains(index) {
             onPick?(windows[index].id)
         }
@@ -271,31 +335,12 @@ final class TabStripView: NSView {
         frames.firstIndex(where: { $0.contains(point) })
     }
 
-    private func layoutMetrics() -> (inset: CGFloat, gap: CGFloat, width: CGFloat, vPad: CGFloat) {
-        let count = max(windows.count, 1)
-        let inset: CGFloat = 6
-        let gap: CGFloat = 4
-        let vPad: CGFloat = 4
-        let available = bounds.width - inset * 2 - gap * CGFloat(max(count - 1, 0))
-        let width = max(80, min(260, floor(available / CGFloat(count))))
-        return (inset, gap, width, vPad)
+    private func tabLayout() -> TabStripLayout {
+        TabStripLayout(bounds: bounds, count: windows.count)
     }
 
     private func recomputeFrames() {
-        let m = layoutMetrics()
-        var x = m.inset
-        var next: [CGRect] = []
-        next.reserveCapacity(windows.count)
-        for _ in windows {
-            next.append(NSRect(
-                x: x,
-                y: m.vPad,
-                width: m.width,
-                height: max(18, bounds.height - m.vPad * 2)
-            ))
-            x += m.width + m.gap
-        }
-        frames = next
+        frames = tabLayout().frames
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -357,10 +402,11 @@ final class TabStripView: NSView {
         stroke.lineWidth = 1
         stroke.stroke()
 
-        let iconSize: CGFloat = 14
+        let sidePad = min(10, max(0, rect.width * 0.15))
+        let contentWidth = max(0, rect.width - sidePad * 2)
+        let iconSize = min(14, contentWidth)
         let fontSize: CGFloat = 12
-        let gap: CGFloat = 6
-        let sidePad: CGFloat = 10
+        let gap = min(6, max(0, contentWidth - iconSize))
         let font = NSFont.systemFont(ofSize: fontSize, weight: selected || elevating ? .medium : .regular)
         let color = selected || elevating
             ? NSColor.white
@@ -389,7 +435,9 @@ final class TabStripView: NSView {
             width: iconSize,
             height: iconSize
         )
-        Icons.shared.icon(for: win).draw(in: iconRect)
+        if iconSize >= 2 {
+            Icons.shared.icon(for: win).draw(in: iconRect)
+        }
 
         let textRect = NSRect(
             x: iconRect.maxX + gap,
@@ -397,6 +445,8 @@ final class TabStripView: NSView {
             width: maxTextWidth,
             height: textSize.height
         )
-        label.draw(in: textRect, withAttributes: attrs)
+        if maxTextWidth >= 2 {
+            label.draw(in: textRect, withAttributes: attrs)
+        }
     }
 }
