@@ -85,7 +85,7 @@ final class GapsConfig {
         }
     }
 
-    private static func parse(_ text: String) -> (top: GapValue, left: GapValue, right: GapValue)? {
+    static func parse(_ text: String) -> (top: GapValue, left: GapValue, right: GapValue)? {
         // Prefer the [gaps] table body; fall back to whole file.
         let body: String
         if let range = text.range(of: #"\[gaps\]"#, options: .regularExpression) {
@@ -122,17 +122,12 @@ final class GapsConfig {
         guard let startLine else { return nil }
         var block = ""
         for i in startLine..<lines.count {
-            let line = String(lines[i])
+            let line = AerospaceConfigSyntax.strippingInlineComment(from: String(lines[i]))
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if i > startLine, trimmed.hasPrefix("outer.") || trimmed.hasPrefix("inner.") || trimmed.hasPrefix("[") {
                 break
             }
-            // Drop end-of-line comments carefully for simple cases.
-            if let hash = trimmed.firstIndex(of: "#"), !trimmed.contains("\"") {
-                block += String(trimmed[..<hash]) + "\n"
-            } else {
-                block += trimmed + "\n"
-            }
+            block += trimmed + "\n"
             if trimmed.hasSuffix("]") || (i == startLine && trimmed.contains("=") && !trimmed.contains("[")) {
                 // Constant form on one line, or finished array.
                 if !trimmed.contains("[") || trimmed.hasSuffix("]") { break }

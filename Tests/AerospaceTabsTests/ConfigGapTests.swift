@@ -44,6 +44,23 @@ final class ConfigGapTests: XCTestCase {
         XCTAssertTrue(shifted.contains("38, # keep 99 in this comment"))
     }
 
+    func testGapParserIgnoresCommentNumbersButKeepsHashesInsideQuotes() throws {
+        let text = #"""
+        [gaps]
+        outer.top = [
+            { monitor."Studio #2" = 12 },
+            20, # 999 must not become the fallback
+        ]
+        outer.left = 8
+        outer.right = 9
+        """#
+
+        let parsed = try XCTUnwrap(GapsConfig.parse(text))
+
+        XCTAssertEqual(parsed.top.resolve(monitorName: "Studio #2"), 12)
+        XCTAssertEqual(parsed.top.resolve(monitorName: "Other"), 20)
+    }
+
     func testBoostWritesResolvedTargetWithoutReplacingSymlink() throws {
         let fixture = try Fixture(useSymlink: true)
         defer { fixture.remove() }
