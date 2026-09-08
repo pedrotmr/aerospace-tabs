@@ -61,6 +61,28 @@ final class ConfigGapTests: XCTestCase {
         XCTAssertEqual(parsed.top.resolve(monitorName: "Other"), 20)
     }
 
+    func testReloadDoesNotWaitForChildProcessExit() throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        try "[gaps]\nouter.top = 10\n".write(
+            to: fixture.target,
+            atomically: true,
+            encoding: .utf8
+        )
+        let executable = fixture.root.appendingPathComponent("slow-reload")
+        try "#!/bin/sh\nsleep 1\n".write(to: executable, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: executable.path
+        )
+        let boost = GapBoost(locator: fixture.locator, reloadExecutableURL: executable)
+        let startedAt = Date()
+
+        boost.sync(shouldBoost: true)
+
+        XCTAssertLessThan(Date().timeIntervalSince(startedAt), 0.5)
+    }
+
     func testBoostWritesResolvedTargetWithoutReplacingSymlink() throws {
         let fixture = try Fixture(useSymlink: true)
         defer { fixture.remove() }

@@ -15,13 +15,17 @@ final class GapBoost {
     private let queue = DispatchQueue(label: "aerospace-tabs.gap-boost")
     private let locator: AerospaceConfigLocator
     private let reloadHandler: (() -> Void)?
+    private let reloadExecutableURL: URL?
+    private var reloadProcesses: [Process] = []
 
     init(
         locator: AerospaceConfigLocator = .shared,
-        reloadHandler: (() -> Void)? = nil
+        reloadHandler: (() -> Void)? = nil,
+        reloadExecutableURL: URL? = nil
     ) {
         self.locator = locator
         self.reloadHandler = reloadHandler
+        self.reloadExecutableURL = reloadExecutableURL
     }
 
     /// Undo any leftover boost from a previous crash, then wait for `sync`.
@@ -142,12 +146,22 @@ final class GapBoost {
         }
 
         let process = Process()
-        process.executableURL = AerospaceClient.binaryURL
+        process.executableURL = reloadExecutableURL ?? AerospaceClient.binaryURL
         process.arguments = ["reload-config"]
-        process.standardOutput = Pipe()
-        process.standardError = Pipe()
-        try? process.run()
-        process.waitUntilExit()
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        process.terminationHandler = { [weak self, weak process] _ in
+            guard let self, let process else { return }
+            self.queue.async {
+                self.reloadProcesses.removeAll { $0 === process }
+            }
+        }
+        do {
+            try process.run()
+            reloadProcesses.append(process)
+        } catch {
+            NSLog("AerospaceTabs could not reload the AeroSpace config: %@", error.localizedDescription)
+        }
     }
 
     static func outerTopBlockRange(in text: String) -> Range<String.Index>? {
