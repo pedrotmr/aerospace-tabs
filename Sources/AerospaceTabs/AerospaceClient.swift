@@ -148,27 +148,49 @@ final class AerospaceClient {
         }
     }
 
-    private func posix(_ op: String) -> NSError {
-        NSError(domain: NSPOSIXErrorDomain, code: Int(errno), userInfo: [
-            NSLocalizedDescriptionKey: "\(op) failed",
-        ])
+    private func posix(_ op: String, code: Int32 = errno) -> NSError {
+        makePOSIXError(op, code: code)
     }
+}
+
+enum AerospaceSocketIOError: Error, Equatable {
+    case unexpectedEOF(expected: Int, received: Int)
 }
 
 private func writeAll(_ fd: Int32, _ buffer: UnsafeRawBufferPointer) throws {
     var written = 0
     while written < buffer.count {
         let n = Darwin.write(fd, buffer.baseAddress!.advanced(by: written), buffer.count - written)
-        if n <= 0 { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
-        written += n
+        if n > 0 {
+            written += n
+            continue
+        }
+        if n == 0 {
+            throw makePOSIXError("write", code: EPIPE)
+        }
+        if errno == EINTR { continue }
+        throw makePOSIXError("write", code: errno)
     }
 }
 
-private func readExact(_ fd: Int32, _ buffer: UnsafeMutableRawBufferPointer) throws {
+func readExact(_ fd: Int32, _ buffer: UnsafeMutableRawBufferPointer) throws {
     var readCount = 0
     while readCount < buffer.count {
         let n = Darwin.read(fd, buffer.baseAddress!.advanced(by: readCount), buffer.count - readCount)
-        if n <= 0 { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
-        readCount += n
+        if n > 0 {
+            readCount += n
+            continue
+        }
+        if n == 0 {
+            throw AerospaceSocketIOError.unexpectedEOF(expected: buffer.count, received: readCount)
+        }
+        if errno == EINTR { continue }
+        throw makePOSIXError("read", code: errno)
     }
+}
+
+private func makePOSIXError(_ operation: String, code: Int32) -> NSError {
+    NSError(domain: NSPOSIXErrorDomain, code: Int(code), userInfo: [
+        NSLocalizedDescriptionKey: "\(operation) failed: \(String(cString: strerror(code)))",
+    ])
 }
