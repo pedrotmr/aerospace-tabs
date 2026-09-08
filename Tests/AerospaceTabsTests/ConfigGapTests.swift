@@ -163,6 +163,32 @@ final class ConfigGapTests: XCTestCase {
         XCTAssertEqual(fixture.locator.location().configURL, fixture.target.standardizedFileURL)
     }
 
+    func testBackupAlonePinsAndRestoresOriginalSymlinkTarget() throws {
+        let fixture = try Fixture(useSymlink: true)
+        defer { fixture.remove() }
+        let original = "gaps.outer.top = 10\n"
+        let otherTarget = fixture.root.appendingPathComponent("other.toml")
+        try original.write(to: fixture.target, atomically: true, encoding: .utf8)
+        try "gaps.outer.top = 1\n".write(to: otherTarget, atomically: true, encoding: .utf8)
+        let boost = GapBoost(locator: fixture.locator, reloadHandler: {})
+        boost.sync(shouldBoost: true)
+        let boostedLocation = fixture.locator.location()
+        // Simulate a verified restore followed by a crash after marker cleanup.
+        try original.write(to: fixture.target, atomically: true, encoding: .utf8)
+        try FileManager.default.removeItem(at: boostedLocation.activeURL)
+        try FileManager.default.removeItem(at: fixture.candidate)
+        try FileManager.default.createSymbolicLink(at: fixture.candidate, withDestinationURL: otherTarget)
+
+        XCTAssertEqual(fixture.locator.location().configURL, fixture.target.standardizedFileURL)
+        XCTAssertTrue(boost.restoreIfNeeded(reload: false))
+        XCTAssertEqual(try String(contentsOf: fixture.target, encoding: .utf8), original)
+        XCTAssertEqual(
+            try String(contentsOf: otherTarget, encoding: .utf8),
+            "gaps.outer.top = 1\n"
+        )
+        XCTAssertFalse(FileManager.default.fileExists(atPath: boostedLocation.backupURL.path))
+    }
+
     func testLocatorRefreshesCandidatesButKeepsRecoveryLocationSelected() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("AerospaceTabsTests-\(UUID().uuidString)", isDirectory: true)

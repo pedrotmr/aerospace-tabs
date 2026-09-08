@@ -69,7 +69,11 @@ final class GapBoost {
         else { return }
 
         let original = String(text[range])
-        guard writeVerified(original, to: location.backupURL) else { return }
+        let backup = AerospaceGapBackup(
+            configURL: location.configURL,
+            originalBlock: original
+        )
+        guard writeVerified(backup.serialized, to: location.backupURL) else { return }
 
         // Persist the resolved target before changing it. Recovery remains tied
         // to this file even if a higher-priority candidate appears or a symlink
@@ -97,7 +101,9 @@ final class GapBoost {
         let current = String(text[range])
         let restored: String
         if backupExists {
-            guard let backup = try? String(contentsOf: location.backupURL, encoding: .utf8) else {
+            guard let contents = try? String(contentsOf: location.backupURL, encoding: .utf8),
+                  let backup = AerospaceGapBackup.originalBlock(from: contents)
+            else {
                 return false
             }
 
@@ -144,8 +150,8 @@ final class GapBoost {
     private func finishRecovery(at location: AerospaceConfigLocation, reload: Bool) {
         let fm = FileManager.default
         do {
-            // Remove the marker first. If that fails, retain the backup so a
-            // later recovery can recognize an already-restored config safely.
+            // The backup carries the resolved target, so it remains safe if a
+            // crash happens after marker removal but before backup removal.
             if fm.fileExists(atPath: location.activeURL.path) {
                 try fm.removeItem(at: location.activeURL)
             }

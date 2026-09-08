@@ -1,5 +1,37 @@
 import Foundation
 
+struct AerospaceGapBackup: Equatable {
+    private static let header = "AEROSPACE_TABS_GAP_BACKUP_V2\n"
+
+    let configURL: URL
+    let originalBlock: String
+
+    var serialized: String {
+        let encodedPath = Data(configURL.path.utf8).base64EncodedString()
+        return Self.header + encodedPath + "\n" + originalBlock
+    }
+
+    static func decode(_ contents: String) -> AerospaceGapBackup? {
+        guard contents.hasPrefix(header) else { return nil }
+        let remainder = contents.dropFirst(header.count)
+        guard let newline = remainder.firstIndex(of: "\n"),
+              let pathData = Data(base64Encoded: String(remainder[..<newline])),
+              let path = String(data: pathData, encoding: .utf8),
+              path.hasPrefix("/")
+        else { return nil }
+
+        return AerospaceGapBackup(
+            configURL: URL(fileURLWithPath: path).standardizedFileURL,
+            originalBlock: String(remainder[remainder.index(after: newline)...])
+        )
+    }
+
+    static func originalBlock(from contents: String) -> String? {
+        guard contents.hasPrefix(header) else { return contents }
+        return decode(contents)?.originalBlock
+    }
+}
+
 struct AerospaceConfigLocation: Equatable {
     let candidateURL: URL
     let configURL: URL
@@ -20,6 +52,14 @@ struct AerospaceConfigLocation: Equatable {
     }
 
     func pinnedForRecovery() -> AerospaceConfigLocation {
+        if let contents = try? String(contentsOf: backupURL, encoding: .utf8),
+           let backup = AerospaceGapBackup.decode(contents)
+        {
+            return AerospaceConfigLocation(
+                candidateURL: candidateURL,
+                configURL: backup.configURL
+            )
+        }
         guard let marker = try? String(contentsOf: activeURL, encoding: .utf8) else {
             return self
         }
