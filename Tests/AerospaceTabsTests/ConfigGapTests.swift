@@ -3,6 +3,19 @@ import XCTest
 @testable import AerospaceTabs
 
 final class ConfigGapTests: XCTestCase {
+    func testUnterminatedOuterTopArrayHasNoRange() {
+        let text = """
+        [gaps]
+        outer.top = [
+            { monitor.main = 20 },
+
+        [mode.main.binding]
+        1 = "workspace 1"
+        """
+
+        XCTAssertNil(GapBoost.outerTopBlockRange(in: text))
+    }
+
     func testOuterTopRangeSupportsDottedAssignmentAndExactKeyMatching() {
         let text = """
         gaps.outer.topology = 99

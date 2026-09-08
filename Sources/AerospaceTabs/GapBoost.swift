@@ -162,12 +162,26 @@ final class GapBoost {
         guard let start else { return nil }
 
         var end = start
-        let head = lines[start].trimmingCharacters(in: .whitespaces)
-        if head.contains("[") {
+        let head = String(lines[start])
+        if AerospaceConfigSyntax.containsUnquoted("[", in: head) {
+            var foundClosingBracket = false
+            var bracketDepth = 0
             for i in start..<lines.count {
                 end = i
-                if lines[i].trimmingCharacters(in: .whitespaces).contains("]") { break }
+                for character in AerospaceConfigSyntax.charactersOutsideQuotes(in: String(lines[i])) {
+                    if character == "[" {
+                        bracketDepth += 1
+                    } else if character == "]" {
+                        bracketDepth -= 1
+                        if bracketDepth == 0 {
+                            foundClosingBracket = true
+                            break
+                        }
+                    }
+                }
+                if foundClosingBracket { break }
             }
+            guard foundClosingBracket else { return nil }
         }
 
         var offset = 0
