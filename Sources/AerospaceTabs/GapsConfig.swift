@@ -115,12 +115,8 @@ final class GapsConfig {
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
         var startLine: Int?
         for (i, raw) in lines.enumerated() {
-            let line = raw.trimmingCharacters(in: .whitespaces)
-            if line.hasPrefix("#") { continue }
-            if line.hasPrefix("\(key)") || line.hasPrefix("gaps.\(key)") {
-                if line.contains("=") {
-                    startLine = i
-                }
+            if AerospaceConfigSyntax.isAssignment(String(raw), key: key) {
+                startLine = i
             }
         }
         guard let startLine else { return nil }

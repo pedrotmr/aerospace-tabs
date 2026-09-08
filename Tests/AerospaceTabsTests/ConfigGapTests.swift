@@ -3,6 +3,18 @@ import XCTest
 @testable import AerospaceTabs
 
 final class ConfigGapTests: XCTestCase {
+    func testOuterTopRangeSupportsDottedAssignmentAndExactKeyMatching() {
+        let text = """
+        gaps.outer.topology = 99
+        gaps.outer.top = 20
+        """
+
+        let range = GapBoost.outerTopBlockRange(in: text)
+
+        XCTAssertNotNil(range)
+        XCTAssertTrue(range.map { text[$0].hasPrefix("gaps.outer.top = 20") } == true)
+    }
+
     func testBoostWritesResolvedTargetWithoutReplacingSymlink() throws {
         let fixture = try Fixture(useSymlink: true)
         defer { fixture.remove() }

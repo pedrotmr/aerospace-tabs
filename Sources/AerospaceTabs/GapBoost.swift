@@ -154,9 +154,7 @@ final class GapBoost {
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
         var start: Int?
         for (i, raw) in lines.enumerated() {
-            let line = raw.trimmingCharacters(in: .whitespaces)
-            if line.hasPrefix("#") { continue }
-            if line.hasPrefix("outer.top"), line.contains("=") {
+            if AerospaceConfigSyntax.isAssignment(String(raw), key: "outer.top") {
                 start = i
                 break
             }
