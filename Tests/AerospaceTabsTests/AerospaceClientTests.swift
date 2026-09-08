@@ -48,6 +48,25 @@ final class AerospaceClientTests: XCTestCase {
         XCTAssertTrue(sendTimeout.tv_sec > 0 || sendTimeout.tv_usec > 0)
     }
 
+    func testValidatedFrameLengthRejectsOversizedPayloadBeforeAllocation() throws {
+        let accepted = UInt32(AerospaceClient.maximumFrameSize).littleEndian
+        XCTAssertEqual(
+            try AerospaceClient.validatedFrameLength(accepted),
+            AerospaceClient.maximumFrameSize
+        )
+
+        let oversized = UInt32(AerospaceClient.maximumFrameSize + 1).littleEndian
+        XCTAssertThrowsError(try AerospaceClient.validatedFrameLength(oversized)) { error in
+            XCTAssertEqual(
+                error as? AerospaceProtocolError,
+                .frameTooLarge(
+                    length: AerospaceClient.maximumFrameSize + 1,
+                    maximum: AerospaceClient.maximumFrameSize
+                )
+            )
+        }
+    }
+
     func testReadExactReportsEOFWithPartialByteCount() throws {
         let sockets = try makeSocketPair()
         defer { Darwin.close(sockets.reader) }

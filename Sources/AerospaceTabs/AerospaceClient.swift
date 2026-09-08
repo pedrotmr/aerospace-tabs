@@ -2,6 +2,10 @@ import Darwin
 import Foundation
 
 final class AerospaceClient {
+    /// AeroSpace replies are small JSON documents. This generous ceiling prevents a
+    /// corrupt or malicious length prefix from causing an unbounded allocation.
+    static let maximumFrameSize = 8 * 1024 * 1024
+
     private static let socketTimeout: TimeInterval = 2
 
     static var binaryURL: URL {
@@ -247,12 +251,20 @@ final class AerospaceClient {
     }
 
     private func readFrame() throws -> Data {
-        var length: UInt32 = 0
-        try withUnsafeMutableBytes(of: &length) { try readExact(fd, $0) }
-        length = UInt32(littleEndian: length)
-        var payload = Data(count: Int(length))
+        var wireLength: UInt32 = 0
+        try withUnsafeMutableBytes(of: &wireLength) { try readExact(fd, $0) }
+        let length = try Self.validatedFrameLength(wireLength)
+        var payload = Data(count: length)
         try payload.withUnsafeMutableBytes { try readExact(fd, $0) }
         return payload
+    }
+
+    static func validatedFrameLength(_ wireLength: UInt32) throws -> Int {
+        let length = Int(UInt32(littleEndian: wireLength))
+        guard length <= maximumFrameSize else {
+            throw AerospaceProtocolError.frameTooLarge(length: length, maximum: maximumFrameSize)
+        }
+        return length
     }
 
     private func close() {
@@ -265,6 +277,10 @@ final class AerospaceClient {
     private func posix(_ op: String, code: Int32 = errno) -> NSError {
         makePOSIXError(op, code: code)
     }
+}
+
+enum AerospaceProtocolError: Error, Equatable {
+    case frameTooLarge(length: Int, maximum: Int)
 }
 
 enum AerospaceSocketIOError: Error, Equatable {
