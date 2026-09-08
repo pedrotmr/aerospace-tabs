@@ -133,6 +133,29 @@ final class ConfigGapTests: XCTestCase {
         XCTAssertEqual(locator.location().candidateURL, fallback)
     }
 
+    func testTransientReadFailureDoesNotSuppressRetryAtSameMtime() throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        try "[gaps]\nouter.top = 10\n".write(
+            to: fixture.target,
+            atomically: true,
+            encoding: .utf8
+        )
+        var attempts = 0
+        let config = GapsConfig(locator: fixture.locator) { url in
+            attempts += 1
+            if attempts == 1 {
+                throw CocoaError(.fileReadUnknown)
+            }
+            return try String(contentsOf: url, encoding: .utf8)
+        }
+
+        config.reload(force: false)
+        config.reload(force: false)
+
+        XCTAssertEqual(attempts, 2)
+    }
+
 }
 
 private final class Fixture {

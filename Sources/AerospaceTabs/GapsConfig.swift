@@ -14,6 +14,7 @@ final class GapsConfig {
     static let shared = GapsConfig()
 
     private let locator: AerospaceConfigLocator
+    private let readText: (URL) throws -> String
     private var loadedConfigURL: URL?
     private var mtime: Date?
     private var top = GapValue.constant(28)
@@ -21,8 +22,14 @@ final class GapsConfig {
     private var right = GapValue.constant(20)
     private var timer: Timer?
 
-    init(locator: AerospaceConfigLocator = .shared) {
+    init(
+        locator: AerospaceConfigLocator = .shared,
+        readText: @escaping (URL) throws -> String = {
+            try String(contentsOf: $0, encoding: .utf8)
+        }
+    ) {
         self.locator = locator
+        self.readText = readText
     }
 
     enum GapValue {
@@ -73,14 +80,14 @@ final class GapsConfig {
         let values = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))
         let newMtime = values?.contentModificationDate
         if !force, url == loadedConfigURL, newMtime == mtime { return }
-        loadedConfigURL = url
-        mtime = newMtime
 
-        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return }
+        guard let text = try? readText(url) else { return }
         if let parsed = Self.parse(text) {
             top = parsed.top
             left = parsed.left
             right = parsed.right
+            loadedConfigURL = url
+            mtime = newMtime
             NotificationCenter.default.post(name: .aerospaceGapsDidChange, object: nil)
         }
     }
