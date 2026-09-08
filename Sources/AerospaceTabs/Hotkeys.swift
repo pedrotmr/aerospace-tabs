@@ -20,9 +20,23 @@ final class Hotkeys {
     private var lastStep = Date()
     private var didRepeatStep = false
     private var installed = false
+    private let scheduleFailurePresentation: (@escaping () -> Void) -> Void
+    private let presentInstallationFailure: (HotkeyInstallationError) -> Void
 
     private let initialRepeatDelay: TimeInterval = 0.35
     private let repeatInterval: TimeInterval = 0.09
+
+    init(
+        scheduleFailurePresentation: @escaping (@escaping () -> Void) -> Void = { action in
+            DispatchQueue.main.async(execute: action)
+        },
+        presentInstallationFailure: @escaping (HotkeyInstallationError) -> Void = { error in
+            Hotkeys.showInstallationFailure(error)
+        }
+    ) {
+        self.scheduleFailurePresentation = scheduleFailurePresentation
+        self.presentInstallationFailure = presentInstallationFailure
+    }
 
     func install() {
         guard !installed else { return }
@@ -129,8 +143,14 @@ final class Hotkeys {
         installed = false
     }
 
-    private func reportInstallationFailure(_ error: HotkeyInstallationError) {
+    func reportInstallationFailure(_ error: HotkeyInstallationError) {
         NSLog("AerospaceTabs hotkey installation failed: %@", error.localizedDescription)
+        scheduleFailurePresentation { [presentInstallationFailure] in
+            presentInstallationFailure(error)
+        }
+    }
+
+    private static func showInstallationFailure(_ error: HotkeyInstallationError) {
         let alert = NSAlert()
         alert.alertStyle = .critical
         alert.messageText = "AerospaceTabs keyboard shortcuts are unavailable"
