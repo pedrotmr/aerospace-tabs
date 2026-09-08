@@ -19,16 +19,19 @@ final class Hotkeys {
     private var holdStarted = Date()
     private var lastStep = Date()
     private var didRepeatStep = false
+    private var installed = false
 
     private let initialRepeatDelay: TimeInterval = 0.35
     private let repeatInterval: TimeInterval = 0.09
 
     func install() {
+        guard !installed else { return }
         promptAccessibilityIfNeeded()
 
         var pressed = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
         let userData = Unmanaged.passUnretained(self).toOpaque()
-        InstallEventHandler(GetApplicationEventTarget(), { _, event, userData in
+        var installedHandler: EventHandlerRef?
+        let handlerStatus = InstallEventHandler(GetApplicationEventTarget(), { _, event, userData in
             guard let userData, let event else { return noErr }
             let hotkeys = Unmanaged<Hotkeys>.fromOpaque(userData).takeUnretainedValue()
             var id = EventHotKeyID()
@@ -46,19 +49,55 @@ final class Hotkeys {
                 hotkeys.handleStep(reverse: id.id == 2)
             }
             return noErr
-        }, 1, &pressed, userData, &handler)
+        }, 1, &pressed, userData, &installedHandler)
+        guard handlerStatus == noErr, let installedHandler else {
+            if let installedHandler {
+                RemoveEventHandler(installedHandler)
+            }
+            reportInstallationFailure(.eventHandler(status: handlerStatus))
+            return
+        }
+        handler = installedHandler
 
         let nextID = EventHotKeyID(signature: OSType(0x41544142), id: 1)
         let prevID = EventHotKeyID(signature: OSType(0x41544142), id: 2)
-        RegisterEventHotKey(UInt32(kVK_Tab), UInt32(optionKey), nextID, GetApplicationEventTarget(), 0, &nextRef)
-        RegisterEventHotKey(
+        var registeredNext: EventHotKeyRef?
+        let nextStatus = RegisterEventHotKey(
+            UInt32(kVK_Tab),
+            UInt32(optionKey),
+            nextID,
+            GetApplicationEventTarget(),
+            0,
+            &registeredNext
+        )
+        guard nextStatus == noErr, let registeredNext else {
+            if let registeredNext {
+                UnregisterEventHotKey(registeredNext)
+            }
+            removeCarbonRegistrations()
+            reportInstallationFailure(.forwardHotKey(status: nextStatus))
+            return
+        }
+        nextRef = registeredNext
+
+        var registeredPrevious: EventHotKeyRef?
+        let previousStatus = RegisterEventHotKey(
             UInt32(kVK_ANSI_Grave),
             UInt32(optionKey),
             prevID,
             GetApplicationEventTarget(),
             0,
-            &prevRef
+            &registeredPrevious
         )
+        guard previousStatus == noErr, let registeredPrevious else {
+            if let registeredPrevious {
+                UnregisterEventHotKey(registeredPrevious)
+            }
+            removeCarbonRegistrations()
+            reportInstallationFailure(.reverseHotKey(status: previousStatus))
+            return
+        }
+        prevRef = registeredPrevious
 
         flagsMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
             if !event.modifierFlags.contains(.option) {
@@ -71,6 +110,34 @@ final class Hotkeys {
             }
             return event
         }
+        installed = true
+    }
+
+    private func removeCarbonRegistrations() {
+        if let prevRef {
+            UnregisterEventHotKey(prevRef)
+            self.prevRef = nil
+        }
+        if let nextRef {
+            UnregisterEventHotKey(nextRef)
+            self.nextRef = nil
+        }
+        if let handler {
+            RemoveEventHandler(handler)
+            self.handler = nil
+        }
+        installed = false
+    }
+
+    private func reportInstallationFailure(_ error: HotkeyInstallationError) {
+        NSLog("AerospaceTabs hotkey installation failed: %@", error.localizedDescription)
+        let alert = NSAlert()
+        alert.alertStyle = .critical
+        alert.messageText = "AerospaceTabs keyboard shortcuts are unavailable"
+        alert.informativeText = "\(error.localizedDescription) The app will keep running without global shortcuts."
+        alert.addButton(withTitle: "OK")
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
     }
 
     private func handleStep(reverse: Bool) {
@@ -138,5 +205,22 @@ final class Hotkeys {
     private func promptAccessibilityIfNeeded() {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)
+    }
+}
+
+enum HotkeyInstallationError: LocalizedError, Equatable {
+    case eventHandler(status: OSStatus)
+    case forwardHotKey(status: OSStatus)
+    case reverseHotKey(status: OSStatus)
+
+    var errorDescription: String? {
+        switch self {
+        case .eventHandler(let status):
+            return "Could not install the keyboard event handler (OSStatus \(status))."
+        case .forwardHotKey(let status):
+            return "Could not register Option-Tab (OSStatus \(status))."
+        case .reverseHotKey(let status):
+            return "Could not register Option-Backtick (OSStatus \(status))."
+        }
     }
 }
