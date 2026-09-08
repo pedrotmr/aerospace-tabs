@@ -116,6 +116,7 @@ final class TabStrip {
 
     func setHidden(_ hidden: Bool) {
         if hidden {
+            view.cancelInteraction()
             panel.alphaValue = 0
             panel.ignoresMouseEvents = true
             panel.orderOut(nil)
@@ -283,6 +284,11 @@ final class TabStripView: NSView {
     }
 
     func endPress(at point: CGPoint) {
+        guard pressIndex != nil else {
+            needsDisplay = true
+            return
+        }
+
         defer {
             pressIndex = nil
             dragging = false
@@ -303,6 +309,26 @@ final class TabStripView: NSView {
         if let index = index(at: point) ?? pressIndex, windows.indices.contains(index) {
             onPick?(windows[index].id)
         }
+    }
+
+    func cancelInteraction() {
+        guard pressIndex != nil || dragging || pendingModel != nil else { return }
+
+        let pendingModel = pendingModel
+        self.pendingModel = nil
+        pressIndex = nil
+        pressPoint = .zero
+        dragging = false
+        dragIndex = nil
+        draggedWindowID = nil
+        dragOffsetX = 0
+        dragX = 0
+        hover = nil
+
+        if let pendingModel {
+            apply(windows: pendingModel.windows, focused: pendingModel.focused)
+        }
+        needsDisplay = true
     }
 
     override func rightMouseDown(with event: NSEvent) {

@@ -92,6 +92,32 @@ final class TabStripTests: XCTestCase {
         XCTAssertEqual(picked, 2)
     }
 
+    func testCancelInteractionAppliesPendingModelAndDiscardsDrag() {
+        let view = makeView()
+        view.set(windows: [makeWindow(id: 1), makeWindow(id: 2)], focused: 1)
+        var reorderedIDs: [[Int]] = []
+        var pickedIDs: [Int] = []
+        view.onReorder = { ids, _ in reorderedIDs.append(ids) }
+        view.onPick = { pickedIDs.append($0) }
+        view.beginPress(at: CGPoint(x: 50, y: 17))
+        view.continuePress(to: CGPoint(x: 170, y: 17))
+        view.set(windows: [makeWindow(id: 3), makeWindow(id: 4)], focused: 3)
+
+        view.cancelInteraction()
+        view.endPress(at: CGPoint(x: 170, y: 17))
+
+        XCTAssertTrue(reorderedIDs.isEmpty)
+        XCTAssertTrue(pickedIDs.isEmpty)
+        view.beginPress(at: CGPoint(x: 50, y: 17))
+        view.endPress(at: CGPoint(x: 50, y: 17))
+        XCTAssertEqual(pickedIDs, [3])
+
+        view.set(windows: [makeWindow(id: 5), makeWindow(id: 6)], focused: 5)
+        view.beginPress(at: CGPoint(x: 50, y: 17))
+        view.endPress(at: CGPoint(x: 50, y: 17))
+        XCTAssertEqual(pickedIDs, [3, 5])
+    }
+
     func testDragFinalizationAlwaysRequestsRedraw() {
         let view = makeView()
         let window = NSWindow(
