@@ -1,6 +1,14 @@
 import AppKit
 import CoreGraphics
 
+struct MissionControlWindowInfo {
+    let owner: String
+    let name: String
+    let layer: Int
+    let width: CGFloat
+    let height: CGFloat
+}
+
 /// Hides overlays while Mission Control / App Exposé is up.
 ///
 /// Dock layer 20 alone is never Mission Control — macOS uses that same
@@ -50,42 +58,51 @@ final class MissionControlWatcher {
         }
 
         let screenSizes = NSScreen.screens.map(\.frame.size)
-        var dockExposeLayers: Set<Int> = []
-
-        for window in info {
-            let owner = window[kCGWindowOwnerName as String] as? String ?? ""
-            let name = window[kCGWindowName as String] as? String ?? ""
-            let layer = window[kCGWindowLayer as String] as? Int ?? 0
+        let windows = info.map { window in
             let bounds = window[kCGWindowBounds as String] as? [String: CGFloat] ?? [:]
-            let width = bounds["Width"] ?? 0
-            let height = bounds["Height"] ?? 0
+            return MissionControlWindowInfo(
+                owner: window[kCGWindowOwnerName as String] as? String ?? "",
+                name: window[kCGWindowName as String] as? String ?? "",
+                layer: window[kCGWindowLayer as String] as? Int ?? 0,
+                width: bounds["Width"] ?? 0,
+                height: bounds["Height"] ?? 0
+            )
+        }
+        return detect(windows: windows, screenSizes: screenSizes)
+    }
 
-            if owner == "Mission Control" || name == "Mission Control"
-                || name == "Window Switcher" || name == "App Exposé"
+    static func detect(windows: [MissionControlWindowInfo], screenSizes: [CGSize]) -> Bool {
+        var dockExposeLayers: Set<Int> = []
+        let activityNames: Set<String> = ["Mission Control", "Window Switcher", "App Exposé"]
+        let systemUIOwners: Set<String> = ["Dock", "WindowManager", "Mission Control"]
+
+        for window in windows {
+            if window.owner == "Mission Control"
+                || systemUIOwners.contains(window.owner) && activityNames.contains(window.name)
             {
                 return true
             }
 
             let coversScreen = screenSizes.contains { size in
-                width >= size.width * 0.95 && height >= size.height * 0.95
+                window.width >= size.width * 0.95 && window.height >= size.height * 0.95
             }
 
             // Newer macOS: exposé surface owned by WindowManager.
-            if owner == "WindowManager", (16...19).contains(layer), coversScreen {
+            if window.owner == "WindowManager", (16...19).contains(window.layer), coversScreen {
                 return true
             }
 
-            guard owner == "Dock", name.isEmpty else { continue }
+            guard window.owner == "Dock", window.name.isEmpty else { continue }
 
             // Fullscreen layer 18 is the exposé surface — not used by a normal Dock.
-            if layer == 18, coversScreen {
+            if window.layer == 18, coversScreen {
                 return true
             }
 
             // Collect Dock expose-ish layers; MC often shows 18 + 20 together.
             // Layer 20 alone (always-visible Dock or hover reveal) must not win.
-            if (18...20).contains(layer), coversScreen || height > 120 {
-                dockExposeLayers.insert(layer)
+            if (18...20).contains(window.layer), coversScreen || window.height > 120 {
+                dockExposeLayers.insert(window.layer)
             }
         }
 
