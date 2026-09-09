@@ -44,6 +44,20 @@ final class ConfigGapTests: XCTestCase {
         XCTAssertTrue(shifted.contains("38, # keep 99 in this comment"))
     }
 
+    func testShiftNumbersPreservesNumericMonitorKey() {
+        let block = """
+        outer.top = [
+            { monitor.2 = 10 },
+            20,
+        ]
+        """
+
+        let shifted = GapBoost.shiftNumbers(in: block, by: 34)
+
+        XCTAssertTrue(shifted.contains("monitor.2 = 44"))
+        XCTAssertFalse(shifted.contains("monitor.36"))
+    }
+
     func testGapParserIgnoresCommentNumbersButKeepsHashesInsideQuotes() throws {
         let text = #"""
         [gaps]

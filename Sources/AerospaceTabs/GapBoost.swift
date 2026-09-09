@@ -332,6 +332,10 @@ final class GapBoost {
     }
 
     private static func isIdentifierCharacter(_ character: Character) -> Bool {
-        character.isLetter || character.isNumber || character == "_" || character == "-"
+        character.isLetter
+            || character.isNumber
+            || character == "_"
+            || character == "-"
+            || character == "."
     }
 }
