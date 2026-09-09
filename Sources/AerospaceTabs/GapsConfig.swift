@@ -156,7 +156,7 @@ final class GapsConfig {
 
     private static func parseArray(_ rhs: String) -> GapValue? {
         var pairs: [(String, CGFloat)] = []
-        let pairPattern = #/\{\s*monitor\.(?:"([^"]+)"|([A-Za-z0-9_-]+))\s*=\s*([0-9][0-9_]*(?:\.[0-9][0-9_]*)?)\s*\}/#
+        let pairPattern = #/\{\s*monitor\.(?:"([^"]+)"|([A-Za-z0-9_-]+))\s*=\s*([+-]?[0-9](?:[0-9]|_[0-9])*(?:\.[0-9](?:[0-9]|_[0-9])*)?(?:[eE][+-]?[0-9](?:[0-9]|_[0-9])*)?)\s*\}/#
         var consumed = rhs
         for match in rhs.matches(of: pairPattern) {
             let name = String(match.1 ?? match.2 ?? "")
@@ -166,7 +166,7 @@ final class GapsConfig {
             consumed = consumed.replacingOccurrences(of: String(match.0), with: " ")
         }
         // Bare fallback number(s) left after removing monitor pairs.
-        let barePattern = #/[0-9][0-9_]*(?:\.[0-9][0-9_]*)?/#
+        let barePattern = #/[+-]?[0-9](?:[0-9]|_[0-9])*(?:\.[0-9](?:[0-9]|_[0-9])*)?(?:[eE][+-]?[0-9](?:[0-9]|_[0-9])*)?/#
         var fallback: CGFloat?
         for match in consumed.matches(of: barePattern) {
             if let value = AerospaceConfigSyntax.parseGapNumber(String(match.0)) {

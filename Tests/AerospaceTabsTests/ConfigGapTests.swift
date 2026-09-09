@@ -104,6 +104,37 @@ final class ConfigGapTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: fixture.target, encoding: .utf8), original)
     }
 
+    func testSignedAndExponentGapNumbersParseBoostAndRestore() throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let original = """
+        [gaps]
+        outer.top = [
+            { monitor.main = +1e2 },
+            2.5e1,
+        ]
+        outer.left = +1_0e0
+
+        """
+        try original.write(to: fixture.target, atomically: true, encoding: .utf8)
+        let parsed = try XCTUnwrap(GapsConfig.parse(original))
+
+        XCTAssertEqual(parsed.top.resolve(monitorName: "main"), 100)
+        XCTAssertEqual(parsed.top.resolve(monitorName: "other"), 25)
+        XCTAssertEqual(parsed.left.resolve(monitorName: "other"), 10)
+        XCTAssertNil(AerospaceConfigSyntax.parseGapNumber("1__0"))
+        XCTAssertNil(AerospaceConfigSyntax.parseGapNumber("1e_2"))
+
+        let boost = GapBoost(locator: fixture.locator, reloadHandler: {})
+        boost.sync(shouldBoost: true)
+        let boosted = try String(contentsOf: fixture.target, encoding: .utf8)
+        XCTAssertTrue(boosted.contains("monitor.main = 134"))
+        XCTAssertTrue(boosted.contains("59,"))
+
+        boost.sync(shouldBoost: false)
+        XCTAssertEqual(try String(contentsOf: fixture.target, encoding: .utf8), original)
+    }
+
     func testRestoreRecognizesAlreadyRestoredBlockAndOnlyCleansState() throws {
         let fixture = try Fixture()
         defer { fixture.remove() }

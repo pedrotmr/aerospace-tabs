@@ -128,35 +128,23 @@ final class AerospaceConfigLocator {
 
 enum AerospaceConfigSyntax {
     static func parseGapNumber(_ literal: String) -> Double? {
-        let components = literal.split(separator: ".", omittingEmptySubsequences: false)
-        guard !components.isEmpty, components.count <= 2 else { return nil }
-        for component in components {
-            guard let first = component.first,
-                  let last = component.last,
-                  isASCIIDigit(first),
-                  isASCIIDigit(last)
-            else { return nil }
-
-            var previousWasDigit = false
-            for character in component {
-                if character == "_" {
-                    guard previousWasDigit else { return nil }
-                    previousWasDigit = false
-                } else {
-                    guard isASCIIDigit(character) else { return nil }
-                    previousWasDigit = true
-                }
-            }
-        }
+        let pattern = #/^[+-]?[0-9](?:[0-9]|_[0-9])*(?:\.[0-9](?:[0-9]|_[0-9])*)?(?:[eE][+-]?[0-9](?:[0-9]|_[0-9])*)?$/#
+        guard literal.wholeMatch(of: pattern) != nil else { return nil }
         return Double(literal.replacingOccurrences(of: "_", with: ""))
     }
 
     static func isGapNumberCharacter(_ character: Character) -> Bool {
-        isASCIIDigit(character) || character == "." || character == "_"
+        isASCIIDigit(character)
+            || character == "."
+            || character == "_"
+            || character == "+"
+            || character == "-"
+            || character == "e"
+            || character == "E"
     }
 
     static func isGapNumberStart(_ character: Character) -> Bool {
-        isASCIIDigit(character) || character == "."
+        isASCIIDigit(character) || character == "." || character == "+" || character == "-"
     }
 
     private static func isASCIIDigit(_ character: Character) -> Bool {
