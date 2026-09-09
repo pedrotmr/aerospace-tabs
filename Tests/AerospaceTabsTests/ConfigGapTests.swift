@@ -135,6 +135,21 @@ final class ConfigGapTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: fixture.target, encoding: .utf8), original)
     }
 
+    func testInvalidMonitorValueDoesNotLeakIntoArrayFallback() throws {
+        let text = """
+        [gaps]
+        outer.top = [
+            20,
+            { monitor.2 = 1__0 },
+        ]
+        """
+
+        let parsed = try XCTUnwrap(GapsConfig.parse(text))
+
+        XCTAssertEqual(parsed.top.resolve(monitorName: "2"), 20)
+        XCTAssertEqual(parsed.top.resolve(monitorName: "other"), 20)
+    }
+
     func testRestoreRecognizesAlreadyRestoredBlockAndOnlyCleansState() throws {
         let fixture = try Fixture()
         defer { fixture.remove() }
