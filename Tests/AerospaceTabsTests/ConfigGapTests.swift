@@ -24,6 +24,18 @@ final class ConfigGapTests: XCTestCase {
             40
         )
         XCTAssertEqual(
+            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\n0\n"),
+            GapBoost.stripHeight
+        )
+        XCTAssertEqual(
+            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\n1\n"),
+            GapBoost.stripHeight
+        )
+        XCTAssertEqual(
+            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\n99999\n"),
+            GapBoost.stripHeight
+        )
+        XCTAssertEqual(
             GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\nnan\n"),
             GapBoost.stripHeight
         )

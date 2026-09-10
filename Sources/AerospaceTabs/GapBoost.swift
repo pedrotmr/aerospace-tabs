@@ -261,11 +261,10 @@ final class GapBoost {
             .split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
+        let allowed = [Double(stripHeight), Double(boostAmount)]
         if lines.count >= 2,
            let value = Double(lines[1]),
-           value.isFinite,
-           value >= 0,
-           value < Double(Int.max)
+           allowed.contains(value)
         {
             return CGFloat(value)
         }
