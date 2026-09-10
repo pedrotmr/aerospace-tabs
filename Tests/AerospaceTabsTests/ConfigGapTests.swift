@@ -23,6 +23,18 @@ final class ConfigGapTests: XCTestCase {
             GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\n40\n"),
             40
         )
+        XCTAssertEqual(
+            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\nnan\n"),
+            GapBoost.stripHeight
+        )
+        XCTAssertEqual(
+            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\n-1\n"),
+            GapBoost.stripHeight
+        )
+        XCTAssertEqual(
+            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\ninf\n"),
+            GapBoost.stripHeight
+        )
     }
 
     func testEditedLegacyBoostSubtractsPersistedStripHeightNotCurrentBoost() throws {
