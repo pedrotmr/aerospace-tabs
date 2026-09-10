@@ -1,16 +1,17 @@
 import Foundation
 
-/// While Aerospace Tabs is running, temporarily adds the strip height to
-/// AeroSpace `gaps.outer.top` so windows clear the bar — then restores on quit.
+/// While Aerospace Tabs is running, temporarily adds the strip height plus a small clearance to AeroSpace `gaps.outer.top` so windows clear the bar — then restores on quit.
 ///
-/// Backup lives on disk next to the AeroSpace config so a force-quit still
-/// leaves a recoverable original. All file access is serialized.
+/// Backup lives on disk next to the AeroSpace config so a force-quit still leaves a recoverable original.
+/// All file access is serialized.
 ///
-/// `sync(shouldBoost:)` ties the boost to strip visibility so hidden spaces
-/// do not keep a phantom top gap.
+/// `sync(shouldBoost:)` ties the boost to strip visibility so hidden spaces do not keep a phantom top gap.
 final class GapBoost {
     static let shared = GapBoost()
     static let stripHeight: CGFloat = 34
+    /// Extra air under the strip so window drop shadows land on wallpaper, not the chrome.
+    static let windowClearance: CGFloat = 6
+    static var boostAmount: CGFloat { stripHeight + windowClearance }
 
     private let queue = DispatchQueue(label: "aerospace-tabs.gap-boost")
     private let locator: AerospaceConfigLocator
@@ -83,7 +84,7 @@ final class GapBoost {
         // is retargeted while the app is running.
         guard writeVerified(location.configURL.path, to: location.activeURL) else { return }
 
-        let boosted = Self.shiftNumbers(in: original, by: Self.stripHeight)
+        let boosted = Self.shiftNumbers(in: original, by: Self.boostAmount)
         text.replaceSubrange(range, with: boosted)
         guard writeVerified(text, to: location.configURL) else { return }
         reloadAerospace()
@@ -118,18 +119,17 @@ final class GapBoost {
                 return true
             }
 
-            let expectedBoosted = Self.shiftNumbers(in: backup, by: Self.stripHeight)
             // Prefer exact undo when the user did not edit outer.top mid-session.
             // Otherwise subtract our delta from the live block so we do not clobber edits.
-            if current == expectedBoosted {
+            if Self.isUneditedBoost(current: current, backup: backup) {
                 restored = backup
             } else if activeExists {
-                restored = Self.shiftNumbers(in: current, by: -Self.stripHeight)
+                restored = Self.shiftNumbers(in: current, by: -Self.boostAmount)
             } else {
                 restored = backup
             }
         } else if activeExists {
-            restored = Self.shiftNumbers(in: current, by: -Self.stripHeight)
+            restored = Self.shiftNumbers(in: current, by: -Self.boostAmount)
         } else {
             return false
         }
@@ -245,6 +245,17 @@ final class GapBoost {
         let lower = text.index(text.startIndex, offsetBy: lowerOffset)
         let upper = text.index(text.startIndex, offsetBy: min(upperOffset, text.count))
         return lower..<upper
+    }
+
+    /// True when `current` matches a known boost of `backup`, including older deltas.
+    static func isUneditedBoost(current: String, backup: String) -> Bool {
+        let deltas: [CGFloat] = [
+            boostAmount,
+            stripHeight, // pre-clearance
+            stripHeight + 4,
+            stripHeight + 10,
+        ]
+        return deltas.contains { current == shiftNumbers(in: backup, by: $0) }
     }
 
     static func shiftNumbers(in block: String, by delta: CGFloat) -> String {

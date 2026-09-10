@@ -3,6 +3,24 @@ import XCTest
 @testable import AerospaceTabs
 
 final class ConfigGapTests: XCTestCase {
+    func testIsUneditedBoostRecognizesCurrentAndLegacyDeltas() {
+        let backup = "outer.top = 10"
+        let deltas: [CGFloat] = [
+            GapBoost.boostAmount,
+            GapBoost.stripHeight,
+            GapBoost.stripHeight + 4,
+            GapBoost.stripHeight + 10,
+        ]
+        for delta in deltas {
+            let boosted = GapBoost.shiftNumbers(in: backup, by: delta)
+            XCTAssertTrue(
+                GapBoost.isUneditedBoost(current: boosted, backup: backup),
+                "delta \(delta) should count as an unedited boost"
+            )
+        }
+        XCTAssertFalse(GapBoost.isUneditedBoost(current: "outer.top = 99", backup: backup))
+    }
+
     func testUnterminatedOuterTopArrayHasNoRange() {
         let text = """
         [gaps]
@@ -97,8 +115,8 @@ final class ConfigGapTests: XCTestCase {
         let boost = GapBoost(locator: fixture.locator, reloadHandler: {})
         boost.sync(shouldBoost: true)
         let boosted = try String(contentsOf: fixture.target, encoding: .utf8)
-        XCTAssertTrue(boosted.contains("monitor.main_2 = 1034"))
-        XCTAssertTrue(boosted.contains("2034,"))
+        XCTAssertTrue(boosted.contains("monitor.main_2 = 1040"))
+        XCTAssertTrue(boosted.contains("2040,"))
 
         boost.sync(shouldBoost: false)
         XCTAssertEqual(try String(contentsOf: fixture.target, encoding: .utf8), original)
@@ -128,8 +146,8 @@ final class ConfigGapTests: XCTestCase {
         let boost = GapBoost(locator: fixture.locator, reloadHandler: {})
         boost.sync(shouldBoost: true)
         let boosted = try String(contentsOf: fixture.target, encoding: .utf8)
-        XCTAssertTrue(boosted.contains("monitor.main = 134"))
-        XCTAssertTrue(boosted.contains("59,"))
+        XCTAssertTrue(boosted.contains("monitor.main = 140"))
+        XCTAssertTrue(boosted.contains("65,"))
 
         boost.sync(shouldBoost: false)
         XCTAssertEqual(try String(contentsOf: fixture.target, encoding: .utf8), original)
@@ -240,7 +258,7 @@ final class ConfigGapTests: XCTestCase {
         XCTAssertNoThrow(try FileManager.default.destinationOfSymbolicLink(atPath: fixture.candidate.path))
         XCTAssertEqual(
             try String(contentsOf: fixture.target, encoding: .utf8),
-            "[gaps]\nouter.top = 44\n"
+            "[gaps]\nouter.top = 50\n"
         )
         let location = fixture.locator.location()
         XCTAssertEqual(location.configURL, fixture.target.standardizedFileURL)
