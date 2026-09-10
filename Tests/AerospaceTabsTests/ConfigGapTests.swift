@@ -3,6 +3,95 @@ import XCTest
 @testable import AerospaceTabs
 
 final class ConfigGapTests: XCTestCase {
+    func testIsUneditedBoostRequiresExactAppliedDelta() {
+        let backup = "outer.top = 10"
+        let boosted40 = "outer.top = 50"
+        let boosted34 = "outer.top = 44"
+        XCTAssertTrue(GapBoost.isUneditedBoost(current: boosted40, backup: backup, delta: 40))
+        XCTAssertFalse(GapBoost.isUneditedBoost(current: boosted34, backup: backup, delta: 40))
+        XCTAssertTrue(GapBoost.isUneditedBoost(current: boosted34, backup: backup, delta: 34))
+        XCTAssertFalse(GapBoost.isUneditedBoost(current: "outer.top = 99", backup: backup, delta: 40))
+    }
+
+    func testAppliedDeltaDefaultsPathOnlyMarkerToStripHeight() {
+        XCTAssertEqual(GapBoost.appliedDelta(fromActiveMarker: nil), GapBoost.stripHeight)
+        XCTAssertEqual(
+            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\n"),
+            GapBoost.stripHeight
+        )
+        XCTAssertEqual(
+            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\n40\n"),
+            40
+        )
+        XCTAssertEqual(
+            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\n0\n"),
+            GapBoost.stripHeight
+        )
+        XCTAssertEqual(
+            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\n1\n"),
+            GapBoost.stripHeight
+        )
+        XCTAssertEqual(
+            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\n99999\n"),
+            GapBoost.stripHeight
+        )
+        XCTAssertEqual(
+            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\nnan\n"),
+            GapBoost.stripHeight
+        )
+        XCTAssertEqual(
+            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\n-1\n"),
+            GapBoost.stripHeight
+        )
+        XCTAssertEqual(
+            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\ninf\n"),
+            GapBoost.stripHeight
+        )
+    }
+
+    func testEditedLegacyBoostSubtractsPersistedStripHeightNotCurrentBoost() throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let original = "[gaps]\nouter.top = 10\n"
+        try original.write(to: fixture.target, atomically: true, encoding: .utf8)
+        let location = fixture.locator.location()
+
+        let backup = AerospaceGapBackup(configURL: fixture.target, originalBlock: "outer.top = 10")
+        try backup.serialized.write(to: location.backupURL, atomically: true, encoding: .utf8)
+        // Path-only active marker from a pre-clearance build (implicit delta 34).
+        try fixture.target.path.write(to: location.activeURL, atomically: true, encoding: .utf8)
+        // Live value was 44 (10+34), then edited +5 while still boosted.
+        try "[gaps]\nouter.top = 49\n".write(to: fixture.target, atomically: true, encoding: .utf8)
+
+        let boost = GapBoost(locator: fixture.locator, reloadHandler: {})
+        XCTAssertTrue(boost.restoreIfNeeded(reload: false))
+        XCTAssertEqual(
+            try String(contentsOf: fixture.target, encoding: .utf8),
+            "[gaps]\nouter.top = 15\n"
+        )
+    }
+
+    func testEditedCurrentBoostMatchingLegacyCandidateSubtractsAppliedDelta() throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let original = "[gaps]\nouter.top = 10\n"
+        try original.write(to: fixture.target, atomically: true, encoding: .utf8)
+        let location = fixture.locator.location()
+
+        let backup = AerospaceGapBackup(configURL: fixture.target, originalBlock: "outer.top = 10")
+        try backup.serialized.write(to: location.backupURL, atomically: true, encoding: .utf8)
+        try "\(fixture.target.path)\n40\n".write(to: location.activeURL, atomically: true, encoding: .utf8)
+        // Live was 50 (10+40); user edited to 44, which equals a legacy 10+34 candidate.
+        try "[gaps]\nouter.top = 44\n".write(to: fixture.target, atomically: true, encoding: .utf8)
+
+        let boost = GapBoost(locator: fixture.locator, reloadHandler: {})
+        XCTAssertTrue(boost.restoreIfNeeded(reload: false))
+        XCTAssertEqual(
+            try String(contentsOf: fixture.target, encoding: .utf8),
+            "[gaps]\nouter.top = 4\n"
+        )
+    }
+
     func testUnterminatedOuterTopArrayHasNoRange() {
         let text = """
         [gaps]
@@ -97,8 +186,8 @@ final class ConfigGapTests: XCTestCase {
         let boost = GapBoost(locator: fixture.locator, reloadHandler: {})
         boost.sync(shouldBoost: true)
         let boosted = try String(contentsOf: fixture.target, encoding: .utf8)
-        XCTAssertTrue(boosted.contains("monitor.main_2 = 1034"))
-        XCTAssertTrue(boosted.contains("2034,"))
+        XCTAssertTrue(boosted.contains("monitor.main_2 = 1040"))
+        XCTAssertTrue(boosted.contains("2040,"))
 
         boost.sync(shouldBoost: false)
         XCTAssertEqual(try String(contentsOf: fixture.target, encoding: .utf8), original)
@@ -128,8 +217,8 @@ final class ConfigGapTests: XCTestCase {
         let boost = GapBoost(locator: fixture.locator, reloadHandler: {})
         boost.sync(shouldBoost: true)
         let boosted = try String(contentsOf: fixture.target, encoding: .utf8)
-        XCTAssertTrue(boosted.contains("monitor.main = 134"))
-        XCTAssertTrue(boosted.contains("59,"))
+        XCTAssertTrue(boosted.contains("monitor.main = 140"))
+        XCTAssertTrue(boosted.contains("65,"))
 
         boost.sync(shouldBoost: false)
         XCTAssertEqual(try String(contentsOf: fixture.target, encoding: .utf8), original)
@@ -240,7 +329,7 @@ final class ConfigGapTests: XCTestCase {
         XCTAssertNoThrow(try FileManager.default.destinationOfSymbolicLink(atPath: fixture.candidate.path))
         XCTAssertEqual(
             try String(contentsOf: fixture.target, encoding: .utf8),
-            "[gaps]\nouter.top = 44\n"
+            "[gaps]\nouter.top = 50\n"
         )
         let location = fixture.locator.location()
         XCTAssertEqual(location.configURL, fixture.target.standardizedFileURL)

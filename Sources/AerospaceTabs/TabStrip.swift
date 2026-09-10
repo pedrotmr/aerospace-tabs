@@ -50,7 +50,9 @@ struct TabStripLayout {
 final class TabStrip {
     private let panel: NSPanel
     private let glass: NSVisualEffectView
+    private let wash: NSView
     private let view: TabStripView
+    private var themeObserver: NSObjectProtocol?
 
     init(
         onPick: @escaping (Int) -> Void,
@@ -63,21 +65,27 @@ final class TabStrip {
         view.onQuit = onQuit
 
         glass = NSVisualEffectView()
-        glass.material = .hudWindow
-        glass.blendingMode = .behindWindow
         glass.state = .active
         glass.wantsLayer = true
         glass.layer?.cornerRadius = TabStripView.chromeRadius
         glass.layer?.masksToBounds = true
         glass.autoresizingMask = [.width, .height]
 
+        wash = NSView()
+        wash.wantsLayer = true
+        wash.layer?.cornerRadius = TabStripView.chromeRadius
+        wash.layer?.masksToBounds = true
+        wash.autoresizingMask = [.width, .height]
+
         let root = NSView(frame: NSRect(x: 0, y: 0, width: 800, height: GapBoost.stripHeight))
         root.wantsLayer = true
         root.layer?.backgroundColor = NSColor.clear.cgColor
         glass.frame = root.bounds
+        wash.frame = root.bounds
         view.frame = root.bounds
         view.autoresizingMask = [.width, .height]
         root.addSubview(glass)
+        root.addSubview(wash)
         root.addSubview(view)
 
         panel = NSPanel(
@@ -86,18 +94,27 @@ final class TabStrip {
             backing: .buffered,
             defer: false
         )
-        panel.isFloatingPanel = true
+        panel.isFloatingPanel = false
         panel.hidesOnDeactivate = false
-        // Above app windows, below macOS notification banners (statusBar covers them).
-        panel.level = .floating
+        // Below app windows so floating tiles can cover the strip.
+        // Gap boost keeps tiled windows clear of this chrome.
+        panel.level = NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue - 1)
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenNone, .ignoresCycle]
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = true
+        panel.hasShadow = false
         panel.ignoresMouseEvents = false
         panel.becomesKeyOnlyIfNeeded = true
         panel.animationBehavior = .none
         panel.contentView = root
+        applyTheme(AppearanceSettings.shared.theme)
+        themeObserver = NotificationCenter.default.addObserver(
+            forName: AppearanceSettings.didChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.applyTheme(AppearanceSettings.shared.theme)
+        }
         panel.orderFrontRegardless()
     }
 
@@ -128,18 +145,62 @@ final class TabStrip {
     }
 
     func close() {
+        removeThemeObserver()
         panel.orderOut(nil)
         panel.close()
     }
 
+    deinit {
+        removeThemeObserver()
+    }
+
+    private func removeThemeObserver() {
+        if let themeObserver {
+            NotificationCenter.default.removeObserver(themeObserver)
+            self.themeObserver = nil
+        }
+    }
+
+    private func applyTheme(_ theme: StripTheme) {
+        let style = theme.chrome
+        glass.material = style.material
+        glass.blendingMode = style.blendingMode
+        if let appearanceName = style.appearanceName {
+            glass.appearance = NSAppearance(named: appearanceName)
+        } else {
+            glass.appearance = nil
+        }
+        if let washColor = style.wash {
+            wash.isHidden = false
+            wash.layer?.backgroundColor = washColor.cgColor
+        } else {
+            wash.isHidden = true
+            wash.layer?.backgroundColor = nil
+        }
+        view.rimAlpha = style.rimAlpha
+        view.needsDisplay = true
+    }
+
     static let preferredBarHeight: CGFloat = GapBoost.stripHeight
+
+    /// Bottom edge of the strip in screen coords.
+    /// User `outer.top` stays above the chrome.
+    /// Only `clearance` sits between the strip and tiled windows.
+    static func originY(
+        visibleMaxY: CGFloat,
+        gapsTop: CGFloat,
+        height: CGFloat = preferredBarHeight,
+        clearance: CGFloat = GapBoost.windowClearance
+    ) -> CGFloat {
+        let reserved = max(gapsTop, height + clearance)
+        return visibleMaxY - reserved + clearance
+    }
 
     private static func frame(on screen: NSScreen, gaps: OuterGaps) -> NSRect {
         let full = screen.frame
         let visible = screen.visibleFrame
-        let reserved = max(gaps.top, Self.preferredBarHeight)
-        let height = min(Self.preferredBarHeight, reserved)
-        let y = visible.maxY - reserved
+        let height = Self.preferredBarHeight
+        let y = originY(visibleMaxY: visible.maxY, gapsTop: gaps.top)
         let width = max(120, full.width - gaps.left - gaps.right)
         return NSRect(
             x: full.minX + gaps.left,
@@ -158,6 +219,7 @@ final class TabStripView: NSView {
     var onPick: ((Int) -> Void)?
     var onReorder: (([Int], String) -> Void)?
     var onQuit: (() -> Void)?
+    var rimAlpha: CGFloat = StripTheme.glass.chrome.rimAlpha
 
     private var windows: [Win] = []
     private var focused: Int?
@@ -333,6 +395,23 @@ final class TabStripView: NSView {
 
     override func rightMouseDown(with event: NSEvent) {
         let menu = NSMenu()
+
+        let appearance = NSMenu(title: "Appearance")
+        let selected = AppearanceSettings.shared.theme
+        for theme in StripTheme.allCases {
+            let item = appearance.addItem(
+                withTitle: theme.title,
+                action: #selector(selectTheme(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = theme.rawValue
+            item.state = theme == selected ? .on : .off
+        }
+        let appearanceItem = menu.addItem(withTitle: "Appearance", action: nil, keyEquivalent: "")
+        menu.setSubmenu(appearance, for: appearanceItem)
+
+        menu.addItem(.separator())
         let restore = menu.addItem(
             withTitle: "Restore AeroSpace gaps",
             action: #selector(restoreGaps),
@@ -343,6 +422,13 @@ final class TabStripView: NSView {
         let quit = menu.addItem(withTitle: "Quit Aerospace Tabs", action: #selector(quit), keyEquivalent: "")
         quit.target = self
         NSMenu.popUpContextMenu(menu, with: event, for: self)
+    }
+
+    @objc private func selectTheme(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String,
+              let theme = StripTheme(rawValue: raw)
+        else { return }
+        AppearanceSettings.shared.select(theme)
     }
 
     @objc private func restoreGaps() {
@@ -405,10 +491,9 @@ final class TabStripView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        // Glass comes from the NSVisualEffectView underneath.
         // Soft outer rim so the chrome reads against wallpaper.
         let rim = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: Self.chromeRadius, yRadius: Self.chromeRadius)
-        NSColor(calibratedWhite: 1, alpha: 0.10).setStroke()
+        NSColor(calibratedWhite: 1, alpha: rimAlpha).setStroke()
         rim.lineWidth = 1
         rim.stroke()
 

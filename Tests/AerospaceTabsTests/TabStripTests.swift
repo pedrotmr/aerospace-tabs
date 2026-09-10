@@ -3,6 +3,15 @@ import XCTest
 @testable import AerospaceTabs
 
 final class TabStripTests: XCTestCase {
+    func testStripSitsAboveWindowsWithOnlyClearanceBelow() {
+        // Boosted outer.top = user 20 + strip 34 + clearance 6.
+        let y = TabStrip.originY(visibleMaxY: 1000, gapsTop: 60, height: 34, clearance: 6)
+        XCTAssertEqual(y, 1000 - 60 + 6) // 946
+        // User gap (20) stays above strip; only clearance between strip and windows.
+        XCTAssertEqual(1000 - (y + 34), 20)
+        XCTAssertEqual(y - (1000 - 60), 6)
+    }
+
     func testLargeTabCountStaysInsideStripBounds() {
         let bounds = CGRect(x: 0, y: 0, width: 120, height: 34)
         let frames = TabStripLayout(bounds: bounds, count: 1_000).frames
