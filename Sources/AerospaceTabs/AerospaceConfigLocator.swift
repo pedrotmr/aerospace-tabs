@@ -63,7 +63,11 @@ struct AerospaceConfigLocation: Equatable {
         guard let marker = try? String(contentsOf: activeURL, encoding: .utf8) else {
             return self
         }
-        let path = marker.trimmingCharacters(in: .whitespacesAndNewlines)
+        let path = marker
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .first
+            .map(String.init)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard path.hasPrefix("/") else { return self }
         return AerospaceConfigLocation(
             candidateURL: candidateURL,

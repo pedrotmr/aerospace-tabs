@@ -79,10 +79,11 @@ final class GapBoost {
         )
         guard writeVerified(backup.serialized, to: location.backupURL) else { return }
 
-        // Persist the resolved target before changing it. Recovery remains tied
-        // to this file even if a higher-priority candidate appears or a symlink
-        // is retargeted while the app is running.
-        guard writeVerified(location.configURL.path, to: location.activeURL) else { return }
+        // Persist the resolved target + applied delta before changing it.
+        // Recovery remains tied to this file even if a higher-priority candidate
+        // appears or a symlink is retargeted while the app is running.
+        let activeMarker = "\(location.configURL.path)\n\(Self.boostAmount)\n"
+        guard writeVerified(activeMarker, to: location.activeURL) else { return }
 
         let boosted = Self.shiftNumbers(in: original, by: Self.boostAmount)
         text.replaceSubrange(range, with: boosted)
@@ -103,6 +104,12 @@ final class GapBoost {
         else { return false }
 
         let current = String(text[range])
+        let activeContents = activeExists
+            ? try? String(contentsOf: location.activeURL, encoding: .utf8)
+            : nil
+        // Path-only markers from older builds default to pre-clearance stripHeight.
+        let appliedDelta = Self.appliedDelta(fromActiveMarker: activeContents)
+
         let restored: String
         if backupExists {
             guard let contents = try? String(contentsOf: location.backupURL, encoding: .utf8),
@@ -120,16 +127,16 @@ final class GapBoost {
             }
 
             // Prefer exact undo when the user did not edit outer.top mid-session.
-            // Otherwise subtract our delta from the live block so we do not clobber edits.
-            if Self.isUneditedBoost(current: current, backup: backup) {
+            // Otherwise subtract the applied delta from the live block so we do not clobber edits.
+            if Self.isUneditedBoost(current: current, backup: backup, delta: appliedDelta) {
                 restored = backup
             } else if activeExists {
-                restored = Self.shiftNumbers(in: current, by: -Self.boostAmount)
+                restored = Self.shiftNumbers(in: current, by: -appliedDelta)
             } else {
                 restored = backup
             }
         } else if activeExists {
-            restored = Self.shiftNumbers(in: current, by: -Self.boostAmount)
+            restored = Self.shiftNumbers(in: current, by: -appliedDelta)
         } else {
             return false
         }
@@ -247,15 +254,22 @@ final class GapBoost {
         return lower..<upper
     }
 
-    /// True when `current` matches a known boost of `backup`, including older deltas.
-    static func isUneditedBoost(current: String, backup: String) -> Bool {
-        let deltas: [CGFloat] = [
-            boostAmount,
-            stripHeight, // pre-clearance
-            stripHeight + 4,
-            stripHeight + 10,
-        ]
-        return deltas.contains { current == shiftNumbers(in: backup, by: $0) }
+    /// Delta recorded in the active marker. Path-only legacy markers use `stripHeight`.
+    static func appliedDelta(fromActiveMarker contents: String?) -> CGFloat {
+        guard let contents else { return stripHeight }
+        let lines = contents
+            .split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        if lines.count >= 2, let value = Double(lines[1]) {
+            return CGFloat(value)
+        }
+        return stripHeight
+    }
+
+    /// True when `current` equals `backup` shifted by `delta`.
+    static func isUneditedBoost(current: String, backup: String, delta: CGFloat) -> Bool {
+        current == shiftNumbers(in: backup, by: delta)
     }
 
     static func shiftNumbers(in block: String, by delta: CGFloat) -> String {

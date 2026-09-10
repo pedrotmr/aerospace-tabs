@@ -145,12 +145,20 @@ final class TabStrip {
     }
 
     func close() {
+        removeThemeObserver()
+        panel.orderOut(nil)
+        panel.close()
+    }
+
+    deinit {
+        removeThemeObserver()
+    }
+
+    private func removeThemeObserver() {
         if let themeObserver {
             NotificationCenter.default.removeObserver(themeObserver)
             self.themeObserver = nil
         }
-        panel.orderOut(nil)
-        panel.close()
     }
 
     private func applyTheme(_ theme: StripTheme) {
