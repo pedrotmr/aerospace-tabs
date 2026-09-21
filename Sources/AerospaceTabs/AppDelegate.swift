@@ -111,13 +111,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             strips.removeValue(forKey: id)
         }
 
-        // Boost only while at least one strip should show (and MC is not hiding us).
-        GapBoost.shared.sync(shouldBoost: anyStripVisible && !hidden)
+        // Boost follows strip *eligibility*, not chrome visibility. Dropping the
+        // boost while Mission Control hides the strip reloads AeroSpace and nudges
+        // every tiled window — keep outer.top stable across MC enter/exit.
+        GapBoost.shared.sync(
+            shouldBoost: Self.shouldBoostGaps(
+                anyStripVisible: anyStripVisible,
+                missionControlActive: hidden
+            )
+        )
     }
 
     /// Strip visibility: two or more windows on the workspace (tiles or accordion).
     private static func shouldShowTabs(_ windows: [Win]) -> Bool {
         windows.count >= 2
+    }
+
+    /// Whether AeroSpace `outer.top` should stay boosted for the strip.
+    ///
+    /// Mission Control only hides chrome; the boost must not toggle with it.
+    static func shouldBoostGaps(anyStripVisible: Bool, missionControlActive _: Bool) -> Bool {
+        anyStripVisible
     }
 }
 
