@@ -24,15 +24,15 @@ final class AerospaceClient {
     private let decoder = JSONDecoder()
 
     private static let format =
-        "%{window-id}%{window-title}%{app-name}%{app-bundle-id}%{app-bundle-path}%{workspace}%{monitor-appkit-nsscreen-screens-id}%{window-parent-container-layout}"
+        "%{window-id}%{window-title}%{app-name}%{app-bundle-id}%{app-bundle-path}%{workspace}%{workspace-is-focused}%{workspace-is-visible}%{monitor-appkit-nsscreen-screens-id}%{window-parent-container-layout}"
 
-    func listVisibleWindows(completion: @escaping (Result<Snapshot, Error>) -> Void) {
+    func listAllWindows(completion: @escaping (Result<Snapshot, Error>) -> Void) {
         queue.async { [weak self] in
             guard let self else { return }
             do {
                 let raw = try self.command([
                     "list-windows",
-                    "--workspace", "visible",
+                    "--all",
                     "--json",
                     "--format", Self.format,
                 ])

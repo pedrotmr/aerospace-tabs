@@ -6,9 +6,9 @@ See [CHARTER.md](CHARTER.md) for what this is, what it isn’t, and how support 
 
 ## Features
 
-- Top tab strip for windows on the current workspace (shows when there are **2+** windows)
-- Click a tab to focus; drag to reorder (order is local to the strip, per workspace)
-- Option-Tab / Option-`` ` `` to cycle (hold to repeat; release Tab/`` ` `` to stop)
+- Top tab strip groups windows from every occupied AeroSpace workspace on each screen, with numbered spaces in ascending order (shown when there are **2+** windows total)
+- Click a tab to focus; drag to reorder within its workspace
+- Option-Tab / Option-`` ` `` to cycle windows on the focused workspace (hold to repeat; release Tab/`` ` `` to stop)
 - Hides during Mission Control / App Exposé
 - Temporarily boosts AeroSpace `gaps.outer.top` so windows clear the strip; restores on quit
 

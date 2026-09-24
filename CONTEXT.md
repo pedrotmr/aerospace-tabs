@@ -32,10 +32,6 @@ _Avoid_: “fast enough”, optimize later
 The hard in/out boundary for what the companion may do. Core verb is list + focus (+ local tab order). Layout ownership, status widgets, other WMs, and Mission Control clones are out.
 _Avoid_: roadmap features, backlog of maybes treated as promises
 
-**Strip visibility**:
-The tab strip shows when the workspace has two or more windows (tiles or accordion). Hidden when empty or single-window. Gap boost follows strip visibility — no phantom top gap.
-_Avoid_: accordion-only (old rule)
-
-**Workspace dots** (backlog):
-Minimal indicators of other workspaces (occupied vs empty). Not an overview, sidebar, or thumbnail Mission Control.
-_Avoid_: AeroMux clone, AeroSpacePreview clone
+**Workspace overview**:
+The strip groups windows by occupied AeroSpace workspace on each screen, sorts numbered workspaces ascending, and appears when that screen has two or more windows total. Selecting a window focuses it; Option-Tab cycles only on the focused workspace. Empty workspaces and window previews are not shown.
+_Avoid_: sidebar, thumbnail Mission Control

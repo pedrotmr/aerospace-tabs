@@ -20,10 +20,28 @@ final class TabOrder {
         // Visible set can span one workspace per monitor; order within each workspace.
         var result: [Win] = []
         let grouped = Dictionary(grouping: windows, by: \.workspace)
-        // Preserve first-seen workspace order from AeroSpace's list.
+        // AeroSpace can return workspaces in focus-dependent order. Keep numeric
+        // workspace names in ascending order, then preserve order for named ones.
         var seenWS: [String] = []
         for win in windows where !seenWS.contains(win.workspace) {
             seenWS.append(win.workspace)
+        }
+        let firstSeenIndex = Dictionary(
+            uniqueKeysWithValues: seenWS.enumerated().map { ($0.element, $0.offset) }
+        )
+        seenWS.sort { lhs, rhs in
+            let lhsNumber = Int(lhs)
+            let rhsNumber = Int(rhs)
+            switch (lhsNumber, rhsNumber) {
+            case let (.some(left), .some(right)) where left != right:
+                return left < right
+            case (.some, .none):
+                return true
+            case (.none, .some):
+                return false
+            default:
+                return firstSeenIndex[lhs, default: 0] < firstSeenIndex[rhs, default: 0]
+            }
         }
         for ws in seenWS {
             let members = grouped[ws] ?? []

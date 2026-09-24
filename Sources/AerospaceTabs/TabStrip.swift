@@ -1,5 +1,13 @@
 import AppKit
 
+private struct WorkspaceHeaderFrame {
+    let workspace: String
+    let frame: CGRect
+    let windowRange: Range<Int>
+    let isFocused: Bool
+    let isVisible: Bool
+}
+
 struct TabStripLayout {
     let bounds: CGRect
     let count: Int
@@ -7,6 +15,8 @@ struct TabStripLayout {
     let gap: CGFloat
     let tabWidth: CGFloat
     let verticalPadding: CGFloat
+    let frames: [CGRect]
+    fileprivate let workspaceHeaders: [WorkspaceHeaderFrame]
 
     init(bounds: CGRect, count: Int) {
         self.bounds = bounds
@@ -24,16 +34,13 @@ struct TabStripLayout {
         let available = max(0, contentWidth - gap * CGFloat(slotCount - 1))
         tabWidth = min(260, available / CGFloat(slotCount))
         verticalPadding = min(4, stripHeight * 0.25)
-    }
-
-    var frames: [CGRect] {
         var x = bounds.minX + inset
         let rightEdge = bounds.maxX - inset
         let height = max(0, bounds.height - verticalPadding * 2)
         var result: [CGRect] = []
-        result.reserveCapacity(count)
+        result.reserveCapacity(self.count)
 
-        for _ in 0..<count {
+        for _ in 0..<self.count {
             let width = min(tabWidth, max(0, rightEdge - x))
             result.append(CGRect(
                 x: x,
@@ -43,7 +50,105 @@ struct TabStripLayout {
             ))
             x += tabWidth + gap
         }
-        return result
+        frames = result
+        workspaceHeaders = []
+    }
+
+    init(bounds: CGRect, windows: [Win]) {
+        self.bounds = bounds
+        count = windows.count
+
+        let stripWidth = max(0, bounds.width)
+        let stripHeight = max(0, bounds.height)
+        inset = min(6, stripWidth * 0.05)
+        verticalPadding = min(4, stripHeight * 0.25)
+
+        let groups = Self.groups(in: windows)
+        guard !windows.isEmpty else {
+            gap = 0
+            tabWidth = 0
+            frames = []
+            workspaceHeaders = []
+            return
+        }
+
+        let contentWidth = max(0, stripWidth - inset * 2)
+        let groupCount = groups.count
+        let headerGap = min(5, contentWidth / CGFloat(max(groupCount * 8, 1)))
+        let sectionGap = min(10, contentWidth / CGFloat(max(groupCount * 4, 1)))
+        let tabGap = groupCount == count
+            ? 0
+            : min(4, contentWidth / CGFloat(max(count * 4, 1)))
+        gap = tabGap
+
+        let maxHeaderWidth = min(76, contentWidth / CGFloat(max(groupCount, 1)) * 0.7)
+        let preferredHeaderWidth = groups.map { workspace, _ in
+            let label = workspace.isEmpty ? "?" : workspace
+            let preferred = max(20, CGFloat(label.count) * 6.4 + 10)
+            return min(maxHeaderWidth, preferred)
+        }.max() ?? 0
+        let headerWidths = Array(repeating: preferredHeaderWidth, count: groupCount)
+        let tabGaps = CGFloat(max(count - groupCount, 0)) * tabGap
+        let groupGaps = CGFloat(max(groupCount - 1, 0)) * sectionGap
+        let headerGaps = CGFloat(groupCount) * headerGap
+        let tabsWidth = max(
+            0,
+            contentWidth - headerWidths.reduce(0, +) - tabGaps - groupGaps - headerGaps
+        )
+        tabWidth = min(260, tabsWidth / CGFloat(max(count, 1)))
+
+        let top = bounds.minY + verticalPadding
+        let height = max(0, bounds.height - verticalPadding * 2)
+        let rightEdge = bounds.maxX - inset
+        var x = bounds.minX + inset
+        var tabFrames: [CGRect] = []
+        var headerFrames: [WorkspaceHeaderFrame] = []
+        tabFrames.reserveCapacity(count)
+        headerFrames.reserveCapacity(groupCount)
+        var windowIndex = 0
+
+        for (groupIndex, (workspace, members)) in groups.enumerated() {
+            let headerWidth = headerWidths[groupIndex]
+            let headerFrame = CGRect(x: x, y: top, width: headerWidth, height: height)
+            let range = windowIndex..<(windowIndex + members.count)
+            headerFrames.append(WorkspaceHeaderFrame(
+                workspace: workspace,
+                frame: headerFrame,
+                windowRange: range,
+                isFocused: members.contains(where: \.workspaceIsFocused),
+                isVisible: members.contains(where: \.workspaceIsVisible)
+            ))
+            x += headerWidth + headerGap
+
+            for (memberIndex, _) in members.enumerated() {
+                let width = min(tabWidth, max(0, rightEdge - x))
+                tabFrames.append(CGRect(x: x, y: top, width: width, height: height))
+                x += tabWidth
+                if memberIndex < members.count - 1 {
+                    x += tabGap
+                }
+                windowIndex += 1
+            }
+
+            if groupIndex < groups.count - 1 {
+                x += sectionGap
+            }
+        }
+
+        frames = tabFrames
+        workspaceHeaders = headerFrames
+    }
+
+    private static func groups(in windows: [Win]) -> [(String, [Win])] {
+        var order: [String] = []
+        var membersByWorkspace: [String: [Win]] = [:]
+        for window in windows {
+            if membersByWorkspace[window.workspace] == nil {
+                order.append(window.workspace)
+            }
+            membersByWorkspace[window.workspace, default: []].append(window)
+        }
+        return order.map { ($0, membersByWorkspace[$0] ?? []) }
     }
 }
 
@@ -225,6 +330,7 @@ final class TabStripView: NSView {
     private var focused: Int?
     private var hover: Int?
     private var frames: [CGRect] = []
+    private var workspaceHeaders: [WorkspaceHeaderFrame] = []
 
     private var pressIndex: Int?
     private var pressPoint: CGPoint = .zero
@@ -316,18 +422,19 @@ final class TabStripView: NSView {
         }
 
         guard let dragIndex else { return }
-        let layout = tabLayout()
-        let m = (inset: layout.inset, gap: layout.gap, width: layout.tabWidth)
-        let minX = bounds.minX + m.inset
-        let maxX = max(minX, bounds.maxX - m.inset - m.width)
+        let workspace = windows[dragIndex].workspace
+        guard let section = workspaceHeaders.first(where: { $0.workspace == workspace }) else { return }
+        let candidates = Array(section.windowRange)
+        guard let first = candidates.first, let last = candidates.last else { return }
+        let tabWidth = tabLayout().tabWidth
+        let minX = frames[first].minX
+        let maxX = max(minX, frames[last].maxX - tabWidth)
         dragX = min(max(point.x - dragOffsetX, minX), maxX)
 
-        let centerX = dragX + m.width / 2
-        let slotWidth = m.width + m.gap
-        let slot = slotWidth > 0
-            ? Int(((centerX - minX) / slotWidth).rounded(.down))
-            : dragIndex
-        let target = min(max(slot, 0), windows.count - 1)
+        let centerX = dragX + tabWidth / 2
+        let target = candidates.min {
+            abs(frames[$0].midX - centerX) < abs(frames[$1].midX - centerX)
+        } ?? dragIndex
         if target != dragIndex {
             var next = windows
             let item = next.remove(at: dragIndex)
@@ -483,11 +590,13 @@ final class TabStripView: NSView {
     }
 
     private func tabLayout() -> TabStripLayout {
-        TabStripLayout(bounds: bounds, count: windows.count)
+        TabStripLayout(bounds: bounds, windows: windows)
     }
 
     private func recomputeFrames() {
-        frames = tabLayout().frames
+        let layout = tabLayout()
+        frames = layout.frames
+        workspaceHeaders = layout.workspaceHeaders
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -505,6 +614,10 @@ final class TabStripView: NSView {
 
         recomputeFrames()
 
+        for header in workspaceHeaders {
+            drawWorkspaceHeader(header)
+        }
+
         for (i, win) in windows.enumerated() {
             if dragging, i == dragIndex { continue }
             drawTab(win, in: frames[i], selected: win.id == focused, hovered: i == hover && !dragging)
@@ -515,6 +628,42 @@ final class TabStripView: NSView {
             let rect = NSRect(x: dragX, y: home.minY, width: home.width, height: home.height)
             drawTab(windows[dragIndex], in: rect, selected: true, hovered: false, elevating: true)
         }
+    }
+
+    private func drawWorkspaceHeader(_ header: WorkspaceHeaderFrame) {
+        let rect = header.frame
+        let radius = min(7, rect.height / 2)
+        let path = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
+        let fill: NSColor
+        if header.isFocused {
+            fill = NSColor(calibratedWhite: 0.55, alpha: 0.58)
+        } else if header.isVisible {
+            fill = NSColor(calibratedWhite: 0.39, alpha: 0.38)
+        } else {
+            fill = NSColor(calibratedWhite: 0.24, alpha: 0.30)
+        }
+        fill.setFill()
+        path.fill()
+
+        let labelText = (header.workspace.isEmpty ? "?" : header.workspace) as NSString
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakMode = .byTruncatingTail
+        paragraph.alignment = .center
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 10, weight: .semibold),
+            .foregroundColor: NSColor.white,
+            .paragraphStyle: paragraph,
+        ]
+        let availableWidth = max(0, rect.width - 6)
+        let measured = labelText.size(withAttributes: attributes)
+        let labelWidth = min(availableWidth, measured.width)
+        let labelRect = NSRect(
+            x: rect.midX - labelWidth / 2,
+            y: rect.midY - measured.height / 2,
+            width: labelWidth,
+            height: measured.height
+        )
+        labelText.draw(in: labelRect, withAttributes: attributes)
     }
 
     private func drawTab(

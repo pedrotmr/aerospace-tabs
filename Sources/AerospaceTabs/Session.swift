@@ -7,9 +7,35 @@ struct Win: Equatable {
     let bundleID: String
     let bundlePath: String
     let workspace: String
+    let workspaceIsFocused: Bool
+    let workspaceIsVisible: Bool
     let screenIndex: Int
     /// AeroSpace parent layout: h_tiles, v_tiles, h_accordion, v_accordion, floating.
     let parentLayout: String
+
+    init(
+        id: Int,
+        title: String,
+        appName: String,
+        bundleID: String,
+        bundlePath: String,
+        workspace: String,
+        screenIndex: Int,
+        parentLayout: String,
+        workspaceIsFocused: Bool = false,
+        workspaceIsVisible: Bool = false
+    ) {
+        self.id = id
+        self.title = title
+        self.appName = appName
+        self.bundleID = bundleID
+        self.bundlePath = bundlePath
+        self.workspace = workspace
+        self.screenIndex = screenIndex
+        self.parentLayout = parentLayout
+        self.workspaceIsFocused = workspaceIsFocused
+        self.workspaceIsVisible = workspaceIsVisible
+    }
 
     var label: String {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -32,6 +58,8 @@ struct WindowRow: Decodable {
     let appBundleId: String?
     let appBundlePath: String?
     let workspace: String?
+    let workspaceIsFocused: Bool?
+    let workspaceIsVisible: Bool?
     let monitorAppkitNsscreenScreensId: Int?
     let windowParentContainerLayout: String?
 
@@ -42,6 +70,8 @@ struct WindowRow: Decodable {
         case appBundleId = "app-bundle-id"
         case appBundlePath = "app-bundle-path"
         case workspace
+        case workspaceIsFocused = "workspace-is-focused"
+        case workspaceIsVisible = "workspace-is-visible"
         case monitorAppkitNsscreenScreensId = "monitor-appkit-nsscreen-screens-id"
         case windowParentContainerLayout = "window-parent-container-layout"
     }
@@ -56,7 +86,9 @@ struct WindowRow: Decodable {
             bundlePath: appBundlePath ?? "",
             workspace: workspace ?? "",
             screenIndex: monitorAppkitNsscreenScreensId ?? 1,
-            parentLayout: windowParentContainerLayout ?? ""
+            parentLayout: windowParentContainerLayout ?? "",
+            workspaceIsFocused: workspaceIsFocused ?? false,
+            workspaceIsVisible: workspaceIsVisible ?? false
         )
     }
 }
@@ -121,8 +153,13 @@ final class Session {
     }
 
     private func cyclePool() -> [Win] {
-        let screen = windows.first(where: { $0.id == focusedID })?.screenIndex
-        return screen.map { index in windows.filter { $0.screenIndex == index } } ?? windows
+        guard let focusedWindow = windows.first(where: { $0.id == focusedID }) else {
+            return windows.filter(\.workspaceIsVisible)
+        }
+        return windows.filter {
+            $0.screenIndex == focusedWindow.screenIndex
+                && $0.workspace == focusedWindow.workspace
+        }
     }
 
     private func handle(_ event: AeroEvent) {
@@ -155,7 +192,7 @@ final class Session {
     }
 
     private func refreshNow() {
-        client.listVisibleWindows { [weak self] result in
+        client.listAllWindows { [weak self] result in
             guard let self else { return }
             switch result {
             case .failure:
