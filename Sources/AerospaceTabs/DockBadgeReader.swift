@@ -20,6 +20,7 @@ final class DockBadgeReader {
     private var timer: DispatchSourceTimer?
     private var started = false
     private var currentBadges: [String: String] = [:]
+    private var bundleIDCache: [String: String] = [:]
 
     var badgesByApp: [String: String] {
         lock.lock()
@@ -45,7 +46,7 @@ final class DockBadgeReader {
     }
 
     private func refresh() {
-        let updated = Self.readDockBadges()
+        guard let updated = readDockBadges() else { return }
         lock.lock()
         let changed = updated != currentBadges
         if changed { currentBadges = updated }
@@ -57,58 +58,68 @@ final class DockBadgeReader {
         }
     }
 
-    private static func readDockBadges() -> [String: String] {
-        guard AXIsProcessTrusted(),
-              let dock = NSRunningApplication.runningApplications(
-                withBundleIdentifier: "com.apple.dock"
-              ).first
-        else { return [:] }
+    private func readDockBadges() -> [String: String]? {
+        guard AXIsProcessTrusted() else { return [:] }
+        guard let dock = NSRunningApplication.runningApplications(
+            withBundleIdentifier: "com.apple.dock"
+        ).first else { return nil }
 
         let root = AXUIElementCreateApplication(dock.processIdentifier)
-        AXUIElementSetMessagingTimeout(root, 0.2)
-
         var badges: [String: String] = [:]
-        collectDockItems(in: root, depth: 0, into: &badges)
+        guard collectDockItems(in: root, depth: 0, into: &badges) else { return nil }
         return badges
     }
 
-    private static func collectDockItems(
+    private func collectDockItems(
         in element: AXUIElement,
         depth: Int,
         into badges: inout [String: String]
-    ) {
-        guard depth < 5 else { return }
+    ) -> Bool {
+        guard depth < 10 else { return false }
+        guard AXUIElementSetMessagingTimeout(element, 0.2) == .success else { return false }
 
-        let role = stringAttribute(kAXRoleAttribute, of: element)
-        let subrole = stringAttribute(kAXSubroleAttribute, of: element)
-        if isApplicationDockItem(role: role, subrole: subrole) {
+        let role = Self.stringAttribute(kAXRoleAttribute, of: element)
+        let subrole = Self.stringAttribute(kAXSubroleAttribute, of: element)
+        if Self.isApplicationDockItem(role: role, subrole: subrole) {
             addBadge(from: element, to: &badges)
         }
 
-        guard let children = attribute(kAXChildrenAttribute as CFString, of: element) as? [AXUIElement] else {
-            return
+        var childrenValue: CFTypeRef?
+        let childrenResult = AXUIElementCopyAttributeValue(
+            element,
+            kAXChildrenAttribute as CFString,
+            &childrenValue
+        )
+        guard childrenResult == .success else {
+            return childrenResult == .noValue
         }
+        guard let children = childrenValue as? [AXUIElement] else { return false }
         for child in children {
-            collectDockItems(in: child, depth: depth + 1, into: &badges)
+            guard collectDockItems(in: child, depth: depth + 1, into: &badges) else {
+                return false
+            }
         }
+        return true
     }
 
-    private static func addBadge(from element: AXUIElement, to badges: inout [String: String]) {
-        guard let label = stringAttribute("AXStatusLabel", of: element),
+    private func addBadge(from element: AXUIElement, to badges: inout [String: String]) {
+        guard let label = Self.stringAttribute("AXStatusLabel", of: element),
               !label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              let appURL = appURL(from: attribute("AXURL" as CFString, of: element))
+              let appURL = Self.appURL(from: Self.attribute("AXURL" as CFString, of: element))
         else { return }
 
         let pathKey = DockBadgeKey.bundlePath(appURL.path)
         badges[pathKey] = label
-        if let bundleID = Bundle(url: appURL)?.bundleIdentifier {
+        if let cachedBundleID = bundleIDCache[pathKey] {
+            badges[DockBadgeKey.bundleID(cachedBundleID)] = label
+        } else if let bundleID = Bundle(url: appURL)?.bundleIdentifier {
+            bundleIDCache[pathKey] = bundleID
             badges[DockBadgeKey.bundleID(bundleID)] = label
         }
     }
 
     private static func isApplicationDockItem(role: String?, subrole: String?) -> Bool {
-        role == kAXApplicationDockItemSubrole
-            || (role == kAXDockItemRole && subrole == kAXApplicationDockItemSubrole)
+        role == kAXDockItemRole && subrole == kAXApplicationDockItemSubrole
     }
 
     private static func appURL(from value: CFTypeRef?) -> URL? {

@@ -1,6 +1,6 @@
 APP := AerospaceTabs.app
 BIN := .build/release/AerospaceTabs
-SIGNING_IDENTITY ?= $(shell security find-identity -v -p codesigning 2>/dev/null | grep -m 1 '^[[:space:]]*[0-9]' | awk '{ print $$2 }')
+SIGNING_IDENTITY ?= $(shell security find-identity -v -p codesigning 2>/dev/null | awk '/^[[:space:]]*[0-9]+[^0-9]/ && $$2 ~ /^[[:xdigit:]]+$$/ { print $$2; exit }')
 ifeq ($(strip $(SIGNING_IDENTITY)),)
 SIGNING_IDENTITY := -
 endif

@@ -368,7 +368,7 @@ final class TabStripView: NSView {
     override var isFlipped: Bool { true }
     override var mouseDownCanMoveWindow: Bool { false }
 
-    func set(windows: [Win], focused: Int?, notificationBadges: [String: String]) {
+    func set(windows: [Win], focused: Int?, notificationBadges: [String: String] = [:]) {
         if dragging {
             pendingModel = (windows, focused, notificationBadges)
             return
@@ -791,10 +791,24 @@ final class TabStripView: NSView {
         }
 
         let notificationBadge = notificationBadge(for: win)
-        let badgeWidth = iconSize >= 10 ? notificationBadge.map { Self.notificationBadgeWidth(for: $0) } ?? 0 : 0
-        let badgeClearance = badgeWidth > 0 ? max(0, badgeWidth - 4) : 0
-        if badgeWidth > 0, let notificationBadge {
-            drawNotificationBadge(notificationBadge, iconRect: iconRect, tabRect: rect)
+        var badgeClearance: CGFloat = 0
+        if iconSize >= 10, let notificationBadge {
+            let width = Self.notificationBadgeWidth(for: notificationBadge)
+            let badgeX = iconRect.maxX - 4
+            let showsCount = rect.height >= 14
+                && !Self.isDotBadge(notificationBadge)
+                && badgeX + width <= rect.maxX - 2
+            if showsCount {
+                badgeClearance = max(0, width - 4)
+            } else if let dotRect = Self.notificationDotRect(iconRect: iconRect, tabRect: rect) {
+                badgeClearance = max(0, dotRect.maxX - iconRect.maxX)
+            }
+            drawNotificationBadge(
+                notificationBadge,
+                iconRect: iconRect,
+                tabRect: rect,
+                showsCount: showsCount
+            )
         }
 
         let textRect = NSRect(
@@ -809,13 +823,13 @@ final class TabStripView: NSView {
     }
 
     private func notificationBadge(for win: Win) -> String? {
-        if !win.bundleID.isEmpty,
-           let badge = notificationBadges[DockBadgeKey.bundleID(win.bundleID)]
+        if !win.bundlePath.isEmpty,
+           let badge = notificationBadges[DockBadgeKey.bundlePath(win.bundlePath)]
         {
             return badge
         }
-        guard !win.bundlePath.isEmpty else { return nil }
-        return notificationBadges[DockBadgeKey.bundlePath(win.bundlePath)]
+        guard !win.bundleID.isEmpty else { return nil }
+        return notificationBadges[DockBadgeKey.bundleID(win.bundleID)]
     }
 
     private static func notificationBadgeWidth(for label: String) -> CGFloat {
@@ -828,8 +842,13 @@ final class TabStripView: NSView {
         return max(12, min(22, ceil(textWidth + 6)))
     }
 
-    private func drawNotificationBadge(_ label: String, iconRect: NSRect, tabRect: NSRect) {
-        if Self.isDotBadge(label) {
+    private func drawNotificationBadge(
+        _ label: String,
+        iconRect: NSRect,
+        tabRect: NSRect,
+        showsCount: Bool
+    ) {
+        guard showsCount else {
             drawNotificationDot(iconRect: iconRect, tabRect: tabRect)
             return
         }
@@ -873,13 +892,22 @@ final class TabStripView: NSView {
         ["•", "●", "∙", "·"].contains(label.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
-    private func drawNotificationDot(iconRect: NSRect, tabRect: NSRect) {
-        let dotRect = NSRect(
-            x: iconRect.maxX - 3,
-            y: tabRect.minY + 2,
-            width: 10,
-            height: 10
+    private static func notificationDotRect(iconRect: NSRect, tabRect: NSRect) -> NSRect? {
+        let inset: CGFloat = 2
+        let size = min(10, tabRect.width - inset * 2, tabRect.height - inset * 2)
+        guard size >= 6 else { return nil }
+
+        let x = max(
+            tabRect.minX + inset,
+            min(iconRect.maxX - 3, tabRect.maxX - inset - size)
         )
+        return NSRect(x: x, y: tabRect.minY + inset, width: size, height: size)
+    }
+
+    private func drawNotificationDot(iconRect: NSRect, tabRect: NSRect) {
+        guard let dotRect = Self.notificationDotRect(iconRect: iconRect, tabRect: tabRect) else {
+            return
+        }
         let path = NSBezierPath(ovalIn: dotRect)
         let shadow = NSShadow()
         shadow.shadowColor = NSColor.black.withAlphaComponent(0.4)
