@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 
 private struct WorkspaceHeaderFrame {
     let workspace: String
@@ -237,12 +238,19 @@ final class TabStrip {
         panel.orderFrontRegardless()
     }
 
-    func update(screen: NSScreen, windows: [Win], focused: Int?, hidden: Bool, gaps: OuterGaps) {
+    func update(
+        screen: NSScreen,
+        windows: [Win],
+        focused: Int?,
+        hidden: Bool,
+        gaps: OuterGaps,
+        notificationBadges: [String: String]
+    ) {
         let frame = Self.frame(on: screen, gaps: gaps)
         if panel.frame != frame {
             panel.setFrame(frame, display: false)
         }
-        view.set(windows: windows, focused: focused)
+        view.set(windows: windows, focused: focused, notificationBadges: notificationBadges)
         if hidden {
             setHidden(true)
             return
@@ -353,24 +361,28 @@ final class TabStripView: NSView {
     private var draggedWindowID: Int?
     private var dragOffsetX: CGFloat = 0
     private var dragX: CGFloat = 0
-    private var pendingModel: (windows: [Win], focused: Int?)?
+    private var pendingModel: (windows: [Win], focused: Int?, badges: [String: String])?
+    private var notificationBadges: [String: String] = [:]
 
     override var isOpaque: Bool { false }
     override var isFlipped: Bool { true }
     override var mouseDownCanMoveWindow: Bool { false }
 
-    func set(windows: [Win], focused: Int?) {
+    func set(windows: [Win], focused: Int?, notificationBadges: [String: String] = [:]) {
         if dragging {
-            pendingModel = (windows, focused)
+            pendingModel = (windows, focused, notificationBadges)
             return
         }
-        apply(windows: windows, focused: focused)
+        apply(windows: windows, focused: focused, notificationBadges: notificationBadges)
     }
 
-    private func apply(windows: [Win], focused: Int?) {
-        if self.windows == windows && self.focused == focused { return }
+    private func apply(windows: [Win], focused: Int?, notificationBadges: [String: String]) {
+        if self.windows == windows, self.focused == focused, self.notificationBadges == notificationBadges {
+            return
+        }
         self.windows = windows
         self.focused = focused
+        self.notificationBadges = notificationBadges
         recomputeFrames()
         needsDisplay = true
     }
@@ -479,7 +491,11 @@ final class TabStripView: NSView {
             draggedWindowID = nil
             if let pendingModel {
                 self.pendingModel = nil
-                apply(windows: pendingModel.windows, focused: pendingModel.focused)
+                apply(
+                    windows: pendingModel.windows,
+                    focused: pendingModel.focused,
+                    notificationBadges: pendingModel.badges
+                )
             }
             needsDisplay = true
         }
@@ -509,7 +525,11 @@ final class TabStripView: NSView {
         hover = nil
 
         if let pendingModel {
-            apply(windows: pendingModel.windows, focused: pendingModel.focused)
+            apply(
+                windows: pendingModel.windows,
+                focused: pendingModel.focused,
+                notificationBadges: pendingModel.badges
+            )
         }
         needsDisplay = true
     }
@@ -531,6 +551,21 @@ final class TabStripView: NSView {
         }
         let appearanceItem = menu.addItem(withTitle: "Appearance", action: nil, keyEquivalent: "")
         menu.setSubmenu(appearance, for: appearanceItem)
+
+        if !AXIsProcessTrusted() {
+            let explanation = menu.addItem(
+                withTitle: "Notification badges need Accessibility access",
+                action: nil,
+                keyEquivalent: ""
+            )
+            explanation.isEnabled = false
+            let settings = menu.addItem(
+                withTitle: "Open Accessibility Settings…",
+                action: #selector(openAccessibilitySettings),
+                keyEquivalent: ""
+            )
+            settings.target = self
+        }
 
         menu.addItem(.separator())
         let restore = menu.addItem(
@@ -554,6 +589,13 @@ final class TabStripView: NSView {
 
     @objc private func restoreGaps() {
         GapBoost.shared.restoreIfNeeded()
+    }
+
+    @objc private func openAccessibilitySettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") else {
+            return
+        }
+        NSWorkspace.shared.open(url)
     }
 
     @objc private func quit() {
@@ -748,14 +790,137 @@ final class TabStripView: NSView {
             Icons.shared.icon(for: win).draw(in: iconRect)
         }
 
+        let notificationBadge = notificationBadge(for: win)
+        var badgeClearance: CGFloat = 0
+        if iconSize >= 10, let notificationBadge {
+            let width = Self.notificationBadgeWidth(for: notificationBadge)
+            let badgeX = iconRect.maxX - 4
+            let showsCount = rect.height >= 14
+                && !Self.isDotBadge(notificationBadge)
+                && badgeX + width <= rect.maxX - 2
+            if showsCount {
+                badgeClearance = max(0, width - 4)
+            } else if let dotRect = Self.notificationDotRect(iconRect: iconRect, tabRect: rect) {
+                badgeClearance = max(0, dotRect.maxX - iconRect.maxX)
+            }
+            drawNotificationBadge(
+                notificationBadge,
+                iconRect: iconRect,
+                tabRect: rect,
+                showsCount: showsCount
+            )
+        }
+
         let textRect = NSRect(
-            x: iconRect.maxX + gap,
+            x: iconRect.maxX + gap + badgeClearance,
             y: rect.midY - textSize.height / 2,
-            width: maxTextWidth,
+            width: max(0, maxTextWidth - badgeClearance),
             height: textSize.height
         )
-        if maxTextWidth >= 2 {
+        if textRect.width >= 2 {
             label.draw(in: textRect, withAttributes: attrs)
         }
+    }
+
+    private func notificationBadge(for win: Win) -> String? {
+        if !win.bundlePath.isEmpty,
+           let badge = notificationBadges[DockBadgeKey.bundlePath(win.bundlePath)]
+        {
+            return badge
+        }
+        guard !win.bundleID.isEmpty else { return nil }
+        return notificationBadges[DockBadgeKey.bundleID(win.bundleID)]
+    }
+
+    private static func notificationBadgeWidth(for label: String) -> CGFloat {
+        if isDotBadge(label) { return 10 }
+        let displayLabel = label.count > 3 ? "99+" : label
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 8, weight: .bold),
+        ]
+        let textWidth = (displayLabel as NSString).size(withAttributes: attributes).width
+        return max(12, min(22, ceil(textWidth + 6)))
+    }
+
+    private func drawNotificationBadge(
+        _ label: String,
+        iconRect: NSRect,
+        tabRect: NSRect,
+        showsCount: Bool
+    ) {
+        guard showsCount else {
+            drawNotificationDot(iconRect: iconRect, tabRect: tabRect)
+            return
+        }
+
+        let displayLabel = label.count > 3 ? "99+" : label
+        let width = Self.notificationBadgeWidth(for: label)
+        let badgeRect = NSRect(
+            x: iconRect.maxX - 4,
+            y: tabRect.minY + 1,
+            width: width,
+            height: 12
+        )
+        let path = NSBezierPath(roundedRect: badgeRect, xRadius: 6, yRadius: 6)
+        let shadow = NSShadow()
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.35)
+        shadow.shadowBlurRadius = 2
+        shadow.shadowOffset = NSSize(width: 0, height: -1)
+
+        NSGraphicsContext.saveGraphicsState()
+        shadow.set()
+        NSColor.systemRed.setFill()
+        path.fill()
+        NSColor.white.withAlphaComponent(0.9).setStroke()
+        path.lineWidth = 0.75
+        path.stroke()
+        NSGraphicsContext.restoreGraphicsState()
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 8, weight: .bold),
+            .foregroundColor: NSColor.white,
+        ]
+        let text = displayLabel as NSString
+        let size = text.size(withAttributes: attributes)
+        text.draw(
+            at: NSPoint(x: badgeRect.midX - size.width / 2, y: badgeRect.midY - size.height / 2),
+            withAttributes: attributes
+        )
+    }
+
+    private static func isDotBadge(_ label: String) -> Bool {
+        ["•", "●", "∙", "·"].contains(label.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private static func notificationDotRect(iconRect: NSRect, tabRect: NSRect) -> NSRect? {
+        let inset: CGFloat = 2
+        let size = min(10, tabRect.width - inset * 2, tabRect.height - inset * 2)
+        guard size >= 6 else { return nil }
+
+        let x = max(
+            tabRect.minX + inset,
+            min(iconRect.maxX - 3, tabRect.maxX - inset - size)
+        )
+        return NSRect(x: x, y: tabRect.minY + inset, width: size, height: size)
+    }
+
+    private func drawNotificationDot(iconRect: NSRect, tabRect: NSRect) {
+        guard let dotRect = Self.notificationDotRect(iconRect: iconRect, tabRect: tabRect) else {
+            return
+        }
+        let path = NSBezierPath(ovalIn: dotRect)
+        let shadow = NSShadow()
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.4)
+        shadow.shadowBlurRadius = 2
+        shadow.shadowOffset = NSSize(width: 0, height: -1)
+
+        NSGraphicsContext.saveGraphicsState()
+        shadow.set()
+        NSColor.systemRed.setFill()
+        path.fill()
+        NSColor.white.withAlphaComponent(0.95).setStroke()
+        path.lineWidth = 1
+        path.stroke()
+        NSGraphicsContext.restoreGraphicsState()
     }
 }

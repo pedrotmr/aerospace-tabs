@@ -22,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let session = Session()
     private let hotkeys = Hotkeys()
     private let missionControl = MissionControlWatcher()
+    private let dockBadgeReader = DockBadgeReader()
     private var strips: [CGDirectDisplayID: TabStrip] = [:]
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -31,6 +32,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         session.onChange = { [weak self] in
             self?.render()
         }
+        dockBadgeReader.onChange = { [weak self] in
+            self?.render()
+        }
+        dockBadgeReader.start()
         hotkeys.onStep = { [weak self] cycle, reverse in
             self?.session.stepCycle(cycle, reverse: reverse)
         }
@@ -68,6 +73,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func render() {
         let grouped = Dictionary(grouping: session.windows, by: \.screenIndex)
+        let badges = dockBadgeReader.badgesByApp
         var seen: Set<CGDirectDisplayID> = []
         let hidden = missionControl.isActive
         var anyStripVisible = false
@@ -102,7 +108,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 windows: windows,
                 focused: session.displayFocusedID,
                 hidden: hidden || !showTabs,
-                gaps: gaps
+                gaps: gaps,
+                notificationBadges: badges
             )
         }
 
