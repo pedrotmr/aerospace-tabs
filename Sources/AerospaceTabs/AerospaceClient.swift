@@ -65,6 +65,13 @@ final class AerospaceClient {
         }
     }
 
+    func focus(workspace: String, completion: @escaping () -> Void) {
+        queue.async { [weak self] in
+            _ = try? self?.command(["workspace", "--", workspace])
+            DispatchQueue.main.async(execute: completion)
+        }
+    }
+
     private func command(_ args: [String]) throws -> String {
         var shouldRetry = true
         while true {

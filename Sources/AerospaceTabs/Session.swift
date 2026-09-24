@@ -99,6 +99,7 @@ final class Session {
     private let order = TabOrder()
     private var refreshQueued = false
     private var focusing = false
+    private var cycleWorkspace: String?
     var windows: [Win] = []
     var focusedID: Int?
     var onChange: (() -> Void)?
@@ -118,7 +119,20 @@ final class Session {
     }
 
     /// Advance and focus immediately so the window is visible while cycling.
-    func stepCycle(reverse: Bool = false) {
+    func stepCycle(_ cycle: HotkeyCycle, reverse: Bool = false) {
+        switch cycle {
+        case .spaces:
+            stepSpaceCycle(reverse: reverse)
+        case .windows:
+            stepWindowCycle(reverse: reverse)
+        }
+    }
+
+    func commitCycle(_ cycle: HotkeyCycle) {
+        if cycle == .spaces { cycleWorkspace = nil }
+    }
+
+    private func stepWindowCycle(reverse: Bool) {
         let pool = cyclePool()
         guard !pool.isEmpty else { return }
         let current = pool.firstIndex(where: { $0.id == focusedID }) ?? (reverse ? 0 : -1)
@@ -126,8 +140,14 @@ final class Session {
         focus(pool[next].id)
     }
 
-    func commitCycle() {
-        // Focus already applied on each step; nothing to do on release.
+    private func stepSpaceCycle(reverse: Bool) {
+        let pool = spaceCyclePool()
+        guard !pool.isEmpty else { return }
+        let currentName = cycleWorkspace ?? focusedWorkspaceName
+        let current = pool.firstIndex(of: currentName ?? "") ?? (reverse ? 0 : -1)
+        let next = (current + (reverse ? -1 : 1) + pool.count) % pool.count
+        cycleWorkspace = pool[next]
+        focus(workspace: pool[next])
     }
 
     func focus(_ id: Int) {
@@ -141,6 +161,10 @@ final class Session {
                 self?.focusing = false
             }
         }
+    }
+
+    private func focus(workspace: String) {
+        client.focus(workspace: workspace) { }
     }
 
     func reorder(ids: [Int], workspace: String) {
@@ -160,6 +184,27 @@ final class Session {
             $0.screenIndex == focusedWindow.screenIndex
                 && $0.workspace == focusedWindow.workspace
         }
+    }
+
+    private var focusedWorkspaceName: String? {
+        windows.first(where: { $0.id == focusedID })?.workspace
+            ?? windows.first(where: \.workspaceIsFocused)?.workspace
+    }
+
+    private func spaceCyclePool() -> [String] {
+        let focusedWindow = windows.first(where: { $0.id == focusedID })
+            ?? windows.first(where: \.workspaceIsFocused)
+            ?? windows.first(where: \.workspaceIsVisible)
+        guard let focusedWindow else { return [] }
+
+        var workspaces: [String] = []
+        var seen: Set<String> = []
+        for window in windows where window.screenIndex == focusedWindow.screenIndex {
+            if seen.insert(window.workspace).inserted {
+                workspaces.append(window.workspace)
+            }
+        }
+        return workspaces
     }
 
     private func handle(_ event: AeroEvent) {

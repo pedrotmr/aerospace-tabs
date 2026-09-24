@@ -31,11 +31,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         session.onChange = { [weak self] in
             self?.render()
         }
-        hotkeys.onStep = { [weak self] reverse in
-            self?.session.stepCycle(reverse: reverse)
+        hotkeys.onStep = { [weak self] cycle, reverse in
+            self?.session.stepCycle(cycle, reverse: reverse)
         }
-        hotkeys.onCommit = { [weak self] in
-            self?.session.commitCycle()
+        hotkeys.onCommit = { [weak self] cycle in
+            self?.session.commitCycle(cycle)
         }
         missionControl.onChange = { [weak self] _ in
             self?.render()
