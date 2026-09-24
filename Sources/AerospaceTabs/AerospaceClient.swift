@@ -1,6 +1,16 @@
 import Darwin
 import Foundation
 
+private struct FocusedWorkspaceRow: Decodable {
+    let workspace: String?
+    let monitorAppkitNsscreenScreensId: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case workspace
+        case monitorAppkitNsscreenScreensId = "monitor-appkit-nsscreen-screens-id"
+    }
+}
+
 final class AerospaceClient {
     /// AeroSpace replies are small JSON documents. This generous ceiling prevents a
     /// corrupt or malicious length prefix from causing an unbounded allocation.
@@ -25,6 +35,10 @@ final class AerospaceClient {
 
     private static let format =
         "%{window-id}%{window-title}%{app-name}%{app-bundle-id}%{app-bundle-path}%{workspace}%{workspace-is-focused}%{workspace-is-visible}%{monitor-appkit-nsscreen-screens-id}%{window-parent-container-layout}"
+    private static let focusedWindowFormat =
+        "%{window-id}%{workspace}%{monitor-appkit-nsscreen-screens-id}"
+    private static let focusedWorkspaceFormat =
+        "%{workspace}%{monitor-appkit-nsscreen-screens-id}"
 
     func listAllWindows(completion: @escaping (Result<Snapshot, Error>) -> Void) {
         queue.async { [weak self] in
@@ -39,16 +53,38 @@ final class AerospaceClient {
                 let rows = try self.decoder.decode([WindowRow].self, from: Data(raw.utf8))
                 let windows = rows.compactMap(\.asWin).filter { $0.bundleID != "com.pedrotmr.AerospaceTabs" }
                 var focused: Int?
+                var focusedWorkspace: String?
+                var focusedScreenIndex: Int?
                 if let focusedRaw = try? self.command([
                     "list-windows",
                     "--focused",
                     "--json",
-                    "--format", "%{window-id}",
-                ]), let focusedRows = try? self.decoder.decode([WindowRow].self, from: Data(focusedRaw.utf8)) {
-                    focused = focusedRows.first?.windowId
+                    "--format", Self.focusedWindowFormat,
+                ]), let focusedRows = try? self.decoder.decode([WindowRow].self, from: Data(focusedRaw.utf8)),
+                   let focusedRow = focusedRows.first {
+                    focused = focusedRow.windowId
+                    focusedWorkspace = focusedRow.workspace
+                    focusedScreenIndex = focusedRow.monitorAppkitNsscreenScreensId
+                }
+                if focusedWorkspace == nil || focusedScreenIndex == nil,
+                   let workspaceRaw = try? self.command([
+                       "list-workspaces",
+                       "--focused",
+                       "--json",
+                       "--format", Self.focusedWorkspaceFormat,
+                   ]),
+                   let workspaceRows = try? self.decoder.decode([FocusedWorkspaceRow].self, from: Data(workspaceRaw.utf8)),
+                   let focusedRow = workspaceRows.first {
+                    focusedWorkspace = focusedWorkspace ?? focusedRow.workspace
+                    focusedScreenIndex = focusedScreenIndex ?? focusedRow.monitorAppkitNsscreenScreensId
                 }
                 DispatchQueue.main.async {
-                    completion(.success(Snapshot(windows: windows, focused: focused)))
+                    completion(.success(Snapshot(
+                        windows: windows,
+                        focused: focused,
+                        focusedWorkspace: focusedWorkspace,
+                        focusedScreenIndex: focusedScreenIndex
+                    )))
                 }
             } catch {
                 DispatchQueue.main.async {

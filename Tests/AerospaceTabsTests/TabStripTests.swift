@@ -41,10 +41,20 @@ final class TabStripTests: XCTestCase {
         })
     }
 
+    func testGroupedLayoutKeepsTabsReachableAtCompactWidth() {
+        let bounds = CGRect(x: 0, y: 0, width: 120, height: 34)
+        let windows = (1...5).map { makeWindow(id: $0, workspace: "space-\($0)") }
+        let frames = TabStripLayout(bounds: bounds, windows: windows).frames
+
+        XCTAssertEqual(frames.count, windows.count)
+        XCTAssertTrue(frames.allSatisfy { $0.width >= 7.9 })
+        XCTAssertTrue(frames.allSatisfy { $0.minX >= bounds.minX && $0.maxX <= bounds.maxX })
+    }
+
     func testLastCompactTabCanBePickedAndReachedByDragging() {
         let view = TabStripView(frame: CGRect(x: 0, y: 0, width: 120, height: 34))
-        let windows = (1...100).map(makeWindow)
-        let frames = TabStripLayout(bounds: view.bounds, count: windows.count).frames
+        let windows = (1...100).map { makeWindow(id: $0) }
+        let frames = TabStripLayout(bounds: view.bounds, windows: windows).frames
         let firstPoint = CGPoint(x: frames[0].midX, y: frames[0].midY)
         let lastPoint = CGPoint(x: frames[99].midX, y: frames[99].midY)
         view.set(windows: windows, focused: 1)
@@ -154,14 +164,14 @@ final class TabStripTests: XCTestCase {
         TabStripView(frame: CGRect(x: 0, y: 0, width: 200, height: 34))
     }
 
-    private func makeWindow(id: Int) -> Win {
+    private func makeWindow(id: Int, workspace: String = "main") -> Win {
         Win(
             id: id,
             title: "Window \(id)",
             appName: "Test",
             bundleID: "test.bundle",
             bundlePath: "/Applications/Test.app",
-            workspace: "main",
+            workspace: workspace,
             screenIndex: 1,
             parentLayout: "h_tiles"
         )

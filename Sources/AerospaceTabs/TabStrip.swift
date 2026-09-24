@@ -74,20 +74,34 @@ struct TabStripLayout {
 
         let contentWidth = max(0, stripWidth - inset * 2)
         let groupCount = groups.count
-        let headerGap = min(5, contentWidth / CGFloat(max(groupCount * 8, 1)))
-        let sectionGap = min(10, contentWidth / CGFloat(max(groupCount * 4, 1)))
-        let tabGap = groupCount == count
+        let preferredHeaderGap = min(5, contentWidth / CGFloat(max(groupCount * 8, 1)))
+        let preferredSectionGap = min(10, contentWidth / CGFloat(max(groupCount * 4, 1)))
+        let preferredTabGap = groupCount == count
             ? 0
             : min(4, contentWidth / CGFloat(max(count * 4, 1)))
-        gap = tabGap
 
         let maxHeaderWidth = min(76, contentWidth / CGFloat(max(groupCount, 1)) * 0.7)
-        let preferredHeaderWidth = groups.map { workspace, _ in
+        let preferredHeaderWidths = groups.map { workspace, _ in
             let label = workspace.isEmpty ? "?" : workspace
             let preferred = max(20, CGFloat(label.count) * 6.4 + 10)
             return min(maxHeaderWidth, preferred)
-        }.max() ?? 0
-        let headerWidths = Array(repeating: preferredHeaderWidth, count: groupCount)
+        }
+
+        let minimumTabWidth = min(8, contentWidth / CGFloat(count))
+        let chromeBudget = max(0, contentWidth - minimumTabWidth * CGFloat(count))
+        let preferredChromeWidth = preferredHeaderWidths.reduce(0, +)
+            + preferredTabGap * CGFloat(max(count - groupCount, 0))
+            + preferredSectionGap * CGFloat(max(groupCount - 1, 0))
+            + preferredHeaderGap * CGFloat(groupCount)
+        let chromeScale = preferredChromeWidth > 0
+            ? min(1, chromeBudget / preferredChromeWidth)
+            : 1
+        let headerWidths = preferredHeaderWidths.map { $0 * chromeScale }
+        let headerGap = preferredHeaderGap * chromeScale
+        let sectionGap = preferredSectionGap * chromeScale
+        let tabGap = preferredTabGap * chromeScale
+        gap = tabGap
+
         let tabGaps = CGFloat(max(count - groupCount, 0)) * tabGap
         let groupGaps = CGFloat(max(groupCount - 1, 0)) * sectionGap
         let headerGaps = CGFloat(groupCount) * headerGap
@@ -424,7 +438,7 @@ final class TabStripView: NSView {
         guard let dragIndex else { return }
         let workspace = windows[dragIndex].workspace
         guard let section = workspaceHeaders.first(where: { $0.workspace == workspace }) else { return }
-        let candidates = Array(section.windowRange)
+        let candidates = section.windowRange
         guard let first = candidates.first, let last = candidates.last else { return }
         let tabWidth = tabLayout().tabWidth
         let minX = frames[first].minX
@@ -654,7 +668,7 @@ final class TabStripView: NSView {
             .foregroundColor: NSColor.white,
             .paragraphStyle: paragraph,
         ]
-        let availableWidth = max(0, rect.width - 6)
+        let availableWidth = max(0, rect.width - min(6, rect.width * 0.2))
         let measured = labelText.size(withAttributes: attributes)
         let labelWidth = min(availableWidth, measured.width)
         let labelRect = NSRect(
