@@ -28,7 +28,7 @@ New ideas must pass the feature fence:
 
 1. Do not touch AeroSpace’s layout tree  
 2. Do not regress strip/focus latency on the hot path  
-3. Serve the current workspace (or an explicit dismissible glance)  
+3. Serve the focused workspace with a grouped overview of occupied workspaces in the strip
 4. The maintainer would use it the following week  
 
 Fail any → no (or file an issue and move on).

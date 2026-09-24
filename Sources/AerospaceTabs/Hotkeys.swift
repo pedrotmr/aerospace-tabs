@@ -4,17 +4,19 @@ import CoreGraphics
 import Foundation
 
 final class Hotkeys {
-    /// Called on each cycle step. `reverse` is Option-backtick.
-    var onStep: ((Bool) -> Void)?
-    var onCommit: (() -> Void)?
+    var onStep: ((HotkeyCycle, Bool) -> Void)?
+    var onCommit: ((HotkeyCycle) -> Void)?
 
     private var nextRef: EventHotKeyRef?
     private var prevRef: EventHotKeyRef?
+    private var nextSpaceRef: EventHotKeyRef?
+    private var prevSpaceRef: EventHotKeyRef?
     private var handler: EventHandlerRef?
     private var flagsMonitor: Any?
     private var holdTimer: Timer?
     private var holdActive = false
     private var reverse = false
+    private var cycle: HotkeyCycle = .windows
     private var holdKey: CGKeyCode = CGKeyCode(kVK_Tab)
     private var holdStarted = Date()
     private var lastStep = Date()
@@ -59,8 +61,8 @@ final class Hotkeys {
                 &id
             )
             DispatchQueue.main.async {
-                // id 1 = Option-Tab (forward), id 2 = Option-` (reverse)
-                hotkeys.handleStep(reverse: id.id == 2)
+                let cycle: HotkeyCycle = id.id >= 3 ? .spaces : .windows
+                hotkeys.handleStep(cycle: cycle, reverse: id.id == 2 || id.id == 4)
             }
             return noErr
         }, 1, &pressed, userData, &installedHandler)
@@ -113,6 +115,40 @@ final class Hotkeys {
         }
         prevRef = registeredPrevious
 
+        var registeredNextSpace: EventHotKeyRef?
+        let nextSpaceStatus = RegisterEventHotKey(
+            UInt32(kVK_Tab),
+            UInt32(optionKey | controlKey),
+            EventHotKeyID(signature: OSType(0x41544142), id: 3),
+            GetApplicationEventTarget(),
+            0,
+            &registeredNextSpace
+        )
+        guard nextSpaceStatus == noErr, let registeredNextSpace else {
+            if let registeredNextSpace { UnregisterEventHotKey(registeredNextSpace) }
+            removeCarbonRegistrations()
+            reportInstallationFailure(.spaceForwardHotKey(status: nextSpaceStatus))
+            return
+        }
+        nextSpaceRef = registeredNextSpace
+
+        var registeredPreviousSpace: EventHotKeyRef?
+        let previousSpaceStatus = RegisterEventHotKey(
+            UInt32(kVK_ANSI_Grave),
+            UInt32(optionKey | controlKey),
+            EventHotKeyID(signature: OSType(0x41544142), id: 4),
+            GetApplicationEventTarget(),
+            0,
+            &registeredPreviousSpace
+        )
+        guard previousSpaceStatus == noErr, let registeredPreviousSpace else {
+            if let registeredPreviousSpace { UnregisterEventHotKey(registeredPreviousSpace) }
+            removeCarbonRegistrations()
+            reportInstallationFailure(.spaceReverseHotKey(status: previousSpaceStatus))
+            return
+        }
+        prevSpaceRef = registeredPreviousSpace
+
         flagsMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
             if !event.modifierFlags.contains(.option) {
                 self?.stopHold()
@@ -131,6 +167,14 @@ final class Hotkeys {
         if let prevRef {
             UnregisterEventHotKey(prevRef)
             self.prevRef = nil
+        }
+        if let nextSpaceRef {
+            UnregisterEventHotKey(nextSpaceRef)
+            self.nextSpaceRef = nil
+        }
+        if let prevSpaceRef {
+            UnregisterEventHotKey(prevSpaceRef)
+            self.prevSpaceRef = nil
         }
         if let nextRef {
             UnregisterEventHotKey(nextRef)
@@ -160,17 +204,18 @@ final class Hotkeys {
         alert.runModal()
     }
 
-    private func handleStep(reverse: Bool) {
+    private func handleStep(cycle: HotkeyCycle, reverse: Bool) {
         // Carbon may fire key-repeat hotkeys; the hold timer owns continuing steps.
         if holdActive { return }
 
         self.reverse = reverse
+        self.cycle = cycle
         holdKey = reverse ? CGKeyCode(kVK_ANSI_Grave) : CGKeyCode(kVK_Tab)
         holdActive = true
         holdStarted = Date()
         lastStep = Date()
         didRepeatStep = false
-        onStep?(reverse)
+        onStep?(cycle, reverse)
         startHoldTimer()
     }
 
@@ -184,7 +229,7 @@ final class Hotkeys {
 
     private func holdTick() {
         // Stop as soon as Tab/` goes up (Option can stay down).
-        guard stepKeyDown, optionDown else {
+        guard stepKeyDown, optionDown, cycle != .spaces || controlDown else {
             stopHold()
             return
         }
@@ -194,14 +239,14 @@ final class Hotkeys {
             if now.timeIntervalSince(holdStarted) >= initialRepeatDelay {
                 didRepeatStep = true
                 lastStep = now
-                onStep?(reverse)
+                onStep?(cycle, reverse)
             }
             return
         }
 
         if now.timeIntervalSince(lastStep) >= repeatInterval {
             lastStep = now
-            onStep?(reverse)
+            onStep?(cycle, reverse)
         }
     }
 
@@ -211,11 +256,15 @@ final class Hotkeys {
         didRepeatStep = false
         holdTimer?.invalidate()
         holdTimer = nil
-        onCommit?()
+        onCommit?(cycle)
     }
 
     private var optionDown: Bool {
         NSEvent.modifierFlags.contains(.option)
+    }
+
+    private var controlDown: Bool {
+        NSEvent.modifierFlags.contains(.control)
     }
 
     private var stepKeyDown: Bool {
@@ -228,10 +277,17 @@ final class Hotkeys {
     }
 }
 
+enum HotkeyCycle: Equatable {
+    case spaces
+    case windows
+}
+
 enum HotkeyInstallationError: LocalizedError, Equatable {
     case eventHandler(status: OSStatus)
     case forwardHotKey(status: OSStatus)
     case reverseHotKey(status: OSStatus)
+    case spaceForwardHotKey(status: OSStatus)
+    case spaceReverseHotKey(status: OSStatus)
 
     var errorDescription: String? {
         switch self {
@@ -241,6 +297,10 @@ enum HotkeyInstallationError: LocalizedError, Equatable {
             return "Could not register Option-Tab (OSStatus \(status))."
         case .reverseHotKey(let status):
             return "Could not register Option-Backtick (OSStatus \(status))."
+        case .spaceForwardHotKey(let status):
+            return "Could not register Control-Option-Tab (OSStatus \(status))."
+        case .spaceReverseHotKey(let status):
+            return "Could not register Control-Option-Backtick (OSStatus \(status))."
         }
     }
 }

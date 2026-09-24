@@ -7,9 +7,35 @@ struct Win: Equatable {
     let bundleID: String
     let bundlePath: String
     let workspace: String
+    let workspaceIsFocused: Bool
+    let workspaceIsVisible: Bool
     let screenIndex: Int
     /// AeroSpace parent layout: h_tiles, v_tiles, h_accordion, v_accordion, floating.
     let parentLayout: String
+
+    init(
+        id: Int,
+        title: String,
+        appName: String,
+        bundleID: String,
+        bundlePath: String,
+        workspace: String,
+        screenIndex: Int,
+        parentLayout: String,
+        workspaceIsFocused: Bool = false,
+        workspaceIsVisible: Bool = false
+    ) {
+        self.id = id
+        self.title = title
+        self.appName = appName
+        self.bundleID = bundleID
+        self.bundlePath = bundlePath
+        self.workspace = workspace
+        self.screenIndex = screenIndex
+        self.parentLayout = parentLayout
+        self.workspaceIsFocused = workspaceIsFocused
+        self.workspaceIsVisible = workspaceIsVisible
+    }
 
     var label: String {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -32,6 +58,8 @@ struct WindowRow: Decodable {
     let appBundleId: String?
     let appBundlePath: String?
     let workspace: String?
+    let workspaceIsFocused: Bool?
+    let workspaceIsVisible: Bool?
     let monitorAppkitNsscreenScreensId: Int?
     let windowParentContainerLayout: String?
 
@@ -42,6 +70,8 @@ struct WindowRow: Decodable {
         case appBundleId = "app-bundle-id"
         case appBundlePath = "app-bundle-path"
         case workspace
+        case workspaceIsFocused = "workspace-is-focused"
+        case workspaceIsVisible = "workspace-is-visible"
         case monitorAppkitNsscreenScreensId = "monitor-appkit-nsscreen-screens-id"
         case windowParentContainerLayout = "window-parent-container-layout"
     }
@@ -56,7 +86,9 @@ struct WindowRow: Decodable {
             bundlePath: appBundlePath ?? "",
             workspace: workspace ?? "",
             screenIndex: monitorAppkitNsscreenScreensId ?? 1,
-            parentLayout: windowParentContainerLayout ?? ""
+            parentLayout: windowParentContainerLayout ?? "",
+            workspaceIsFocused: workspaceIsFocused ?? false,
+            workspaceIsVisible: workspaceIsVisible ?? false
         )
     }
 }
@@ -67,6 +99,9 @@ final class Session {
     private let order = TabOrder()
     private var refreshQueued = false
     private var focusing = false
+    private var cycleWorkspace: String?
+    private var focusedWorkspace: String?
+    private var focusedScreenIndex: Int?
     var windows: [Win] = []
     var focusedID: Int?
     var onChange: (() -> Void)?
@@ -86,7 +121,20 @@ final class Session {
     }
 
     /// Advance and focus immediately so the window is visible while cycling.
-    func stepCycle(reverse: Bool = false) {
+    func stepCycle(_ cycle: HotkeyCycle, reverse: Bool = false) {
+        switch cycle {
+        case .spaces:
+            stepSpaceCycle(reverse: reverse)
+        case .windows:
+            stepWindowCycle(reverse: reverse)
+        }
+    }
+
+    func commitCycle(_ cycle: HotkeyCycle) {
+        if cycle == .spaces { cycleWorkspace = nil }
+    }
+
+    private func stepWindowCycle(reverse: Bool) {
         let pool = cyclePool()
         guard !pool.isEmpty else { return }
         let current = pool.firstIndex(where: { $0.id == focusedID }) ?? (reverse ? 0 : -1)
@@ -94,11 +142,21 @@ final class Session {
         focus(pool[next].id)
     }
 
-    func commitCycle() {
-        // Focus already applied on each step; nothing to do on release.
+    private func stepSpaceCycle(reverse: Bool) {
+        let pool = spaceCyclePool()
+        guard !pool.isEmpty else { return }
+        let currentName = cycleWorkspace ?? focusedWorkspaceName
+        let current = pool.firstIndex(of: currentName ?? "") ?? (reverse ? 0 : -1)
+        let next = (current + (reverse ? -1 : 1) + pool.count) % pool.count
+        cycleWorkspace = pool[next]
+        focus(workspace: pool[next])
     }
 
     func focus(_ id: Int) {
+        if let window = windows.first(where: { $0.id == id }) {
+            focusedWorkspace = window.workspace
+            focusedScreenIndex = window.screenIndex
+        }
         if focusedID != id {
             focusedID = id
             onChange?()
@@ -111,6 +169,11 @@ final class Session {
         }
     }
 
+    private func focus(workspace: String) {
+        focusedWorkspace = workspace
+        client.focus(workspace: workspace) { }
+    }
+
     func reorder(ids: [Int], workspace: String) {
         order.setOrder(ids: ids, workspace: workspace)
         let sorted = order.apply(windows)
@@ -120,9 +183,36 @@ final class Session {
         }
     }
 
-    private func cyclePool() -> [Win] {
-        let screen = windows.first(where: { $0.id == focusedID })?.screenIndex
-        return screen.map { index in windows.filter { $0.screenIndex == index } } ?? windows
+    func cyclePool() -> [Win] {
+        guard let focusedWindow = windows.first(where: { $0.id == focusedID }) else {
+            return windows.filter(\.workspaceIsFocused)
+        }
+        return windows.filter {
+            $0.screenIndex == focusedWindow.screenIndex
+                && $0.workspace == focusedWindow.workspace
+        }
+    }
+
+    private var focusedWorkspaceName: String? {
+        windows.first(where: { $0.id == focusedID })?.workspace
+            ?? focusedWorkspace
+            ?? windows.first(where: \.workspaceIsFocused)?.workspace
+    }
+
+    func spaceCyclePool() -> [String] {
+        let screenIndex = windows.first(where: { $0.id == focusedID })?.screenIndex
+            ?? focusedScreenIndex
+            ?? windows.first(where: \.workspaceIsFocused)?.screenIndex
+        guard let screenIndex else { return [] }
+
+        var workspaces: [String] = []
+        var seen: Set<String> = []
+        for window in windows where window.screenIndex == screenIndex {
+            if seen.insert(window.workspace).inserted {
+                workspaces.append(window.workspace)
+            }
+        }
+        return workspaces
     }
 
     private func handle(_ event: AeroEvent) {
@@ -155,7 +245,7 @@ final class Session {
     }
 
     private func refreshNow() {
-        client.listVisibleWindows { [weak self] result in
+        client.listAllWindows { [weak self] result in
             guard let self else { return }
             switch result {
             case .failure:
@@ -169,9 +259,15 @@ final class Session {
 
     func apply(_ snapshot: Snapshot) {
         let sorted = order.apply(snapshot.windows)
-        if sorted != windows || snapshot.focused != focusedID {
-            windows = sorted
-            focusedID = snapshot.focused
+        let changed = sorted != windows
+            || snapshot.focused != focusedID
+            || snapshot.focusedWorkspace != focusedWorkspace
+            || snapshot.focusedScreenIndex != focusedScreenIndex
+        windows = sorted
+        focusedID = snapshot.focused
+        focusedWorkspace = snapshot.focusedWorkspace
+        focusedScreenIndex = snapshot.focusedScreenIndex
+        if changed {
             onChange?()
         }
     }
@@ -180,6 +276,8 @@ final class Session {
 struct Snapshot {
     var windows: [Win]
     var focused: Int?
+    var focusedWorkspace: String? = nil
+    var focusedScreenIndex: Int? = nil
 }
 
 struct AeroEvent {

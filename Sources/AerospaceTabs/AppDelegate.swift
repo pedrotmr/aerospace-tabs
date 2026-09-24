@@ -31,11 +31,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         session.onChange = { [weak self] in
             self?.render()
         }
-        hotkeys.onStep = { [weak self] reverse in
-            self?.session.stepCycle(reverse: reverse)
+        hotkeys.onStep = { [weak self] cycle, reverse in
+            self?.session.stepCycle(cycle, reverse: reverse)
         }
-        hotkeys.onCommit = { [weak self] in
-            self?.session.commitCycle()
+        hotkeys.onCommit = { [weak self] cycle in
+            self?.session.commitCycle(cycle)
         }
         missionControl.onChange = { [weak self] _ in
             self?.render()
@@ -94,7 +94,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return created
             }()
             let gaps = GapsConfig.shared.gaps(for: screen)
-            // Charter: show for any 2+ windows (tiles or accordion).
+            // Show an overview when this monitor has at least two occupied windows.
             let showTabs = Self.shouldShowTabs(windows)
             if showTabs { anyStripVisible = true }
             strip.update(
@@ -122,7 +122,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }
 
-    /// Strip visibility: two or more windows on the workspace (tiles or accordion).
+    /// Strip visibility: two or more windows across this monitor's occupied workspaces.
     private static func shouldShowTabs(_ windows: [Win]) -> Bool {
         windows.count >= 2
     }
