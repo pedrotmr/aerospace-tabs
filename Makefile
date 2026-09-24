@@ -1,5 +1,9 @@
 APP := AerospaceTabs.app
 BIN := .build/release/AerospaceTabs
+SIGNING_IDENTITY ?= $(shell security find-identity -v -p codesigning 2>/dev/null | grep -m 1 '^[[:space:]]*[0-9]' | awk '{ print $$2 }')
+ifeq ($(strip $(SIGNING_IDENTITY)),)
+SIGNING_IDENTITY := -
+endif
 
 .PHONY: build run kill restore-gaps
 
@@ -9,6 +13,7 @@ build:
 	mkdir -p $(APP)/Contents/MacOS
 	cp $(BIN) $(APP)/Contents/MacOS/AerospaceTabs
 	cp Resources/Info.plist $(APP)/Contents/Info.plist
+	codesign --force --sign "$(SIGNING_IDENTITY)" --identifier com.pedrotmr.AerospaceTabs $(APP)
 
 kill:
 	-$(BIN) --restore-gaps 2>/dev/null || true

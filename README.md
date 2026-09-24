@@ -10,6 +10,7 @@ See [CHARTER.md](CHARTER.md) for what this is, what it isn’t, and how support 
 - Click a tab to focus; drag to reorder within its workspace
 - Option-Tab / Option-`` ` `` to cycle windows in the focused space (hold to repeat; release Tab/`` ` `` to stop)
 - Control-Option-Tab / Control-Option-`` ` `` to cycle occupied spaces
+- Mirrors app notification badges from the Dock on matching tabs
 - Hides during Mission Control / App Exposé
 - Temporarily boosts AeroSpace `gaps.outer.top` so windows clear the strip; restores on quit
 
@@ -17,7 +18,7 @@ See [CHARTER.md](CHARTER.md) for what this is, what it isn’t, and how support 
 
 - macOS
 - [AeroSpace](https://github.com/nikitabobko/AeroSpace) running
-- Accessibility permission (for Option-Tab to be swallowed instead of going to the focused app)
+- Accessibility permission (for global shortcuts and Dock notification badges)
 
 ## Run
 
