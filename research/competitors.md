@@ -1,0 +1,96 @@
+# Competitive scan: AeroSpace companions and window overviews
+
+**Surveyed:** 28 September 2026. This scan treats “AeroSpace” as the macOS tiling window manager used by Aerospace Tabs. The repo describes Aerospace Tabs as a companion that lists and focuses windows while AeroSpace owns layout; its current overview groups occupied workspaces on each screen in a persistent top strip ([README](../README.md), [CHARTER](../CHARTER.md)). I classified products by overlap with workspace/window visibility and focus, rather than general tiling features.
+
+## Summary
+
+The closest competition is a small cluster of AeroSpace-specific utilities:
+
+- **omacosy** bundles a live Mission Control-style overview into an AeroSpace-centered macOS setup. It has the strongest new popularity signal, but it is a full environment rather than a standalone companion.
+- **SwipeAeroSpace** offers a full-screen overview of workspaces and apps grouped by monitor, with hover previews and direct window focus. It is the closest newly found standalone all-window overview.
+- **AeroKit** offers a spatial overview of the focused workspace, plus snapshots and workspace switching.
+- **AeroMux** is the closest persistent “all windows and workspaces” inventory: a sidebar groups non-empty workspaces and lets users focus a window from its row.
+- **Raycast’s AeroSpace extension** is the most capable search-first alternative, with focused, visible, and all-workspace scopes.
+- **AeroTabs** is the closest tab-strip peer, but its documented tabs cover only the focused workspace.
+- **AeroSpace Workspace Switcher** adds a searchable panel across non-empty workspaces, with selection documented at the workspace level.
+
+The general macOS category is crowded with window switchers and Dock previews. These are useful substitutes for finding/focusing a window, but most are transient overlays or Dock/sidebar surfaces rather than a persistent, AeroSpace-aware overview. Apple’s built-in Mission Control remains the baseline: it displays the current desktop’s open windows in a single layer, with Spaces shown along the top and behavior scoped to the current display ([Apple Support](https://support.apple.com/en-nz/guide/mac-help/mchlb7beb9af/mac)).
+
+## AeroSpace-specific competitors
+
+| Product | Overlap and interface | Platform / market |
+|---|---|---|
+| [AeroKit](https://github.com/jomatsu/aerokit) | **High; visual overview.** A menu-bar companion with a Cmd-Tab-style workspace switcher, snapshot previews, and spatial Exposé for the focused workspace. App Exposé finds windows for the focused app across workspaces. Its experimental window-switcher strip cycles through windows in the focused workspace. It does not change the AeroSpace layout. | macOS 14+, requires AeroSpace; MIT-licensed source and Homebrew install. Screen Recording permission enables window previews. |
+| [AeroMux](https://github.com/raghavendra-talur/aeromux) | **High; persistent inventory.** A left sidebar lists non-empty workspaces and windows by app and title, highlights the focused workspace/window, and focuses a selected row through AeroSpace. Workspace titles and descriptions are editable. It is a textual list rather than thumbnail Exposé. Standard mode reserves a left gap; floating mode can cover tiled windows. | macOS 13+, requires AeroSpace; MIT-licensed public repo. Its documented view is limited to the main monitor. |
+| [AeroSpace extension for Raycast](https://www.raycast.com/limonkufu/aerospace) | **High; searchable cockpit.** Browses focused, visible, non-empty, and empty workspaces with apps and workspace metadata. “Switch Apps in Workspace” searches windows across focused, visible, or all workspaces and can focus, move, float, tile, or fullscreen them. It also offers menu-bar status and shortcut access. | Raycast on macOS plus AeroSpace. Raycast’s listing showed 16,940 installs when checked. MIT-licensed extension; requires adopting the Raycast launcher. |
+| [AeroTabs](https://github.com/alexlazarian/aerotabs) | **High; persistent tab strip.** Shows each window in the focused workspace as a clickable menu-bar tab, with the active window highlighted. Focus/workspace hooks drive event-based updates. It is the closest conceptual peer to a window tab bar, though the README documents only the focused workspace, not a grouped overview of every occupied workspace. | macOS 14+, requires AeroSpace; MIT-licensed Swift app distributed via Homebrew. |
+| [AeroSpace Workspace Switcher](https://github.com/rvk7895/aerospace-workspace-switcher) | **Medium-high; searchable panel.** A floating Spotlight-style panel lists non-empty workspaces and their apps/window titles, with real-time search and focused/visible badges. The documented action selects and switches to a workspace. | macOS 14+, requires AeroSpace; MIT-licensed Swift project with Homebrew install. |
+
+Sources: [AeroKit README](https://github.com/jomatsu/aerokit), [AeroKit’s AeroSpace discussion](https://github.com/nikitabobko/AeroSpace/discussions/2187), [AeroMux README](https://github.com/raghavendra-talur/aeromux), [Raycast Store listing](https://www.raycast.com/limonkufu/aerospace), [AeroTabs README](https://github.com/alexlazarian/aerotabs), [AeroSpace Workspace Switcher README](https://github.com/rvk7895/aerospace-workspace-switcher).
+
+## Other popular GitHub projects in the AeroSpace ecosystem
+
+The most-starred projects are mostly ecosystem infrastructure, while the closest window-overview references have smaller audiences. GitHub star counts below were checked on 28 September 2026; they indicate repository interest, not active users.
+
+| Project | GitHub stars | What it does | Relevance |
+|---|---:|---|---|
+| [SketchyBar](https://github.com/FelixKratz/SketchyBar) | 12.4k | Highly customizable macOS status-bar platform with scripting, events, and mouse interaction. AeroSpace’s [Goodies guide](https://nikitabobko.github.io/AeroSpace/goodies#show-aerospace-workspaces-in-sketchybar) documents a workspace indicator integration. | Biggest ecosystem platform; useful benchmark for customization and workspace status, but it requires users to configure/build their own UI. |
+| [JankyBorders](https://github.com/FelixKratz/JankyBorders) | 3.8k | Adds colored borders around macOS windows, including AeroSpace startup integration. | Popular visual companion, but not a window inventory or overview. |
+| [simple-bar](https://github.com/Jean-Tinland/simple-bar) | 1.6k | Übersicht bar for AeroSpace or yabai; shows apps across every space and windows on the current space, with click-to-focus and layout display. | Strongest popular reference for compact, persistent workspace/window visibility. It is a configurable widget, not a standalone app. |
+| [omacosy](https://github.com/paulsp94/omacosy) | 667 | An installable macOS environment built around AeroSpace by default, including a themed bar, gestures, window controls, and a live workspace overview. | Strongest new popularity signal with a Mission Control-like feature: live thumbnails for workspaces on the current monitor, title/app search, click or digit to switch, and drag-to-reorganize. It is a full desktop setup, pre-1.0, built/tested on macOS 26 and Apple Silicon. The repo had commits through 26 September 2026. |
+| [Barik](https://github.com/mocki-toki/barik) | 519 | Menu-bar replacement that can show AeroSpace spaces and window titles alongside system widgets. | Adjacent persistent-bar product. The maintainer says they currently have limited time to maintain it, so treat maintenance as a risk. |
+| [aerospace-swipe](https://github.com/acsandmann/aerospace-swipe) | 148 | Switches AeroSpace workspaces with configurable trackpad swipes, with empty-workspace skipping and optional haptics. | A focused interaction add-on, not an overview UI. |
+
+### Smaller direct overview and companion projects
+
+| Project | GitHub stars | What it does | Activity / relevance |
+|---|---:|---|---|
+| [SwipeAeroSpace](https://github.com/MediosZ/SwipeAeroSpace) | 101 | Native menu-bar app; swipe up for a full-screen overview of workspaces and apps grouped by monitor. Hover previews a workspace, and selecting a window row focuses it, switching workspaces if needed. | **Closest newly found Mission Control match.** README shows 67 commits; no formal GitHub release is listed. |
+| [aerospace-sketchybar](https://github.com/Kainoa-h/aerospace-sketchybar) | 66 | SketchyBar configuration that shows active/inactive workspaces, apps per workspace, and monitor placement. | Archived on 23 August 2026; configuration example rather than an app. |
+| [Aegis](https://github.com/CCMurphy-dev/Aegis) | 44 | AeroSpace-aware menu-bar/notch control center with workspace icons and a Cmd-Tab replacement that can show window-preview thumbnails. | Smaller, broad-featured companion; GitHub lists 143 commits. |
+| [a-bar](https://github.com/Jean-Tinland/a-bar) | 31 | Native Swift menu-bar replacement for AeroSpace/yabai with workspace/window indicators and system widgets. | Recently active: v1.6.0 was released 21 September 2026. |
+| [AeroSpaceBar](https://github.com/rdrkr/AeroSpaceBar) | 24 | Native menu-bar app showing AeroSpace spaces; click to switch and hover to preview windows. It supports AeroSpace’s event stream. | Recently active: v1.0.3 was released 15 September 2026. |
+
+Sources: [SketchyBar repository](https://github.com/FelixKratz/SketchyBar), [AeroSpace Goodies](https://nikitabobko.github.io/AeroSpace/goodies), [JankyBorders repository](https://github.com/FelixKratz/JankyBorders), [simple-bar repository](https://github.com/Jean-Tinland/simple-bar), [omacosy repository](https://github.com/paulsp94/omacosy), [omacosy commit history](https://github.com/paulsp94/omacosy/commits), [Barik repository and maintenance note](https://github.com/mocki-toki/barik), [aerospace-swipe repository](https://github.com/acsandmann/aerospace-swipe), [SwipeAeroSpace repository](https://github.com/MediosZ/SwipeAeroSpace), [aerospace-sketchybar repository](https://github.com/Kainoa-h/aerospace-sketchybar), [Aegis repository](https://github.com/CCMurphy-Dev/Aegis), [a-bar repository and releases](https://github.com/Jean-Tinland/a-bar/releases), [AeroSpaceBar repository and releases](https://github.com/rdrkr/AeroSpaceBar/releases).
+
+**Read for Aerospace Tabs:** `omacosy` is the most popular newly found project with a live overview, but it bundles the feature into a full desktop setup; `SwipeAeroSpace` is the closest new standalone Mission Control reference; `simple-bar` is the most popular direct reference for persistent workspace/window visibility; `AeroSpaceBar` shows hover-to-preview on each workspace. SketchyBar shows the scale and flexibility available to users willing to assemble their own bar. The star counts suggest that the broader status-bar ecosystem is much more established than dedicated AeroSpace overview apps.
+
+## Adjacent macOS alternatives
+
+| Product | Overlap and interface | Platform / market |
+|---|---|---|
+| [Mission Control](https://support.apple.com/en-nz/guide/mac-help/mchlb7beb9af/mac) | **Baseline substitute.** Built into macOS; shows the current desktop’s open windows in a single layer and Spaces along the top, then focuses a window or Space when selected. AeroSpace’s [guide](https://github.com/nikitabobko/AeroSpace/blob/main/docs/guide.adoc) notes its off-screen window placement can make Mission Control thumbnails appear too small. | macOS, included with the OS; invoked overview rather than a persistent AeroSpace companion. |
+| [AltTab](https://alt-tab.app/) | **High for window finding; low for workspace awareness.** Replaces app switching with an all-window switcher and live previews. It adds search and alternate title/icon list styles in Pro. Its general window list is not described as AeroSpace-workspace grouped. | macOS; free and open-source core, with paid Pro upgrades. |
+| [DockDoor](https://dockdoor.net/) | **Medium-high; visual previews.** Shows live thumbnails when hovering or long-pressing Dock apps, and includes a keyboard window switcher. Its menu-bar “Window Actions” submenu lists every open app and window. DockDoor Pro adds preview filters for the current Space or display. | macOS; DockDoor is free, with a separate paid DockDoor Pro offering. The changelog shows ongoing releases in 2026. |
+| [Witch](https://manytricks.com/witch/) | **Medium-high; configurable switcher.** Switches among apps, windows, and supported tabs, with searchable horizontal, vertical, or menu-bar switchers. It supports previews and can list windows from all Spaces. | macOS; Witch 4.7 is listed at $14 and its latest release notes are dated December 2025. |
+| [Contexts](https://contexts.co/) | **Medium-high; persistent sidebar.** Its sidebar groups windows by Space, with window search, app badges, and per-display sidebars. The Command-Tab-style switcher can show windows from all Spaces. This is a strong UI precedent for a persistent workspace-grouped inventory. | macOS; vendor lists a $9.99 license and support for Ventura, Sonoma, and Sequoia. Its “What’s New” page lists 3.9.0 from August 2022, so compatibility with newer macOS releases is unverified from the vendor’s published compatibility. |
+| [WindowShelf](https://windowshelf.app/) | **High; persistent all-window list.** Shows every open window in an always-visible or auto-hidden sidebar; groups by app or custom project shelves, with optional thumbnails and window actions. | macOS 13+, Apple Silicon and Intel; currently listed as free. General Mac window manager, not AeroSpace-specific. |
+| [WinPin](https://winpin.app/) | **High; spatial overview.** Its organizer shows every window across displays in a bird’s-eye panel. It also has fuzzy search and named arrangements that restore across display changes. | macOS; vendor lists a $34.95 one-time license. A general window-management suite rather than an AeroSpace companion. |
+| [AeroBar](https://github.com/adityaonx/aerobar) | **Medium-high; persistent taskbar.** A general macOS bottom bar with live window tabs, pinned apps, and a Start menu. It targets the familiar Windows taskbar model, not AeroSpace workspace grouping. | macOS 14–26, Apple Silicon per the repo; currently described as experimental alpha. |
+| [CloseUp](https://github.com/oomol-lab/CloseUp) and [Mission Control Plus](https://www.fadel.io/missioncontrolplus) | **Medium; native Mission Control add-ons.** They add window controls and keyboard actions inside Apple’s existing Mission Control view. CloseUp is free/open source and supports close, minimize, maximize, hide, quit, and batch actions; Mission Control Plus adds close/minimize/quit/open shortcuts. Neither is a separate persistent workspace inventory. | macOS; CloseUp requires macOS 14+ and Accessibility permission. Mission Control Plus lists macOS 10.13+ and a 10-day trial; its site does not publish a price. |
+
+Sources: [Apple Support](https://support.apple.com/en-nz/guide/mac-help/mchlb7beb9af/mac), [AltTab](https://alt-tab.app/), [DockDoor changelog](https://dockdoor.net/CHANGELOG.html), [DockDoor Pro feature list](https://pro.dockdoor.net/features/), [Witch](https://manytricks.com/witch/) and [release notes](https://manytricks.com/witch/releasenotes/), [Contexts](https://contexts.co/) and [release history](https://contexts.co/whats-new/), [WindowShelf](https://windowshelf.app/), [WinPin](https://winpin.app/), [AeroBar](https://github.com/adityaonx/aerobar), [CloseUp README](https://github.com/oomol-lab/CloseUp), [Mission Control Plus](https://www.fadel.io/missioncontrolplus).
+
+### More all-window references
+
+[Spacelist](https://github.com/magicmark/spacelist) is a terminal UI that lists AeroSpace windows grouped by workspace and filters by app name. It is useful as an inventory reference, though it is not a native desktop overview. The general Mac competitors WindowShelf and WinPin are included above because both surface many windows in a single persistent or spatial view.
+
+## User-need signal
+
+An [AeroSpace community discussion from February 2025](https://github.com/nikitabobko/AeroSpace/discussions/1146) asks for a Mission Control-like way to visualize every window in an AeroSpace workspace. Replies discuss scaling the windows into a visual overview; a later commenter points to an AeroSpace fork's Overview feature. This is anecdotal evidence that the need exists among some AeroSpace users, not a measure of market size.
+
+## What stands out
+
+1. **omacosy is the strongest new popularity signal with direct feature overlap.** Its live, searchable thumbnail overview covers workspaces on the current monitor, but it comes as part of a full AeroSpace-centered desktop setup and is pre-1.0.
+2. **SwipeAeroSpace is the closest newly found standalone match to “see all open windows.”** It has a full-screen, monitor-grouped overview and can focus a particular window from its row. Its current surface is an invoked overview, not a persistent strip.
+3. **AeroMux is the closest persistent all-window inventory.** It keeps non-empty workspaces visible and makes individual windows directly focusable in a text sidebar on the main display.
+4. **AeroKit is the closest spatial Exposé reference.** It provides previews, but its documented Exposé shows the focused workspace; its cross-workspace overview is scoped to the focused app.
+5. **Raycast is the strongest search-first substitute.** It can browse and act on windows across AeroSpace scopes without requiring a dedicated companion surface. Its tradeoff is that the workflow lives inside a general-purpose launcher.
+6. **AeroTabs validates the tab-strip interaction.** It is an especially close peer in form factor and focus action, while the repo’s current all-occupied-workspaces grouping creates a broader persistent overview. Its near-match in name may also create search or word-of-mouth confusion.
+7. **General-purpose window switchers set the usability bar.** AltTab, Witch, Contexts, and DockDoor show that users can already choose among visual previews, searchable title lists, Space filtering, and persistent sidebars without changing window managers.
+
+**Inference from the feature set:** the clearest product distinction for Aerospace Tabs is a compact, persistent, AeroSpace-aware inventory that stays visible across occupied workspaces and displays. omacosy and SwipeAeroSpace are references for a full-screen overview; AeroKit is the reference for spatial thumbnails; AeroMux and Contexts are references for persistent grouping; Raycast is a reference for keyboard search. These products compete on window discovery and focus, but they differ in whether the view is persistent, thumbnail-based, scoped to one workspace, or available across displays. This framing fits the project’s existing feature fence: compare overview and focus behavior without treating tiling/layout ownership or status widgets as direct competition.
+
+## Sources and limits
+
+I prioritized first-party product pages, project READMEs, the Raycast Store, and Apple Support. Feature and compatibility statements above describe what each source currently documents; they are not independent hands-on compatibility tests. Pricing, install counts, version support, and release cadence can change.

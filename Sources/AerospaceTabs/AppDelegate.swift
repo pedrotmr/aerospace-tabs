@@ -23,12 +23,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let hotkeys = Hotkeys()
     private let missionControl = MissionControlWatcher()
     private let dockBadgeReader = DockBadgeReader()
+    private let overview = WindowOverviewController()
+    private let hotCorner = HotCornerMonitor()
+    private let swipeMonitor = ThreeFingerSwipeMonitor()
+    private let nativeGestureOverrides = NativeGestureOverrides.shared
     private var strips: [CGDirectDisplayID: TabStrip] = [:]
+    private var overviewSettingsObserver: NSObjectProtocol?
+    private var nativeSettingsRestart: DispatchWorkItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Clear a leftover boost from a previous crash; live boost follows strip visibility in render().
         GapBoost.shared.prepareAtLaunch()
         GapsConfig.shared.start()
+        overview.onFocusWindow = { [weak self] id in
+            self?.session.focus(id)
+        }
+        overview.onPresentationChange = { [weak self] isPresented in
+            self?.hotCorner.setSuspended(isPresented)
+        }
+        hotCorner.onTrigger = { [weak self] in
+            self?.overview.present()
+        }
+        hotCorner.start()
+        swipeMonitor.onSwipe = { [weak self] direction in
+            switch direction {
+            case .up: self?.overview.present()
+            case .down: self?.overview.dismiss()
+            }
+        }
+        swipeMonitor.onAvailabilityChanged = { [weak self] in
+            self?.syncActivationSettings()
+        }
+        overviewSettingsObserver = NotificationCenter.default.addObserver(
+            forName: OverviewSettings.didChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.syncActivationSettings()
+        }
         session.onChange = { [weak self] in
             self?.render()
         }
@@ -61,10 +93,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil
         )
         render()
+        syncActivationSettings()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        overview.dismiss(restorePrevious: false)
+        hotCorner.stop()
+        swipeMonitor.stop()
+        nativeSettingsRestart?.cancel()
+        nativeGestureOverrides.restore()
         GapBoost.shared.deactivate()
+        if let overviewSettingsObserver {
+            NotificationCenter.default.removeObserver(overviewSettingsObserver)
+            self.overviewSettingsObserver = nil
+        }
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        overview.present()
+        return false
     }
 
     @objc private func screensChanged() {
@@ -72,6 +119,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func render() {
+        overview.update(windows: session.windows, focusedID: session.focusedID)
         let grouped = Dictionary(grouping: session.windows, by: \.screenIndex)
         let badges = dockBadgeReader.badgesByApp
         var seen: Set<CGDirectDisplayID> = []
@@ -90,6 +138,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     },
                     onReorder: { [weak self] ids, workspace in
                         self?.session.reorder(ids: ids, workspace: workspace)
+                    },
+                    onOpenOverview: { [weak self] in
+                        self?.overview.toggle()
+                    },
+                    onToggleSwipe: {
+                        let settings = OverviewSettings.shared
+                        settings.setSwipeEnabled(!settings.swipeEnabled)
+                    },
+                    isSwipeAvailable: { [weak self] in
+                        self?.swipeMonitor.isAvailable ?? false
                     },
                     onQuit: {
                         // applicationWillTerminate restores gaps once.
@@ -127,6 +185,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 missionControlActive: hidden
             )
         )
+    }
+
+    private func syncSwipeMonitor() {
+        if OverviewSettings.shared.swipeEnabled {
+            _ = swipeMonitor.start()
+        } else {
+            swipeMonitor.stop()
+        }
+    }
+
+    private func syncActivationSettings() {
+        nativeSettingsRestart?.cancel()
+        nativeSettingsRestart = nil
+        hotCorner.setSuspended(true)
+        syncSwipeMonitor()
+        let restartedDock = nativeGestureOverrides.reconcile(
+            swipeEnabled: OverviewSettings.shared.swipeEnabled && swipeMonitor.isRunning,
+            hotCorner: OverviewSettings.shared.hotCorner
+        )
+        if restartedDock {
+            // Dock does not own the trackpad callback. Keep that connection alive
+            // while Dock restarts, rather than rediscovering devices mid-restart.
+            let resume = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                self.hotCorner.setSuspended(self.overview.isPresented)
+                self.nativeSettingsRestart = nil
+            }
+            nativeSettingsRestart = resume
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: resume)
+        } else {
+            hotCorner.setSuspended(overview.isPresented)
+        }
     }
 
     /// Strip visibility: two or more windows across this monitor's occupied workspaces.
