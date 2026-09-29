@@ -13,7 +13,7 @@ final class ThreeFingerSwipeMonitor {
     private static let logger = Logger(subsystem: "com.pedrotmr.AerospaceTabs", category: "Trackpad")
     private(set) var isRunning = false
     private(set) var isAvailable = false
-    var canOwnGesture: Bool { wantsMonitoring && framework != nil }
+    var canOwnGesture: Bool { wantsMonitoring && framework != nil && hasConnectedDevice }
 
     private typealias DeviceRef = UnsafeMutableRawPointer
     private typealias ContactCallback = @convention(c) (
@@ -25,6 +25,7 @@ final class ThreeFingerSwipeMonitor {
     private var wakeObserver: NSObjectProtocol?
     private var recoveryTimer: Timer?
     private var wantsMonitoring = false
+    private var hasConnectedDevice = false
 
     private static let active = ActiveState()
 
@@ -115,6 +116,7 @@ final class ThreeFingerSwipeMonitor {
         isRunning = true
         let devicesStarted = devicesAreRunning
         isRunning = devicesStarted
+        if devicesStarted { hasConnectedDevice = true }
         setAvailable(devicesStarted)
         Self.logger.info(
             "Three-finger swipe started on \(detectors.count) trackpad device(s); running=\(devicesStarted)"
@@ -154,6 +156,7 @@ final class ThreeFingerSwipeMonitor {
 
     func stop() {
         wantsMonitoring = false
+        hasConnectedDevice = false
         recoveryTimer?.invalidate()
         recoveryTimer = nil
         removeWakeObserver()
