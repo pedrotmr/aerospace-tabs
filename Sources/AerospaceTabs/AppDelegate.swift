@@ -2,6 +2,7 @@ import AppKit
 
 @main
 enum AerospaceTabsMain {
+    @MainActor
     static func main() {
         if CommandLine.arguments.contains("--restore-gaps") {
             let ok = GapBoost.shared.restoreIfNeeded()
@@ -18,6 +19,7 @@ enum AerospaceTabsMain {
     }
 }
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let session = Session()
     private let hotkeys = Hotkeys()
@@ -59,7 +61,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.syncActivationSettings()
+            MainActor.assumeIsolated {
+                self?.syncActivationSettings()
+            }
         }
         session.onChange = { [weak self] in
             self?.render()
@@ -201,7 +205,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotCorner.setSuspended(true)
         syncSwipeMonitor()
         let restartedDock = nativeGestureOverrides.reconcile(
-            swipeEnabled: OverviewSettings.shared.swipeEnabled && swipeMonitor.isRunning,
+            swipeEnabled: OverviewSettings.shared.swipeEnabled && swipeMonitor.canOwnGesture,
             hotCorner: OverviewSettings.shared.hotCorner
         )
         if restartedDock {

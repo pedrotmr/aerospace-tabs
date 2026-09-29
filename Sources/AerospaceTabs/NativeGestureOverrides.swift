@@ -36,6 +36,8 @@ final class NativeGestureOverrides {
     private let lock = NSRecursiveLock()
     private let defaults: UserDefaults
     private var overrides: [Override]
+    private var isTerminating = false
+    private var dockRestartPending = false
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -53,7 +55,11 @@ final class NativeGestureOverrides {
     func reconcile(swipeEnabled: Bool, hotCorner: OverviewHotCorner?) -> Bool {
         lock.lock()
         defer { lock.unlock() }
+        guard !isTerminating else { return false }
+        return reconcileLocked(swipeEnabled: swipeEnabled, hotCorner: hotCorner)
+    }
 
+    private func reconcileLocked(swipeEnabled: Bool, hotCorner: OverviewHotCorner?) -> Bool {
         var desired: [PreferenceKey: Data] = [:]
         if swipeEnabled, let value = Self.encode(false) {
             desired[Self.missionControlGesture] = value
@@ -100,9 +106,11 @@ final class NativeGestureOverrides {
 
         overrides = nextOverrides
         guard persistOverrides() else { return false }
-        guard !writes.isEmpty else { return false }
+        if writes.contains(where: { $0.key.domain == Self.dockDomain }) {
+            dockRestartPending = true
+        }
+        guard !writes.isEmpty || dockRestartPending else { return false }
 
-        var changedDockPreferences = false
         for write in writes {
             // Unwrap before bridging: casting Any? directly boxes Optional as
             // __SwiftValue, which CFPreferences rejects with an Objective-C exception.
@@ -117,13 +125,12 @@ final class NativeGestureOverrides {
                 value,
                 write.key.domain as CFString
             )
-            if write.key.domain == Self.dockDomain {
-                changedDockPreferences = true
-            }
         }
 
         var synchronizedDomains: Set<String> = []
-        for domain in Set(writes.map(\.key.domain)) {
+        var domainsToSynchronize = Set(writes.map(\.key.domain))
+        if dockRestartPending { domainsToSynchronize.insert(Self.dockDomain) }
+        for domain in domainsToSynchronize {
             if CFPreferencesAppSynchronize(domain as CFString) {
                 synchronizedDomains.insert(domain)
             } else {
@@ -138,14 +145,24 @@ final class NativeGestureOverrides {
             _ = persistOverrides()
         }
 
-        if changedDockPreferences {
-            restartDock()
+        if dockRestartPending,
+           synchronizedDomains.contains(Self.dockDomain),
+           restartDock() {
+            dockRestartPending = false
+            return true
         }
-        return changedDockPreferences
+        return false
     }
 
     func restore() {
-        _ = reconcile(swipeEnabled: false, hotCorner: nil)
+        restoreForTermination()
+    }
+
+    func restoreForTermination() {
+        lock.lock()
+        defer { lock.unlock() }
+        isTerminating = true
+        _ = reconcileLocked(swipeEnabled: false, hotCorner: nil)
     }
 
     private func currentValue(for key: PreferenceKey) -> Any? {
@@ -161,14 +178,21 @@ final class NativeGestureOverrides {
         return defaults.synchronize()
     }
 
-    private func restartDock() {
+    private func restartDock() -> Bool {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
         process.arguments = ["Dock"]
         do {
             try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else {
+                NSLog("Aerospace Tabs: Dock restart exited with status %d.", process.terminationStatus)
+                return false
+            }
+            return true
         } catch {
             NSLog("Aerospace Tabs: Could not restart Dock to apply gesture settings: %@", error.localizedDescription)
+            return false
         }
     }
 

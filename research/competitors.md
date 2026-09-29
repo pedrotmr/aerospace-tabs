@@ -1,6 +1,6 @@
 # Competitive scan: AeroSpace companions and window overviews
 
-**Surveyed:** 28 September 2026. This scan treats “AeroSpace” as the macOS tiling window manager used by Aerospace Tabs. The repo describes Aerospace Tabs as a companion that lists and focuses windows while AeroSpace owns layout; its current overview groups occupied workspaces on each screen in a persistent top strip ([README](../README.md), [CHARTER](../CHARTER.md)). I classified products by overlap with workspace/window visibility and focus, rather than general tiling features.
+**Surveyed:** 28 September 2026. This scan treats “AeroSpace” as the macOS tiling window manager used by Aerospace Tabs. The repo describes Aerospace Tabs as a companion that lists and focuses windows while AeroSpace owns layout. Its tab strip groups windows from occupied workspaces on each screen, and its Window Overview shows previews across connected displays ([README](../README.md), [CHARTER](../CHARTER.md)). I classified products by overlap with workspace/window visibility and focus, rather than general tiling features.
 
 ## Summary
 

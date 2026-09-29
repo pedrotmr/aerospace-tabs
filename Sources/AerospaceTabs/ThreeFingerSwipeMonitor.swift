@@ -13,6 +13,7 @@ final class ThreeFingerSwipeMonitor {
     private static let logger = Logger(subsystem: "com.pedrotmr.AerospaceTabs", category: "Trackpad")
     private(set) var isRunning = false
     private(set) var isAvailable = false
+    var canOwnGesture: Bool { wantsMonitoring && framework != nil }
 
     private typealias DeviceRef = UnsafeMutableRawPointer
     private typealias ContactCallback = @convention(c) (
@@ -67,10 +68,7 @@ final class ThreeFingerSwipeMonitor {
         if recoveryTimer == nil {
             recoveryTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
                 guard let self, self.wantsMonitoring else { return }
-                if !self.isRunning || !self.devicesAreRunning {
-                    self.stopDevices()
-                    _ = self.connectDevices()
-                }
+                self.refreshDevices()
             }
         }
         return isRunning || connectDevices()
@@ -85,14 +83,15 @@ final class ThreeFingerSwipeMonitor {
         }
     }
 
-    private func connectDevices() -> Bool {
+    private func connectDevices(using discoveredDevices: CFArray? = nil) -> Bool {
         guard let framework = framework ?? Framework.load() else {
             setAvailable(false)
             Self.logger.error("MultitouchSupport could not be loaded; will retry")
             return false
         }
         self.framework = framework
-        guard let list = framework.createList()?.takeRetainedValue(), CFArrayGetCount(list) > 0 else {
+        guard let list = discoveredDevices ?? framework.createList()?.takeRetainedValue(),
+              CFArrayGetCount(list) > 0 else {
             setAvailable(false)
             Self.logger.info("No trackpad devices yet; waiting for device recovery")
             return false
@@ -114,9 +113,34 @@ final class ThreeFingerSwipeMonitor {
             framework.start(device, 0)
         }
         isRunning = true
-        setAvailable(true)
-        Self.logger.info("Three-finger swipe connected to \(detectors.count) trackpad device(s)")
-        return true
+        let devicesStarted = devicesAreRunning
+        isRunning = devicesStarted
+        setAvailable(devicesStarted)
+        Self.logger.info(
+            "Three-finger swipe started on \(detectors.count) trackpad device(s); running=\(devicesStarted)"
+        )
+        return devicesStarted
+    }
+
+    private func refreshDevices() {
+        guard let framework else {
+            _ = connectDevices()
+            return
+        }
+        guard let discovered = framework.createList()?.takeRetainedValue() else { return }
+        let currentIDs = deviceIDs(in: devices)
+        let discoveredIDs = deviceIDs(in: discovered)
+        if discoveredIDs.isEmpty, !currentIDs.isEmpty, devicesAreRunning { return }
+        guard !isRunning || !devicesAreRunning || currentIDs != discoveredIDs else { return }
+        stopDevices()
+        _ = connectDevices(using: discovered)
+    }
+
+    private func deviceIDs(in devices: CFArray?) -> Set<UInt> {
+        guard let devices else { return [] }
+        return Set((0..<CFArrayGetCount(devices)).compactMap { index in
+            CFArrayGetValueAtIndex(devices, index).map { UInt(bitPattern: $0) }
+        })
     }
 
     private func setAvailable(_ available: Bool) {

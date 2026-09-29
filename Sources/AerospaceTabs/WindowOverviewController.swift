@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 
+@MainActor
 final class WindowOverviewController {
     var onFocusWindow: ((Int) -> Void)?
     var onPresentationChange: ((Bool) -> Void)?
@@ -21,8 +22,10 @@ final class WindowOverviewController {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.model.updateSettings()
-            self?.applyPanelAppearances()
+            MainActor.assumeIsolated {
+                self?.model.updateSettings()
+                self?.applyPanelAppearances()
+            }
         }
     }
 
@@ -34,7 +37,10 @@ final class WindowOverviewController {
     func update(windows: [Win], focusedID: Int?) {
         model.update(windows: windows, focusedID: focusedID)
         previews.update(windows: windows)
-        guard !windows.isEmpty else { return }
+        guard !windows.isEmpty else {
+            if isPresented { dismiss() }
+            return
+        }
         syncScreens()
         if isPresented { syncPanelVisibility() }
     }

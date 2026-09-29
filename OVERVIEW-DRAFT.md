@@ -18,8 +18,8 @@ When windows are spread across many AeroSpace workspaces, the user wants one vis
 
 - Three-finger upward trackpad swipe opens the overview; another upward swipe leaves it open. A downward swipe closes it.
 - A configurable hot corner is an optional trigger; the user may leave it disabled.
-- While a trigger is enabled, Aerospace Tabs temporarily disables the matching native Mission Control gesture or selected macOS hot corner, then restores the exact prior preference when the trigger is turned off or the app quits.
-- Dock restarts briefly when these preferences change so macOS applies them. Saved values survive a force-quit and are restored when the app next exits cleanly.
+- While a trigger is enabled, Aerospace Tabs temporarily disables the matching native Mission Control gesture or selected macOS hot corner. On disable or quit, it restores the saved preference only if the native setting still matches the value Aerospace Tabs applied; otherwise it leaves the changed value alone. While ownership remains enabled, a later settings reconciliation can reapply the override.
+- Dock restarts briefly when these preferences change so macOS applies them. Saved values survive a force-quit and can be restored on the next clean exit if the native setting still matches the app’s override.
 
 ### Browse windows
 
@@ -33,7 +33,7 @@ When windows are spread across many AeroSpace workspaces, the user wants one vis
 
 ### Focus a window
 
-Selecting a window closes the overview, switches to that window’s workspace and display as needed, then focuses the window. Canceling the overview returns to the previous workspace and focus. The overview does not move, resize, close, or retile windows.
+Selecting a window closes the overview, switches to that window’s workspace and display as needed, then focuses the window. Canceling the overview attempts to reactivate the previously frontmost application. The overview does not move, resize, close, or retile windows.
 
 ## MVP boundary
 
@@ -63,8 +63,8 @@ For performance and privacy, the implementation uses a hybrid update policy:
 1. One activation shows windows from every occupied AeroSpace workspace on all displays, grouped visually without visible labels.
 2. Selecting any card activates its existing window, even when it is on another workspace or display.
 3. Keyboard and pointer users can navigate, select, and dismiss the overview without visible control text.
-4. Dismissing without selection preserves the previous workspace and focused window.
-5. Enabling or disabling a trigger restores the previous macOS gesture or hot-corner preference; clean app quit restores all active overrides.
+4. Dismissing without selection attempts to reactivate the previously frontmost application.
+5. Disabling a trigger or quitting restores its saved macOS preference when it still matches the value applied by Aerospace Tabs; clean app quit restores all matching active overrides.
 6. The feature does not change AeroSpace’s layout tree or rewrite the user’s AeroSpace configuration without an explicit setup action.
 7. If preview permission is absent, workspace grouping and focus still work with app icons as visual placeholders.
 

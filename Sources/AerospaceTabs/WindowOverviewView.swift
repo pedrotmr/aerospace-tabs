@@ -28,9 +28,11 @@ struct OverviewWorkspaceGroup: Identifiable {
 /// Choose the row count that gives real window images the most screen area.
 struct WindowOverviewGridPlan {
     struct Row: Identifiable {
+        let workspace: String
+        let index: Int
         let windows: [Win]
         let startsWorkspace: Bool
-        var id: Int { windows.first?.id ?? 0 }
+        var id: String { "\(workspace):\(index)" }
     }
 
     let rows: [Row]
@@ -57,8 +59,10 @@ struct WindowOverviewGridPlan {
 
         for columns in 1...maxColumns {
             let rows = groups.flatMap { group in
-                stride(from: 0, to: group.windows.count, by: columns).map { start in
-                    Row(windows: Array(group.windows[start..<min(start + columns, group.windows.count)]),
+                stride(from: 0, to: group.windows.count, by: columns).enumerated().map { row, start in
+                    Row(workspace: group.workspace,
+                        index: row,
+                        windows: Array(group.windows[start..<min(start + columns, group.windows.count)]),
                         startsWorkspace: start == 0)
                 }
             }
@@ -266,6 +270,7 @@ struct WindowOverviewScreen: View {
                         availableSize: availableSize,
                         aspectRatioForWindow: previews.aspectRatio(for:)
                     )
+                    let frames = plan.frames()
 
                     ScrollView {
                         VStack(spacing: 0) {
@@ -304,10 +309,10 @@ struct WindowOverviewScreen: View {
                     .scrollIndicators(.hidden)
                     .onAppear {
                         model.select(model.selectedID ?? model.focusedID ?? model.navigationWindows.first?.id ?? -1)
-                        model.setFrames(plan.frames(), screenIndex: display.screenIndex)
+                        model.setFrames(frames, screenIndex: display.screenIndex)
                         updatePriorityPreview()
                     }
-                    .onChange(of: plan.frames()) { _, frames in
+                    .onChange(of: frames) { _, frames in
                         model.setFrames(frames, screenIndex: display.screenIndex)
                     }
                     .onChange(of: model.selectedID) { _, selectedID in

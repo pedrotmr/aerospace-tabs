@@ -5,7 +5,8 @@ import Darwin
 import os
 
 /// All observable state is confined to the main queue. Captures run off that queue.
-final class WindowPreviewStore: ObservableObject, @unchecked Sendable {
+@MainActor
+final class WindowPreviewStore: ObservableObject {
     @Published private(set) var livePreviews: [Int: OverviewLivePreview] = [:]
     @Published private(set) var images: [Int: NSImage] = [:]
     @Published private(set) var needsScreenRecording = !CGPreflightScreenCaptureAccess()
@@ -53,7 +54,9 @@ final class WindowPreviewStore: ObservableObject, @unchecked Sendable {
         if membershipChanged { updateAspectRatios() }
         if timer == nil {
             timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
-                self?.refreshDuePreviews()
+                MainActor.assumeIsolated {
+                    self?.refreshDuePreviews()
+                }
             }
             updateAspectRatios()
         }
@@ -297,19 +300,34 @@ final class WindowPreviewStore: ObservableObject, @unchecked Sendable {
 }
 
 private actor OverviewWindowDiscovery {
-    private var lookup: Task<[Int: SCWindow], Never>?
+    private var lookup: Task<[Int: SCWindow]?, Never>?
     private var expires = Date.distantPast
+    private var generation = 0
 
     func window(id: Int) async -> SCWindow? {
         if lookup == nil || Date() >= expires {
+            generation += 1
+            let generation = generation
             expires = Date().addingTimeInterval(10)
             lookup = Task {
                 guard let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
-                else { return [:] }
+                else { return nil }
                 return Dictionary(content.windows.map { (Int($0.windowID), $0) }) { first, _ in first }
             }
+            return await result(id: id, generation: generation)
         }
-        return await lookup?.value[id]
+        return await result(id: id, generation: generation)
+    }
+
+    private func result(id: Int, generation: Int) async -> SCWindow? {
+        guard let lookup else { return nil }
+        let windows = await lookup.value
+        guard generation == self.generation else { return windows?[id] }
+        if windows?[id] == nil {
+            // Keep one shared retry window for concurrent preview requests.
+            expires = Date().addingTimeInterval(0.5)
+        }
+        return windows?[id]
     }
 }
 

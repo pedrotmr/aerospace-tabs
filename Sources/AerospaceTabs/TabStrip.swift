@@ -555,8 +555,8 @@ final class TabStripView: NSView {
         overviewItem.target = self
 
         let activation = NSMenu(title: "Activation")
-        let swipeAvailable = isSwipeAvailable?() ?? true
         let swipeEnabled = OverviewSettings.shared.swipeEnabled
+        let swipeAvailable = !swipeEnabled || (isSwipeAvailable?() ?? true)
         let swipe = activation.addItem(
             withTitle: swipeAvailable ? "Three-Finger Swipe" : "Three-Finger Swipe (Waiting for Trackpad)",
             action: #selector(toggleThreeFingerSwipe),

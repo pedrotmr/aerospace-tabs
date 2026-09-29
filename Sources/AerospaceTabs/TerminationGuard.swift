@@ -30,7 +30,7 @@ enum TerminationGuard {
                     sigwait(setPtr, sigPtr)
                 }
             }
-            NativeGestureOverrides.shared.restore()
+            NativeGestureOverrides.shared.restoreForTermination()
             GapBoost.shared.deactivate()
             // Hard exit so we don't race AppKit teardown.
             _exit(0)

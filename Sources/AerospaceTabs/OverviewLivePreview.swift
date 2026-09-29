@@ -77,6 +77,7 @@ final class OverviewLivePreview: NSObject, SCStreamOutput, SCStreamDelegate, @un
     }
 
     /// Stop accepting frames immediately; release the stream asynchronously.
+    @MainActor
     func stop(keepSnapshot: Bool = true) {
         guard !stopped else { return }
         stopped = true
@@ -111,7 +112,8 @@ final class OverviewLivePreview: NSObject, SCStreamOutput, SCStreamDelegate, @un
         latestBuffer = buffer
         if renderer.status == .failed { renderer.flush() }
         guard renderer.isReadyForMoreMediaData else { return }
-        if let array = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: true) {
+        if let array = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: true),
+           CFArrayGetCount(array) > 0 {
             let values = unsafeBitCast(CFArrayGetValueAtIndex(array, 0), to: CFMutableDictionary.self)
             CFDictionarySetValue(values,
                 Unmanaged.passUnretained(kCMSampleAttachmentKey_DisplayImmediately).toOpaque(),
