@@ -177,11 +177,17 @@ final class TabStrip {
     init(
         onPick: @escaping (Int) -> Void,
         onReorder: @escaping ([Int], String) -> Void,
+        onOpenOverview: @escaping () -> Void,
+        onToggleSwipe: @escaping () -> Void,
+        isSwipeAvailable: @escaping () -> Bool,
         onQuit: @escaping () -> Void
     ) {
         view = TabStripView()
         view.onPick = onPick
         view.onReorder = onReorder
+        view.onOpenOverview = onOpenOverview
+        view.onToggleSwipe = onToggleSwipe
+        view.isSwipeAvailable = isSwipeAvailable
         view.onQuit = onQuit
 
         glass = NSVisualEffectView()
@@ -339,6 +345,10 @@ final class TabStrip {
 }
 
 final class TabStripView: NSView {
+    var onOpenOverview: (() -> Void)?
+    var onToggleSwipe: (() -> Void)?
+    var isSwipeAvailable: (() -> Bool)?
+
     static let chromeRadius: CGFloat = 12
     private static let tabRadius: CGFloat = 9
     private static let dragThreshold: CGFloat = 4
@@ -537,6 +547,54 @@ final class TabStripView: NSView {
     override func rightMouseDown(with event: NSEvent) {
         let menu = NSMenu()
 
+        let overviewItem = menu.addItem(
+            withTitle: "Open Window Overview",
+            action: #selector(openOverview),
+            keyEquivalent: ""
+        )
+        overviewItem.target = self
+
+        let activation = NSMenu(title: "Activation")
+        let swipeEnabled = OverviewSettings.shared.swipeEnabled
+        let swipeAvailable = !swipeEnabled || (isSwipeAvailable?() ?? true)
+        let swipe = activation.addItem(
+            withTitle: swipeAvailable ? "Three-Finger Swipe" : "Three-Finger Swipe (Waiting for Trackpad)",
+            action: #selector(toggleThreeFingerSwipe),
+            keyEquivalent: ""
+        )
+        swipe.target = self
+        swipe.isEnabled = true
+        swipe.state = swipeEnabled ? .on : .off
+        swipe.toolTip = "Swipe up to open the overview and down to close it. Temporarily replaces the macOS Mission Control swipe."
+
+        let cornerMenu = NSMenu(title: "Hot Corner")
+        let selectedCorner = OverviewSettings.shared.hotCorner
+        let off = cornerMenu.addItem(
+            withTitle: "Off",
+            action: #selector(selectHotCorner(_:)),
+            keyEquivalent: ""
+        )
+        off.target = self
+        off.representedObject = "off"
+        off.state = selectedCorner == nil ? .on : .off
+        cornerMenu.addItem(.separator())
+        for corner in OverviewHotCorner.allCases {
+            let item = cornerMenu.addItem(
+                withTitle: corner.title,
+                action: #selector(selectHotCorner(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = corner.rawValue
+            item.state = corner == selectedCorner ? .on : .off
+        }
+        let cornerItem = activation.addItem(withTitle: "Hot Corner", action: nil, keyEquivalent: "")
+        cornerItem.toolTip = "Aerospace Tabs restores the selected macOS corner when the app quits."
+        activation.setSubmenu(cornerMenu, for: cornerItem)
+        let activationItem = menu.addItem(withTitle: "Activation", action: nil, keyEquivalent: "")
+        menu.setSubmenu(activation, for: activationItem)
+        menu.addItem(.separator())
+
         let appearance = NSMenu(title: "Appearance")
         let selected = AppearanceSettings.shared.theme
         for theme in StripTheme.allCases {
@@ -585,6 +643,23 @@ final class TabStripView: NSView {
               let theme = StripTheme(rawValue: raw)
         else { return }
         AppearanceSettings.shared.select(theme)
+    }
+
+    @objc private func openOverview() {
+        onOpenOverview?()
+    }
+
+    @objc private func toggleThreeFingerSwipe() {
+        onToggleSwipe?()
+    }
+
+    @objc private func selectHotCorner(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String else { return }
+        if raw == "off" {
+            OverviewSettings.shared.select(hotCorner: nil)
+        } else if let corner = OverviewHotCorner(rawValue: raw) {
+            OverviewSettings.shared.select(hotCorner: corner)
+        }
     }
 
     @objc private func restoreGaps() {

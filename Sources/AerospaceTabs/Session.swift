@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 struct Win: Equatable {
     let id: Int
@@ -95,6 +96,8 @@ struct WindowRow: Decodable {
 
 final class Session {
     private let client = AerospaceClient()
+    private let logger = Logger(subsystem: "com.pedrotmr.AerospaceTabs", category: "Session")
+    private var lastRefreshError: String?
     private let subscribe = SubscribePump()
     private let order = TabOrder()
     private var refreshQueued = false
@@ -248,10 +251,16 @@ final class Session {
         client.listAllWindows { [weak self] result in
             guard let self else { return }
             switch result {
-            case .failure:
+            case .failure(let error):
+                let description = String(describing: error)
+                if description != self.lastRefreshError {
+                    self.logger.error("Window refresh failed: \(description, privacy: .public)")
+                    self.lastRefreshError = description
+                }
                 // Keep the last good snapshot so a socket blip does not blank the strip.
                 return
             case .success(let snapshot):
+                self.lastRefreshError = nil
                 self.apply(snapshot)
             }
         }

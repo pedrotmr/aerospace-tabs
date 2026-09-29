@@ -29,9 +29,13 @@ Snappy focus and strip updates beat extra features. When a feature and speed con
 _Avoid_: “fast enough”, optimize later
 
 **Feature fence**:
-The hard in/out boundary for what the companion may do. Core verb is list + focus (+ local tab order). Layout ownership, status widgets, other WMs, and Mission Control clones are out.
+The hard in/out boundary for what the companion may do. Core verbs are list + focus (+ local tab order) and the AeroSpace-grouped Window Overview. Layout ownership, status widgets, other WMs, and managing native macOS Spaces are out.
 _Avoid_: roadmap features, backlog of maybes treated as promises
 
-**Workspace overview**:
-The strip groups windows by occupied AeroSpace workspace on each screen, sorts numbered workspaces ascending, and appears when that screen has two or more windows total. Selecting a window focuses it; Option-Tab cycles only on the focused workspace. Empty workspaces and window previews are not shown.
-_Avoid_: sidebar, thumbnail Mission Control
+**Window Overview**:
+Aerospace Tabs’ full-screen view of open windows across occupied AeroSpace workspaces. Every connected display is shown. Window previews are visually grouped by workspace without persistent text or controls; hovering reveals the window title, and selecting one focuses it without changing AeroSpace’s layout.
+_Avoid_: native Spaces manager, layout editor
+
+**Preview policy**:
+Window previews use exact AeroSpace window IDs. Cached images appear immediately; ScreenCaptureKit streams target 30 fps while their thumbnails are visible, rendered directly through AVSampleBufferDisplayLayer without per-frame SwiftUI updates. All streams stop on close, retaining their final frames in a 96 MB image cache. Stream resolution follows thumbnail size, using the display backing scale, capped at 3200 pixels per edge and a 20-megapixel total across displays, with three capture buffers per stream. New windows are warmed once; visible-workspace snapshots refresh every five seconds while closed. Failed streams fall back to periodic snapshots and retry. Closed-window images are removed, and nothing is saved to disk or sent off-device. Layout uses window bounds independently of incoming frames.
+_Avoid_: background video capture, saved screenshots
