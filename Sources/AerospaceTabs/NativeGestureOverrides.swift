@@ -180,11 +180,17 @@ final class NativeGestureOverrides {
 
     private func restartDock() -> Bool {
         let process = Process()
+        let exitSignal = DispatchSemaphore(value: 0)
         process.executableURL = URL(fileURLWithPath: "/usr/bin/killall")
         process.arguments = ["Dock"]
+        process.terminationHandler = { _ in exitSignal.signal() }
         do {
             try process.run()
-            process.waitUntilExit()
+            guard exitSignal.wait(timeout: .now() + 2) == .success else {
+                if process.isRunning { process.terminate() }
+                NSLog("Aerospace Tabs: Dock restart timed out.")
+                return false
+            }
             guard process.terminationStatus == 0 else {
                 NSLog("Aerospace Tabs: Dock restart exited with status %d.", process.terminationStatus)
                 return false
