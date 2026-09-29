@@ -28,11 +28,16 @@ struct OverviewWorkspaceGroup: Identifiable {
 /// Choose the row count that gives real window images the most screen area.
 struct WindowOverviewGridPlan {
     struct Row: Identifiable {
+        struct ID: Hashable {
+            let workspace: String
+            let index: Int
+        }
+
         let workspace: String
         let index: Int
         let windows: [Win]
         let startsWorkspace: Bool
-        var id: String { "\(workspace):\(index)" }
+        var id: ID { ID(workspace: workspace, index: index) }
     }
 
     let rows: [Row]
