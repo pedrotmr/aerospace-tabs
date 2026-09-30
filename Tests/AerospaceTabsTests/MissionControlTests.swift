@@ -5,6 +5,7 @@ import XCTest
 final class MissionControlTests: XCTestCase {
     private let screenSizes = [CGSize(width: 1_440, height: 900)]
 
+    @MainActor
     func testGapBoostStaysOnWhileMissionControlHidesStrip() {
         // Opening Mission Control must not restore outer.top — that reloads
         // AeroSpace and shifts every tiled window by the boost amount.

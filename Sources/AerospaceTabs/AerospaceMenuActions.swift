@@ -126,7 +126,7 @@ final class AerospaceMenuActions {
         }
 
         if let bundleIdentifier = defaults.string(forKey: Key.editorBundleIdentifier),
-           let url = workspace.urlForApplication(withBundleIdentifier: bundleIdentifier),
+           let url = workspace.urlsForApplications(withBundleIdentifier: bundleIdentifier).first,
            let bundle = Bundle(url: url)
         {
             defaults.set(url.path, forKey: Key.editorPath)

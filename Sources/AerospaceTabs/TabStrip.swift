@@ -630,6 +630,7 @@ final class TabStripView: NSView {
 
         menu.addItem(.separator())
         let aerospace = NSMenu(title: "AeroSpace")
+        aerospace.autoenablesItems = false
         let reload = aerospace.addItem(
             withTitle: "Reload Config",
             action: #selector(reloadAerospaceConfig),
