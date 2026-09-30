@@ -17,6 +17,9 @@ See [CHARTER.md](CHARTER.md) for what this is, what it isn’t, and how support 
 - Mirrors app notification badges from the Dock on matching tabs
 - The tab strip hides during native Mission Control / App Exposé
 - Temporarily boosts AeroSpace `gaps.outer.top` so windows clear the strip; restores on quit
+- The right-click menu groups strip settings, AeroSpace config controls, and quit actions; quitting AeroSpace also closes its companion
+
+Select **Choose Config Editor…** once from the AeroSpace submenu; **Open Config** uses that editor on later openings.
 
 ## Requirements
 
@@ -42,7 +45,7 @@ Grant Accessibility when macOS asks.
 
 On launch the app adds strip height to your `gaps.outer.top`, keeps a backup next to your AeroSpace config, and restores on quit.
 
-If a force-quit left gaps boosted: right-click the strip → **Restore AeroSpace gaps**, or:
+If Aerospace Tabs is force-quit before cleanup, the next launch restores any leftover gap boost automatically. To restore it manually without opening the app, run:
 
 ```bash
 make restore-gaps

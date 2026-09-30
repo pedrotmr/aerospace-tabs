@@ -57,7 +57,7 @@ final class GapBoost {
         }
     }
 
-    /// Manual recovery (menu item / CLI). Safe if nothing was boosted.
+    /// Manual recovery (CLI). Safe if nothing was boosted.
     @discardableResult
     func restoreIfNeeded(reload: Bool = true) -> Bool {
         queue.sync {

@@ -611,27 +611,67 @@ final class TabStripView: NSView {
         menu.setSubmenu(appearance, for: appearanceItem)
 
         if !AXIsProcessTrusted() {
-            let explanation = menu.addItem(
-                withTitle: "Notification badges need Accessibility access",
+            let accessibility = NSMenu(title: "Accessibility")
+            let explanation = accessibility.addItem(
+                withTitle: "Notification Badges Need Accessibility Access",
                 action: nil,
                 keyEquivalent: ""
             )
             explanation.isEnabled = false
-            let settings = menu.addItem(
+            let settings = accessibility.addItem(
                 withTitle: "Open Accessibility Settings…",
                 action: #selector(openAccessibilitySettings),
                 keyEquivalent: ""
             )
             settings.target = self
+            let accessibilityItem = menu.addItem(withTitle: "Accessibility", action: nil, keyEquivalent: "")
+            menu.setSubmenu(accessibility, for: accessibilityItem)
         }
 
         menu.addItem(.separator())
-        let restore = menu.addItem(
-            withTitle: "Restore AeroSpace gaps",
-            action: #selector(restoreGaps),
+        let aerospace = NSMenu(title: "AeroSpace")
+        let reload = aerospace.addItem(
+            withTitle: "Reload Config",
+            action: #selector(reloadAerospaceConfig),
             keyEquivalent: ""
         )
-        restore.target = self
+        reload.target = self
+        reload.isEnabled = FileManager.default.isExecutableFile(atPath: AerospaceClient.binaryURL.path)
+
+        let configURL = AerospaceConfigLocator.shared.location().configURL
+        let openConfig = aerospace.addItem(
+            withTitle: "Open Config",
+            action: #selector(openAerospaceConfig),
+            keyEquivalent: ""
+        )
+        openConfig.target = self
+        openConfig.isEnabled = FileManager.default.isReadableFile(atPath: configURL.path)
+
+        let chooseEditor = aerospace.addItem(
+            withTitle: "Choose Config Editor…",
+            action: #selector(chooseConfigEditor),
+            keyEquivalent: ""
+        )
+        chooseEditor.target = self
+        if let editorName = AerospaceMenuActions.shared.selectedEditorName {
+            chooseEditor.toolTip = "Current editor: \(editorName)"
+        }
+
+        aerospace.addItem(.separator())
+        let quitAerospace = aerospace.addItem(
+            withTitle: "Quit AeroSpace",
+            action: #selector(quitAerospace),
+            keyEquivalent: ""
+        )
+        quitAerospace.target = self
+        quitAerospace.isEnabled = !NSRunningApplication.runningApplications(
+            withBundleIdentifier: AerospaceMenuActions.aerospaceBundleIdentifier
+        ).isEmpty
+        quitAerospace.toolTip = "Also quits Aerospace Tabs, which requires AeroSpace to run."
+
+        let aerospaceItem = menu.addItem(withTitle: "AeroSpace", action: nil, keyEquivalent: "")
+        menu.setSubmenu(aerospace, for: aerospaceItem)
+
         menu.addItem(.separator())
         let quit = menu.addItem(withTitle: "Quit Aerospace Tabs", action: #selector(quit), keyEquivalent: "")
         quit.target = self
@@ -662,8 +702,20 @@ final class TabStripView: NSView {
         }
     }
 
-    @objc private func restoreGaps() {
-        GapBoost.shared.restoreIfNeeded()
+    @objc private func reloadAerospaceConfig() {
+        AerospaceMenuActions.shared.reloadConfig()
+    }
+
+    @objc private func openAerospaceConfig() {
+        AerospaceMenuActions.shared.openConfig()
+    }
+
+    @objc private func chooseConfigEditor() {
+        AerospaceMenuActions.shared.chooseEditor()
+    }
+
+    @objc private func quitAerospace() {
+        AerospaceMenuActions.shared.quitAerospace()
     }
 
     @objc private func openAccessibilitySettings() {
