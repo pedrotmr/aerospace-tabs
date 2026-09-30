@@ -27,6 +27,23 @@ final class AerospaceMenuActions {
     }
 
     func reloadConfig() {
+        reloadConfig { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success(let status) where status == 0:
+                break
+            case .success:
+                self.showError(
+                    title: "Could Not Reload Config",
+                    message: "AeroSpace could not reload its config. Check the config error shown by AeroSpace."
+                )
+            case .failure(let error):
+                self.showError(title: "Could Not Reload Config", message: error.localizedDescription)
+            }
+        }
+    }
+
+    private func reloadConfig(completion: @escaping (Result<Int32, Error>) -> Void) {
         let process = Process()
         process.executableURL = AerospaceClient.binaryURL
         process.arguments = ["reload-config"]
@@ -37,12 +54,7 @@ final class AerospaceMenuActions {
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.runningProcesses.removeAll { $0 === process }
-                if status != 0 {
-                    self.showError(
-                        title: "Could Not Reload Config",
-                        message: "AeroSpace could not reload its config. Check the config error shown by AeroSpace."
-                    )
-                }
+                completion(.success(status))
             }
         }
 
@@ -50,7 +62,7 @@ final class AerospaceMenuActions {
             try process.run()
             runningProcesses.append(process)
         } catch {
-            showError(title: "Could Not Reload Config", message: error.localizedDescription)
+            completion(.failure(error))
         }
     }
 
@@ -68,7 +80,37 @@ final class AerospaceMenuActions {
             selectEditor(openConfigAfterSelection: true)
             return
         }
-        open(configURL, in: editor.url)
+        switch GapBoost.shared.prepareForConfigEditing() {
+        case .noBoost:
+            open(configURL, in: editor.url)
+        case .failedToRestore:
+            showError(
+                title: "Could Not Prepare Config",
+                message: "AeroSpace Tabs could not restore the original gap setting, so it did not open the config."
+            )
+        case .restoredBoost:
+            reloadConfig { [weak self] result in
+                guard let self else {
+                    GapBoost.shared.resumeAfterConfigEditingFailure()
+                    return
+                }
+                if case .failure(let error) = result {
+                    self.showError(title: "Could Not Reload Config", message: error.localizedDescription)
+                } else if case .success(let status) = result, status != 0 {
+                    self.showError(
+                        title: "Could Not Reload Config",
+                        message: "AeroSpace could not reload its config. Check the config error shown by AeroSpace."
+                    )
+                }
+                self.open(
+                    configURL,
+                    in: editor.url,
+                    restoresGapBoostOnFailure: true,
+                    onSuccess: { NSApp.terminate(nil) },
+                    onFailure: { GapBoost.shared.resumeAfterConfigEditingFailure() }
+                )
+            }
+        }
     }
 
     func chooseEditor() {
@@ -137,15 +179,27 @@ final class AerospaceMenuActions {
         return nil
     }
 
-    private func open(_ fileURL: URL, in applicationURL: URL) {
+    private func open(
+        _ fileURL: URL,
+        in applicationURL: URL,
+        restoresGapBoostOnFailure: Bool = false,
+        onSuccess: (() -> Void)? = nil,
+        onFailure: (() -> Void)? = nil
+    ) {
         workspace.open(
             [fileURL],
             withApplicationAt: applicationURL,
             configuration: NSWorkspace.OpenConfiguration()
         ) { [weak self] _, error in
-            guard let error else { return }
-            let message = error.localizedDescription
             DispatchQueue.main.async {
+                guard let error else {
+                    onSuccess?()
+                    return
+                }
+                onFailure?()
+                let message = restoresGapBoostOnFailure
+                    ? "\(error.localizedDescription)\n\nAeroSpace Tabs restored its normal gap boost."
+                    : error.localizedDescription
                 self?.showError(title: "Could Not Open Config", message: message)
             }
         }

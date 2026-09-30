@@ -647,6 +647,7 @@ final class TabStripView: NSView {
         )
         openConfig.target = self
         openConfig.isEnabled = FileManager.default.isReadableFile(atPath: configURL.path)
+        openConfig.toolTip = "If the tab strip's gap boost is active, opening the config restores it and quits Aerospace Tabs."
 
         let chooseEditor = aerospace.addItem(
             withTitle: "Choose Config Editor…",
