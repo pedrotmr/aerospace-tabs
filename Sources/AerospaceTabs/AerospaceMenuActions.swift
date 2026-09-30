@@ -84,34 +84,7 @@ final class AerospaceMenuActions {
             return
         }
         isOpeningConfig = true
-
-        switch GapBoost.shared.prepareForConfigEditing() {
-        case .noBoost:
-            openPreparedConfig(configURL, in: editor.url, restoresGapBoostOnFailure: false)
-        case .failedToRestore:
-            isOpeningConfig = false
-            showError(
-                title: "Could Not Prepare Config",
-                message: "AeroSpace Tabs could not restore the original gap setting, so it did not open the config."
-            )
-        case .restoredBoost:
-            reloadConfig { [weak self] result in
-                guard let self else {
-                    GapBoost.shared.resumeAfterConfigEditingFailure()
-                    return
-                }
-                switch result {
-                case .success(0):
-                    self.openPreparedConfig(configURL, in: editor.url, restoresGapBoostOnFailure: true)
-                case .success:
-                    self.cancelConfigEditingAfterReloadFailure(
-                        "AeroSpace could not reload its config. Check the config error shown by AeroSpace."
-                    )
-                case .failure(let error):
-                    self.cancelConfigEditingAfterReloadFailure(error.localizedDescription)
-                }
-            }
-        }
+        openPreparedConfig(configURL, in: editor.url)
     }
 
     func chooseEditor() {
@@ -180,35 +153,22 @@ final class AerospaceMenuActions {
         return nil
     }
 
-    private func openPreparedConfig(_ fileURL: URL, in applicationURL: URL, restoresGapBoostOnFailure: Bool) {
+    private func openPreparedConfig(_ fileURL: URL, in applicationURL: URL) {
         open(
             fileURL,
             in: applicationURL,
-            restoresGapBoostOnFailure: restoresGapBoostOnFailure,
             onSuccess: { [weak self] in
                 self?.isOpeningConfig = false
-                NSApp.terminate(nil)
             },
             onFailure: { [weak self] in
                 self?.isOpeningConfig = false
-                GapBoost.shared.resumeAfterConfigEditingFailure()
             }
-        )
-    }
-
-    private func cancelConfigEditingAfterReloadFailure(_ reason: String) {
-        GapBoost.shared.resumeAfterConfigEditingFailure()
-        isOpeningConfig = false
-        showError(
-            title: "Could Not Reload Config",
-            message: "\(reason)\n\nConfig editing was canceled and Aerospace Tabs will stay open."
         )
     }
 
     private func open(
         _ fileURL: URL,
         in applicationURL: URL,
-        restoresGapBoostOnFailure: Bool = false,
         onSuccess: (() -> Void)? = nil,
         onFailure: (() -> Void)? = nil
     ) {
@@ -223,10 +183,7 @@ final class AerospaceMenuActions {
                     return
                 }
                 onFailure?()
-                let message = restoresGapBoostOnFailure
-                    ? "\(error.localizedDescription)\n\nAeroSpace Tabs restored its normal gap boost."
-                    : error.localizedDescription
-                self?.showError(title: "Could Not Open Config", message: message)
+                self?.showError(title: "Could Not Open Config", message: error.localizedDescription)
             }
         }
     }
