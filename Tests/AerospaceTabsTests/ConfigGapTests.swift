@@ -281,6 +281,7 @@ final class ConfigGapTests: XCTestCase {
             try String(contentsOf: fixture.target, encoding: .utf8),
             "[gaps]\nouter.top = 50\n"
         )
+        XCTAssertTrue(fixture.locator.location().hasRecoveryState())
         XCTAssertEqual(reloads, 2)
     }
 

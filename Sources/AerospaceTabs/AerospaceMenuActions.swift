@@ -100,15 +100,16 @@ final class AerospaceMenuActions {
                     GapBoost.shared.resumeAfterConfigEditingFailure()
                     return
                 }
-                if case .failure(let error) = result {
-                    self.showError(title: "Could Not Reload Config", message: error.localizedDescription)
-                } else if case .success(let status) = result, status != 0 {
-                    self.showError(
-                        title: "Could Not Reload Config",
-                        message: "AeroSpace could not reload its config. Check the config error shown by AeroSpace."
+                switch result {
+                case .success(0):
+                    self.openPreparedConfig(configURL, in: editor.url, restoresGapBoostOnFailure: true)
+                case .success:
+                    self.cancelConfigEditingAfterReloadFailure(
+                        "AeroSpace could not reload its config. Check the config error shown by AeroSpace."
                     )
+                case .failure(let error):
+                    self.cancelConfigEditingAfterReloadFailure(error.localizedDescription)
                 }
-                self.openPreparedConfig(configURL, in: editor.url, restoresGapBoostOnFailure: true)
             }
         }
     }
@@ -192,6 +193,15 @@ final class AerospaceMenuActions {
                 self?.isOpeningConfig = false
                 GapBoost.shared.resumeAfterConfigEditingFailure()
             }
+        )
+    }
+
+    private func cancelConfigEditingAfterReloadFailure(_ reason: String) {
+        GapBoost.shared.resumeAfterConfigEditingFailure()
+        isOpeningConfig = false
+        showError(
+            title: "Could Not Reload Config",
+            message: "\(reason)\n\nConfig editing was canceled and Aerospace Tabs will stay open."
         )
     }
 
