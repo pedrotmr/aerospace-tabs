@@ -1,5 +1,11 @@
 import Foundation
 
+enum ConfigEditingPreparation: Equatable {
+    case noBoost
+    case restoredBoost
+    case failedToRestore
+}
+
 /// While Aerospace Tabs is running, temporarily adds the strip height plus a small clearance to AeroSpace `gaps.outer.top` so windows clear the bar — then restores on quit.
 ///
 /// Backup lives on disk next to the AeroSpace config so a force-quit still leaves a recoverable original.
@@ -19,6 +25,8 @@ final class GapBoost {
     private let reloadExecutableURL: URL?
     private let reloadDidTerminate: (() -> Void)?
     private var reloadProcesses: [Process] = []
+    private var isPausedForConfigEditing = false
+    private var shouldBoost = false
 
     init(
         locator: AerospaceConfigLocator = .shared,
@@ -42,6 +50,38 @@ final class GapBoost {
     /// Keep boost aligned with whether any strip should be visible.
     func sync(shouldBoost: Bool) {
         queue.sync {
+            self.shouldBoost = shouldBoost
+            guard !isPausedForConfigEditing else { return }
+            if shouldBoost {
+                applyBoostIfNeeded()
+            } else {
+                _ = restoreBackup(reload: true)
+            }
+        }
+    }
+
+    /// Restore the user's config and pause boosting while it is open in an editor.
+    func prepareForConfigEditing() -> ConfigEditingPreparation {
+        queue.sync {
+            if isPausedForConfigEditing { return .restoredBoost }
+
+            isPausedForConfigEditing = true
+            let location = locator.location()
+            guard location.hasRecoveryState() else { return .noBoost }
+
+            guard restoreBackup(reload: false) else {
+                isPausedForConfigEditing = false
+                return .failedToRestore
+            }
+            return .restoredBoost
+        }
+    }
+
+    /// Resume boosting if opening the config in its editor fails.
+    func resumeAfterConfigEditingFailure() {
+        queue.sync {
+            guard isPausedForConfigEditing else { return }
+            isPausedForConfigEditing = false
             if shouldBoost {
                 applyBoostIfNeeded()
             } else {
@@ -57,7 +97,7 @@ final class GapBoost {
         }
     }
 
-    /// Manual recovery (menu item / CLI). Safe if nothing was boosted.
+    /// Manual recovery (CLI). Safe if nothing was boosted.
     @discardableResult
     func restoreIfNeeded(reload: Bool = true) -> Bool {
         queue.sync {

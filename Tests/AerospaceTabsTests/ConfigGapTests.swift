@@ -256,6 +256,69 @@ final class ConfigGapTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: location.activeURL.path))
     }
 
+    func testConfigEditingRestoresAndPausesBoostUntilFailedOpenResumesIt() throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let original = "[gaps]\nouter.top = 10\n"
+        try original.write(to: fixture.target, atomically: true, encoding: .utf8)
+        var reloads = 0
+        let boost = GapBoost(locator: fixture.locator, reloadHandler: { reloads += 1 })
+
+        boost.sync(shouldBoost: true)
+        XCTAssertEqual(
+            try String(contentsOf: fixture.target, encoding: .utf8),
+            "[gaps]\nouter.top = 50\n"
+        )
+
+        XCTAssertEqual(boost.prepareForConfigEditing(), .restoredBoost)
+        XCTAssertEqual(try String(contentsOf: fixture.target, encoding: .utf8), original)
+
+        boost.sync(shouldBoost: true)
+        XCTAssertEqual(try String(contentsOf: fixture.target, encoding: .utf8), original)
+
+        boost.resumeAfterConfigEditingFailure()
+        XCTAssertEqual(
+            try String(contentsOf: fixture.target, encoding: .utf8),
+            "[gaps]\nouter.top = 50\n"
+        )
+        XCTAssertTrue(fixture.locator.location().hasRecoveryState())
+        XCTAssertEqual(reloads, 2)
+    }
+
+    func testConfigEditingFailureDoesNotRestoreBoostAfterStripHides() throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let original = "[gaps]\nouter.top = 10\n"
+        try original.write(to: fixture.target, atomically: true, encoding: .utf8)
+        let boost = GapBoost(locator: fixture.locator, reloadHandler: {})
+
+        boost.sync(shouldBoost: true)
+        XCTAssertEqual(boost.prepareForConfigEditing(), .restoredBoost)
+        boost.sync(shouldBoost: false)
+
+        boost.resumeAfterConfigEditingFailure()
+
+        XCTAssertEqual(try String(contentsOf: fixture.target, encoding: .utf8), original)
+    }
+
+    func testConfigEditingPausesFutureBoostWhenNoBoostWasActive() throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let original = "[gaps]\nouter.top = 10\n"
+        try original.write(to: fixture.target, atomically: true, encoding: .utf8)
+        let boost = GapBoost(locator: fixture.locator, reloadHandler: {})
+
+        XCTAssertEqual(boost.prepareForConfigEditing(), .noBoost)
+        boost.sync(shouldBoost: true)
+        XCTAssertEqual(try String(contentsOf: fixture.target, encoding: .utf8), original)
+
+        boost.resumeAfterConfigEditingFailure()
+        XCTAssertEqual(
+            try String(contentsOf: fixture.target, encoding: .utf8),
+            "[gaps]\nouter.top = 50\n"
+        )
+    }
+
     func testFailedRestoreKeepsRecoveryState() throws {
         let fixture = try Fixture()
         defer { fixture.remove() }
