@@ -300,6 +300,24 @@ final class ConfigGapTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: fixture.target, encoding: .utf8), original)
     }
 
+    func testConfigEditingPausesFutureBoostWhenNoBoostWasActive() throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let original = "[gaps]\nouter.top = 10\n"
+        try original.write(to: fixture.target, atomically: true, encoding: .utf8)
+        let boost = GapBoost(locator: fixture.locator, reloadHandler: {})
+
+        XCTAssertEqual(boost.prepareForConfigEditing(), .noBoost)
+        boost.sync(shouldBoost: true)
+        XCTAssertEqual(try String(contentsOf: fixture.target, encoding: .utf8), original)
+
+        boost.resumeAfterConfigEditingFailure()
+        XCTAssertEqual(
+            try String(contentsOf: fixture.target, encoding: .utf8),
+            "[gaps]\nouter.top = 50\n"
+        )
+    }
+
     func testFailedRestoreKeepsRecoveryState() throws {
         let fixture = try Fixture()
         defer { fixture.remove() }

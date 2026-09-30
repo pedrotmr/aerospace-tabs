@@ -19,7 +19,7 @@ See [CHARTER.md](CHARTER.md) for what this is, what it isn’t, and how support 
 - Temporarily boosts AeroSpace `gaps.outer.top` so windows clear the strip; restores on quit
 - The right-click menu groups strip settings, AeroSpace config controls, and quit actions; quitting AeroSpace also closes its companion
 
-Select **Choose Config Editor…** once from the AeroSpace submenu; **Open Config** uses that editor on later openings. If the tab strip's gap boost is active, opening the config restores and reloads the original gap, opens the editor, and quits Aerospace Tabs. Reopen the app after editing.
+Select **Choose Config Editor…** once from the AeroSpace submenu; **Open Config** uses that editor on later openings. Opening the config pauses gap updates and quits Aerospace Tabs after launching the editor; if a gap boost is active, it restores and reloads the original gap first. Reopen the app after editing.
 
 ## Requirements
 

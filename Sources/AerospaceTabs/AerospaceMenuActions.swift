@@ -15,6 +15,7 @@ final class AerospaceMenuActions {
     private let defaults: UserDefaults
     private let workspace: NSWorkspace
     private var runningProcesses: [Process] = []
+    private var isOpeningConfig = false
 
     init(defaults: UserDefaults = .standard, workspace: NSWorkspace = .shared) {
         self.defaults = defaults
@@ -67,6 +68,8 @@ final class AerospaceMenuActions {
     }
 
     func openConfig() {
+        guard !isOpeningConfig else { return }
+
         let configURL = AerospaceConfigLocator.shared.location().configURL
         guard FileManager.default.isReadableFile(atPath: configURL.path) else {
             showError(
@@ -80,10 +83,13 @@ final class AerospaceMenuActions {
             selectEditor(openConfigAfterSelection: true)
             return
         }
+        isOpeningConfig = true
+
         switch GapBoost.shared.prepareForConfigEditing() {
         case .noBoost:
-            open(configURL, in: editor.url)
+            openPreparedConfig(configURL, in: editor.url, restoresGapBoostOnFailure: false)
         case .failedToRestore:
+            isOpeningConfig = false
             showError(
                 title: "Could Not Prepare Config",
                 message: "AeroSpace Tabs could not restore the original gap setting, so it did not open the config."
@@ -102,13 +108,7 @@ final class AerospaceMenuActions {
                         message: "AeroSpace could not reload its config. Check the config error shown by AeroSpace."
                     )
                 }
-                self.open(
-                    configURL,
-                    in: editor.url,
-                    restoresGapBoostOnFailure: true,
-                    onSuccess: { NSApp.terminate(nil) },
-                    onFailure: { GapBoost.shared.resumeAfterConfigEditingFailure() }
-                )
+                self.openPreparedConfig(configURL, in: editor.url, restoresGapBoostOnFailure: true)
             }
         }
     }
@@ -177,6 +177,22 @@ final class AerospaceMenuActions {
         }
 
         return nil
+    }
+
+    private func openPreparedConfig(_ fileURL: URL, in applicationURL: URL, restoresGapBoostOnFailure: Bool) {
+        open(
+            fileURL,
+            in: applicationURL,
+            restoresGapBoostOnFailure: restoresGapBoostOnFailure,
+            onSuccess: { [weak self] in
+                self?.isOpeningConfig = false
+                NSApp.terminate(nil)
+            },
+            onFailure: { [weak self] in
+                self?.isOpeningConfig = false
+                GapBoost.shared.resumeAfterConfigEditingFailure()
+            }
+        )
     }
 
     private func open(

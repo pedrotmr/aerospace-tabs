@@ -65,10 +65,10 @@ final class GapBoost {
         queue.sync {
             if isPausedForConfigEditing { return .restoredBoost }
 
+            isPausedForConfigEditing = true
             let location = locator.location()
             guard location.hasRecoveryState() else { return .noBoost }
 
-            isPausedForConfigEditing = true
             guard restoreBackup(reload: false) else {
                 isPausedForConfigEditing = false
                 return .failedToRestore
