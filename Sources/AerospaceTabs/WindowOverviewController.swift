@@ -13,6 +13,8 @@ final class WindowOverviewController {
     private var liveStart: DispatchWorkItem?
     private var previousApplication: NSRunningApplication?
     private var appearanceObserver: NSObjectProtocol?
+    private var windows: [Win] = []
+    private var focusedID: Int?
 
     private(set) var isPresented = false
 
@@ -35,14 +37,17 @@ final class WindowOverviewController {
     }
 
     func update(windows: [Win], focusedID: Int?) {
-        model.update(windows: windows, focusedID: focusedID)
+        self.windows = windows
+        self.focusedID = focusedID
         previews.update(windows: windows)
+        guard isPresented else { return }
+        model.update(windows: windows, focusedID: focusedID)
         guard !windows.isEmpty else {
-            if isPresented { dismiss() }
+            dismiss()
             return
         }
         syncScreens()
-        if isPresented { syncPanelVisibility() }
+        syncPanelVisibility()
     }
 
     func toggle() {
@@ -50,12 +55,15 @@ final class WindowOverviewController {
     }
 
     func present() {
-        guard !isPresented, !model.windows.isEmpty else { return }
+        guard !isPresented, !windows.isEmpty else { return }
         previousApplication = NSWorkspace.shared.frontmostApplication
         isPresented = true
         var transaction = Transaction()
         transaction.disablesAnimations = true
-        withTransaction(transaction) { model.beginPresentation() }
+        withTransaction(transaction) {
+            model.update(windows: windows, focusedID: focusedID)
+            model.beginPresentation()
+        }
         previews.beginSession()
         previews.setPriorityWindow(model.windows.first(where: { $0.id == model.selectedID }))
         syncScreens()
@@ -86,7 +94,8 @@ final class WindowOverviewController {
         liveStart = nil
         removeKeyMonitor()
         previews.endSession()
-        for panel in panels.values { panel.hide() }
+        for panel in panels.values { panel.close() }
+        panels.removeAll()
         onPresentationChange?(false)
 
         let application = previousApplication
@@ -269,12 +278,6 @@ private final class OverviewPanel: NSPanel {
             alphaValue = 1
             orderFrontRegardless()
         }
-    }
-
-    func hide() {
-        guard isVisible else { return }
-        alphaValue = 0
-        orderOut(nil)
     }
 
     func applyTheme(_ theme: StripTheme) {

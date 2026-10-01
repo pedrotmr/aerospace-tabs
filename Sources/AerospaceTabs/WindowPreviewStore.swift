@@ -9,7 +9,7 @@ import os
 final class WindowPreviewStore: ObservableObject {
     @Published private(set) var livePreviews: [Int: OverviewLivePreview] = [:]
     @Published private(set) var images: [Int: NSImage] = [:]
-    @Published private(set) var needsScreenRecording = !CGPreflightScreenCaptureAccess()
+    @Published private(set) var needsScreenRecording: Bool
     @Published private(set) var aspectRatios: [Int: CGFloat] = [:]
 
     private var windows: [Int: Win] = [:]
@@ -27,11 +27,33 @@ final class WindowPreviewStore: ObservableObject {
     private var isPresented = false
     private var liveEnabled = false
     private var timer: Timer?
+    private var resourceCleanup: DispatchWorkItem?
     private let discovery = OverviewWindowDiscovery()
+    private let screenRecordingAccess: () -> Bool
+    private let captureSnapshot: @Sendable (Int) async -> CGImage?
     private let memoryLimit = 96 * 1024 * 1024
     private let logger = Logger(subsystem: "com.pedrotmr.AerospaceTabs", category: "OverviewPreviews")
 
-    deinit { timer?.invalidate() }
+    init(
+        screenRecordingAccess: @escaping () -> Bool = { CGPreflightScreenCaptureAccess() },
+        captureSnapshot: (@Sendable (Int) async -> CGImage?)? = nil
+    ) {
+        self.screenRecordingAccess = screenRecordingAccess
+        needsScreenRecording = !screenRecordingAccess()
+        let discovery = discovery
+        self.captureSnapshot = captureSnapshot ?? { id in
+            if let image = OverviewWindowCapture.captureBackingStore(windowID: CGWindowID(id)) {
+                return image
+            }
+            guard let window = await discovery.window(id: id) else { return nil }
+            return await OverviewWindowCapture.capture(window)
+        }
+    }
+
+    deinit {
+        timer?.invalidate()
+        resourceCleanup?.cancel()
+    }
 
     func aspectRatio(for id: Int) -> CGFloat { aspectRatios[id] ?? 1.66 }
 
@@ -51,28 +73,27 @@ final class WindowPreviewStore: ObservableObject {
         self.windows = latest
         pending.removeAll { latest[$0] == nil }
         visibleIDs.formIntersection(latest.keys)
-        if membershipChanged { updateAspectRatios() }
-        if timer == nil {
-            timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    self?.refreshDuePreviews()
-                }
-            }
-            updateAspectRatios()
-        }
+        if membershipChanged, isPresented { updateAspectRatios() }
         refreshDuePreviews()
     }
 
     func beginSession() {
+        guard !isPresented else { return }
+        resourceCleanup?.cancel()
+        resourceCleanup = nil
         generation += 1
         isPresented = true
         liveEnabled = false
         liveRetryDates.removeAll()
         refreshScreenRecordingAccess()
         updateAspectRatios()
+        timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.refreshDuePreviews()
+            }
+        }
+        timer?.tolerance = 0.05
         logger.debug("Overview opening: \(self.images.count) cached previews for \(self.windows.count) windows")
-        // Hosting views survive orderOut; their onAppear is not a presentation callback.
-        reconcileLivePreviews()
         for window in windows.values { request(window) }
     }
 
@@ -85,13 +106,31 @@ final class WindowPreviewStore: ObservableObject {
     func endSession() {
         isPresented = false
         liveEnabled = false
+        timer?.invalidate()
+        timer = nil
         priorityID = nil
+        visibleIDs.removeAll()
+        targetSizes.removeAll()
         pending.removeAll()
         stopLivePreviews()
+        let cleanup = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, !self.isPresented else { return }
+                self.resourceCleanup = nil
+                Task.detached(priority: .utility) {
+                    OverviewLivePreview.releaseTransientResources()
+                }
+            }
+        }
+        resourceCleanup?.cancel()
+        resourceCleanup = cleanup
+        // Let stream shutdown and final-frame callbacks release their buffers first.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: cleanup)
         // Keep the last valid images in RAM for the next presentation.
     }
 
     func registerVisible(_ window: Win, size: CGSize, scale: CGFloat) {
+        guard isPresented else { return }
         visibleIDs.insert(window.id)
         let desired = CGSize(width: size.width * scale, height: size.height * scale)
         targetSizes[window.id] = desired
@@ -123,7 +162,7 @@ final class WindowPreviewStore: ObservableObject {
     }
 
     func refreshScreenRecordingAccess() {
-        let unavailable = !CGPreflightScreenCaptureAccess()
+        let unavailable = !screenRecordingAccess()
         if needsScreenRecording != unavailable { needsScreenRecording = unavailable }
         if unavailable {
             stopLivePreviews(keepSnapshots: false)
@@ -149,31 +188,23 @@ final class WindowPreviewStore: ObservableObject {
     }
 
     private func refreshDuePreviews() {
-        guard !needsScreenRecording, !isPresented || liveEnabled else { return }
+        guard isPresented, !needsScreenRecording, liveEnabled else { return }
         reconcileLivePreviews()
         let now = Date()
         for window in windows.values {
-            let interval: TimeInterval
-            if isPresented {
-                guard visibleIDs.contains(window.id) || images[window.id] == nil else { continue }
-                guard livePreviews[window.id] == nil else { continue }
-                interval = 3
-            } else {
-                // Warm every new window once, then only refresh the visible workspace.
-                guard window.workspaceIsVisible || captureDates[window.id] == nil else { continue }
-                interval = 5
-            }
+            guard visibleIDs.contains(window.id) else { continue }
+            guard livePreviews[window.id] == nil else { continue }
             let lastAttempt = attemptDates[window.id] ?? .distantPast
             let lastCapture = captureDates[window.id] ?? .distantPast
             let failedLastTime = lastAttempt > lastCapture
-            if now.timeIntervalSince(lastAttempt) >= (failedLastTime ? 10 : interval) {
+            if now.timeIntervalSince(lastAttempt) >= (failedLastTime ? 10 : 3) {
                 request(window, refresh: true)
             }
         }
     }
 
     func request(_ window: Win, refresh: Bool = false) {
-        guard !needsScreenRecording, windows[window.id] != nil,
+        guard isPresented, !needsScreenRecording, windows[window.id] != nil,
               livePreviews[window.id] == nil || images[window.id] == nil,
               !inFlight.contains(window.id), !pending.contains(window.id),
               refresh || images[window.id] == nil else { return }
@@ -183,24 +214,22 @@ final class WindowPreviewStore: ObservableObject {
     }
 
     private func pump() {
+        guard isPresented, !needsScreenRecording else { return }
         while inFlight.count < 3, !pending.isEmpty {
             let id = pending.removeFirst()
             guard let window = windows[id] else { continue }
             inFlight.insert(id)
             attemptDates[id] = Date()
             let started = Date()
-            let discovery = discovery
+            let token = generation
+            let captureSnapshot = captureSnapshot
             Task.detached(priority: .userInitiated) { [weak self] in
-                // Most windows can be captured immediately, without SCShareableContent discovery.
-                var image = OverviewWindowCapture.captureBackingStore(windowID: CGWindowID(id))
-                if image == nil, let captureWindow = await discovery.window(id: id) {
-                    image = await OverviewWindowCapture.capture(captureWindow)
-                }
-                let captured = image
+                let captured = await captureSnapshot(id)
                 await MainActor.run { [weak self] in
                     guard let self else { return }
                     self.inFlight.remove(id)
-                    guard self.windows[id]?.bundleID == window.bundleID, !self.needsScreenRecording else {
+                    guard token == self.generation,
+                          self.windows[id]?.bundleID == window.bundleID, !self.needsScreenRecording else {
                         self.pump()
                         return
                     }
@@ -214,6 +243,11 @@ final class WindowPreviewStore: ObservableObject {
                     let elapsed = Int(Date().timeIntervalSince(started) * 1000)
                     self.logger.debug("Preview \(id): \(captured != nil ? "ready" : "unavailable") in \(elapsed) ms")
                     self.pump()
+                    if !self.isPresented, self.inFlight.isEmpty {
+                        Task.detached(priority: .utility) {
+                            OverviewLivePreview.releaseTransientResources()
+                        }
+                    }
                 }
             }
         }

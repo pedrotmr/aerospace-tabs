@@ -2,6 +2,7 @@ import AppKit
 @preconcurrency import AVFoundation
 @preconcurrency import ScreenCaptureKit
 import CoreImage
+import Darwin
 import SwiftUI
 import os
 
@@ -24,6 +25,12 @@ final class OverviewLivePreview: NSObject, SCStreamOutput, SCStreamDelegate, @un
     private var frameCount = 0
     private let started = ContinuousClock.now
     private static let imageContext = CIContext(options: [.cacheIntermediates: false])
+
+    static func releaseTransientResources() {
+        imageContext.clearCaches()
+        // Return freed capture buffers that the allocator otherwise keeps for reuse.
+        malloc_zone_pressure_relief(nil, 0)
+    }
 
     init(windowID: Int, pixelSize: CGSize, onFailure: @escaping () -> Void,
          onSnapshot: @escaping (CGImage) -> Void) {
@@ -81,6 +88,7 @@ final class OverviewLivePreview: NSObject, SCStreamOutput, SCStreamDelegate, @un
     func stop(keepSnapshot: Bool = true) {
         guard !stopped else { return }
         stopped = true
+        displayLayer.removeFromSuperlayer()
         let stream = self.stream
         self.stream = nil
         outputQueue.async { [self] in
