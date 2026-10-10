@@ -75,9 +75,12 @@ public enum SessionPolicy {
         windows.count >= 2
     }
 
-    /// Keep outer.top boosted while any screen has enough windows for a strip.
-    public static func shouldBoostGaps(windowsByScreen: [[Win]]) -> Bool {
-        windowsByScreen.contains(where: shouldShowTabs)
+    /// Keep outer.top clear for eligible strips and the disconnected-state banner.
+    public static func shouldBoostGaps(
+        windowsByScreen: [[Win]],
+        connectionStatusVisible: Bool = false
+    ) -> Bool {
+        connectionStatusVisible || windowsByScreen.contains(where: shouldShowTabs)
     }
 
     public static func focusedWorkspaceName(

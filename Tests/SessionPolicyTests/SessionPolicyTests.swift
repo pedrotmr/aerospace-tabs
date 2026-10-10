@@ -32,6 +32,14 @@ final class SessionPolicyTests: XCTestCase {
             [window(5, workspace: "2", screen: 2)],
         ]))
         XCTAssertFalse(SessionPolicy.shouldBoostGaps(windowsByScreen: []))
+        XCTAssertTrue(SessionPolicy.shouldBoostGaps(
+            windowsByScreen: [oneWindow],
+            connectionStatusVisible: true
+        ))
+        XCTAssertTrue(SessionPolicy.shouldBoostGaps(
+            windowsByScreen: [],
+            connectionStatusVisible: true
+        ))
     }
 
     func testWindowCyclePoolStaysOnFocusedWorkspaceAndMonitor() {
