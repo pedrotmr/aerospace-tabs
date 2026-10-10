@@ -122,8 +122,11 @@ public enum SessionPolicy {
 
         let grouped = Dictionary(grouping: windows, by: \.workspace)
         var seenWorkspaces: [String] = []
-        for window in windows where !seenWorkspaces.contains(window.workspace) {
-            seenWorkspaces.append(window.workspace)
+        var seenWorkspaceSet: Set<String> = []
+        for window in windows {
+            if seenWorkspaceSet.insert(window.workspace).inserted {
+                seenWorkspaces.append(window.workspace)
+            }
         }
 
         let firstSeenIndex = Dictionary(
@@ -160,9 +163,10 @@ public enum SessionPolicy {
                 ordered.append(window)
             }
         }
-        for window in windows where remaining[window.id] != nil {
-            ordered.append(window)
-            remaining.removeValue(forKey: window.id)
+        for window in windows {
+            if remaining.removeValue(forKey: window.id) != nil {
+                ordered.append(window)
+            }
         }
         return ordered
     }
