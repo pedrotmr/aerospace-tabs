@@ -127,6 +127,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         overview.update(windows: session.windows, focusedID: session.focusedID)
         let grouped = Dictionary(grouping: session.windows, by: \.screenIndex)
         let screens = NSScreen.screens
+        let firstScreenDisplayID = screens.first?.displayID
         let windowsByScreen = screens.map { grouped[$0.aerospaceScreenIndex] ?? [] }
         let shouldBoostGaps = SessionPolicy.shouldBoostGaps(windowsByScreen: windowsByScreen)
         let badges = dockBadgeReader.badgesByApp
@@ -166,11 +167,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let gaps = GapsConfig.shared.gaps(for: screen)
             // Show an overview when this monitor has at least two occupied windows.
             let showTabs = Self.shouldShowTabs(windows)
+            let showConnectionStatus = connectionUnavailable && (
+                showTabs || (!shouldBoostGaps && displayID == firstScreenDisplayID)
+            )
             strip.update(
                 screen: screen,
                 windows: connectionUnavailable ? [] : windows,
                 focused: connectionUnavailable ? nil : session.displayFocusedID,
-                hidden: hidden || !(showTabs || connectionUnavailable),
+                hidden: hidden || !(showTabs || showConnectionStatus),
                 gaps: gaps,
                 notificationBadges: badges,
                 connectionUnavailable: connectionUnavailable

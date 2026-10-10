@@ -874,7 +874,7 @@ final class TabStripView: NSView {
         NSColor(calibratedRed: 0.62, green: 0.12, blue: 0.12, alpha: 0.94).setFill()
         pill.fill()
         label.draw(
-            in: rect.insetBy(dx: 8, dy: 0),
+            in: rect.insetBy(dx: min(8, rect.width / 2), dy: 0),
             withAttributes: attributes
         )
     }

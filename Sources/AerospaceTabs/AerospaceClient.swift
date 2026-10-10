@@ -41,6 +41,7 @@ final class AerospaceClient {
     private static let focusedWorkspaceFormat =
         "%{workspace}%{monitor-appkit-nsscreen-screens-id}"
 
+    /// Delivers success and failure results on the main queue.
     func listAllWindows(completion: @escaping (Result<Snapshot, Error>) -> Void) {
         queue.async { [weak self] in
             guard let self else { return }
