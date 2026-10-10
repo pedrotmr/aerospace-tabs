@@ -27,6 +27,10 @@ final class SessionPolicyTests: XCTestCase {
 
         XCTAssertTrue(SessionPolicy.shouldBoostGaps(windowsByScreen: [oneWindow, twoAccordionWindows]))
         XCTAssertFalse(SessionPolicy.shouldBoostGaps(windowsByScreen: [oneWindow]))
+        XCTAssertFalse(SessionPolicy.shouldBoostGaps(windowsByScreen: [
+            [window(4, workspace: "1", screen: 1)],
+            [window(5, workspace: "2", screen: 2)],
+        ]))
         XCTAssertFalse(SessionPolicy.shouldBoostGaps(windowsByScreen: []))
     }
 
