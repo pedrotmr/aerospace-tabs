@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import SessionPolicy
 
 private struct FocusedWorkspaceRow: Decodable {
     let workspace: String?

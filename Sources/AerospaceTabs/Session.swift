@@ -1,56 +1,6 @@
 import Foundation
 import os
-
-struct Win: Equatable {
-    let id: Int
-    let title: String
-    let appName: String
-    let bundleID: String
-    let bundlePath: String
-    let workspace: String
-    let workspaceIsFocused: Bool
-    let workspaceIsVisible: Bool
-    let screenIndex: Int
-    /// AeroSpace parent layout: h_tiles, v_tiles, h_accordion, v_accordion, floating.
-    let parentLayout: String
-
-    init(
-        id: Int,
-        title: String,
-        appName: String,
-        bundleID: String,
-        bundlePath: String,
-        workspace: String,
-        screenIndex: Int,
-        parentLayout: String,
-        workspaceIsFocused: Bool = false,
-        workspaceIsVisible: Bool = false
-    ) {
-        self.id = id
-        self.title = title
-        self.appName = appName
-        self.bundleID = bundleID
-        self.bundlePath = bundlePath
-        self.workspace = workspace
-        self.screenIndex = screenIndex
-        self.parentLayout = parentLayout
-        self.workspaceIsFocused = workspaceIsFocused
-        self.workspaceIsVisible = workspaceIsVisible
-    }
-
-    var label: String {
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? appName : trimmed
-    }
-
-    var isAccordion: Bool {
-        parentLayout.contains("accordion")
-    }
-
-    var isTiles: Bool {
-        parentLayout.contains("tiles")
-    }
-}
+import SessionPolicy
 
 struct WindowRow: Decodable {
     let windowId: Int
@@ -187,35 +137,23 @@ final class Session {
     }
 
     func cyclePool() -> [Win] {
-        guard let focusedWindow = windows.first(where: { $0.id == focusedID }) else {
-            return windows.filter(\.workspaceIsFocused)
-        }
-        return windows.filter {
-            $0.screenIndex == focusedWindow.screenIndex
-                && $0.workspace == focusedWindow.workspace
-        }
+        SessionPolicy.cyclePool(windows: windows, focusedID: focusedID)
     }
 
     private var focusedWorkspaceName: String? {
-        windows.first(where: { $0.id == focusedID })?.workspace
-            ?? focusedWorkspace
-            ?? windows.first(where: \.workspaceIsFocused)?.workspace
+        SessionPolicy.focusedWorkspaceName(
+            windows: windows,
+            focusedID: focusedID,
+            fallbackWorkspace: focusedWorkspace
+        )
     }
 
     func spaceCyclePool() -> [String] {
-        let screenIndex = windows.first(where: { $0.id == focusedID })?.screenIndex
-            ?? focusedScreenIndex
-            ?? windows.first(where: \.workspaceIsFocused)?.screenIndex
-        guard let screenIndex else { return [] }
-
-        var workspaces: [String] = []
-        var seen: Set<String> = []
-        for window in windows where window.screenIndex == screenIndex {
-            if seen.insert(window.workspace).inserted {
-                workspaces.append(window.workspace)
-            }
-        }
-        return workspaces
+        SessionPolicy.spaceCyclePool(
+            windows: windows,
+            focusedID: focusedID,
+            focusedScreenIndex: focusedScreenIndex
+        )
     }
 
     private func handle(_ event: AeroEvent) {

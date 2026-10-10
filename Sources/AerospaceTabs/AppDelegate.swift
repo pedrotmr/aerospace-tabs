@@ -1,4 +1,5 @@
 import AppKit
+import SessionPolicy
 
 @main
 enum AerospaceTabsMain {
@@ -225,7 +226,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Strip visibility: two or more windows across this monitor's occupied workspaces.
     private static func shouldShowTabs(_ windows: [Win]) -> Bool {
-        windows.count >= 2
+        SessionPolicy.shouldShowTabs(windows)
     }
 
     /// Whether AeroSpace `outer.top` should stay boosted for the strip.

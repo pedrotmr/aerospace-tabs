@@ -1,5 +1,6 @@
 import CoreGraphics
 import XCTest
+import SessionPolicy
 @testable import AerospaceTabs
 
 final class MissionControlTests: XCTestCase {
@@ -30,13 +31,13 @@ final class MissionControlTests: XCTestCase {
             window(owner: "Demo", name: "App Exposé"),
         ]
 
-        XCTAssertFalse(MissionControlWatcher.detect(windows: windows, screenSizes: screenSizes))
+        XCTAssertFalse(MissionControlPolicy.detect(windows: windows, screenSizes: screenSizes))
     }
 
     func testSystemOwnerAndActivityNameTriggerDetection() {
         let windows = [window(owner: "Dock", name: "App Exposé")]
 
-        XCTAssertTrue(MissionControlWatcher.detect(windows: windows, screenSizes: screenSizes))
+        XCTAssertTrue(MissionControlPolicy.detect(windows: windows, screenSizes: screenSizes))
     }
 
     func testWindowManagerSurfaceStillTriggersDetection() {
@@ -49,7 +50,7 @@ final class MissionControlTests: XCTestCase {
             ),
         ]
 
-        XCTAssertTrue(MissionControlWatcher.detect(windows: windows, screenSizes: screenSizes))
+        XCTAssertTrue(MissionControlPolicy.detect(windows: windows, screenSizes: screenSizes))
     }
 
     func testDockLayerTwentyAloneDoesNotTriggerDetection() {
@@ -62,7 +63,7 @@ final class MissionControlTests: XCTestCase {
             ),
         ]
 
-        XCTAssertFalse(MissionControlWatcher.detect(windows: windows, screenSizes: screenSizes))
+        XCTAssertFalse(MissionControlPolicy.detect(windows: windows, screenSizes: screenSizes))
     }
 
     private func window(
