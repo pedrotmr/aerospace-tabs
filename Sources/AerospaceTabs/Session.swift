@@ -48,6 +48,7 @@ final class Session {
     private let client = AerospaceClient()
     private let logger = Logger(subsystem: "com.pedrotmr.AerospaceTabs", category: "Session")
     private var lastRefreshError: String?
+    var isAerospaceUnavailable: Bool { lastRefreshError != nil }
     private let subscribe = SubscribePump()
     private let order = TabOrder()
     private var refreshQueued = false
@@ -190,21 +191,27 @@ final class Session {
             guard let self else { return }
             switch result {
             case .failure(let error):
-                let description = String(describing: error)
-                if description != self.lastRefreshError {
-                    self.logger.error("Window refresh failed: \(description, privacy: .public)")
-                    self.lastRefreshError = description
-                }
-                // Keep the last good snapshot so a socket blip does not blank the strip.
-                return
+                self.markUnavailable(error)
             case .success(let snapshot):
-                self.lastRefreshError = nil
                 self.apply(snapshot)
             }
         }
     }
 
+    func markUnavailable(_ error: Error) {
+        let description = String(describing: error)
+        guard description != lastRefreshError else { return }
+        logger.error("Window refresh failed: \(description, privacy: .public)")
+        let wasUnavailable = isAerospaceUnavailable
+        lastRefreshError = description
+        if !wasUnavailable {
+            onChange?()
+        }
+    }
+
     func apply(_ snapshot: Snapshot) {
+        let recovered = isAerospaceUnavailable
+        lastRefreshError = nil
         let sorted = order.apply(snapshot.windows)
         let changed = sorted != windows
             || snapshot.focused != focusedID
@@ -214,7 +221,7 @@ final class Session {
         focusedID = snapshot.focused
         focusedWorkspace = snapshot.focusedWorkspace
         focusedScreenIndex = snapshot.focusedScreenIndex
-        if changed {
+        if changed || recovered {
             onChange?()
         }
     }

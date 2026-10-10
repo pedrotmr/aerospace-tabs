@@ -4,6 +4,24 @@ import SessionPolicy
 @testable import AerospaceTabs
 
 final class SessionTests: XCTestCase {
+    func testConnectionFailureStaysVisibleUntilSuccessfulSnapshot() {
+        let session = Session()
+        var changeCount = 0
+        session.onChange = { changeCount += 1 }
+
+        let failure = NSError(domain: "AeroSpace", code: 1)
+        session.markUnavailable(failure)
+        XCTAssertTrue(session.isAerospaceUnavailable)
+        XCTAssertEqual(changeCount, 1)
+
+        session.markUnavailable(failure)
+        XCTAssertEqual(changeCount, 1, "Repeated failures should not keep rerendering the warning")
+
+        session.apply(Snapshot(windows: [], focused: nil))
+        XCTAssertFalse(session.isAerospaceUnavailable)
+        XCTAssertEqual(changeCount, 2, "A successful refresh should clear the warning")
+    }
+
     func testApplyingSnapshotClearsStaleFocusedWindow() {
         let session = Session()
         let window = Win(

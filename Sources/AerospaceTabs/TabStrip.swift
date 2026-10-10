@@ -251,13 +251,19 @@ final class TabStrip {
         focused: Int?,
         hidden: Bool,
         gaps: OuterGaps,
-        notificationBadges: [String: String]
+        notificationBadges: [String: String],
+        connectionUnavailable: Bool = false
     ) {
         let frame = Self.frame(on: screen, gaps: gaps)
         if panel.frame != frame {
             panel.setFrame(frame, display: false)
         }
-        view.set(windows: windows, focused: focused, notificationBadges: notificationBadges)
+        view.set(
+            windows: windows,
+            focused: focused,
+            notificationBadges: notificationBadges,
+            connectionUnavailable: connectionUnavailable
+        )
         if hidden {
             setHidden(true)
             return
@@ -372,28 +378,49 @@ final class TabStripView: NSView {
     private var draggedWindowID: Int?
     private var dragOffsetX: CGFloat = 0
     private var dragX: CGFloat = 0
-    private var pendingModel: (windows: [Win], focused: Int?, badges: [String: String])?
+    private var pendingModel: (windows: [Win], focused: Int?, badges: [String: String], connectionUnavailable: Bool)?
     private var notificationBadges: [String: String] = [:]
+    private var connectionUnavailable = false
 
     override var isOpaque: Bool { false }
     override var isFlipped: Bool { true }
     override var mouseDownCanMoveWindow: Bool { false }
 
-    func set(windows: [Win], focused: Int?, notificationBadges: [String: String] = [:]) {
+    func set(
+        windows: [Win],
+        focused: Int?,
+        notificationBadges: [String: String] = [:],
+        connectionUnavailable: Bool = false
+    ) {
         if dragging {
-            pendingModel = (windows, focused, notificationBadges)
+            pendingModel = (windows, focused, notificationBadges, connectionUnavailable)
             return
         }
-        apply(windows: windows, focused: focused, notificationBadges: notificationBadges)
+        apply(
+            windows: windows,
+            focused: focused,
+            notificationBadges: notificationBadges,
+            connectionUnavailable: connectionUnavailable
+        )
     }
 
-    private func apply(windows: [Win], focused: Int?, notificationBadges: [String: String]) {
-        if self.windows == windows, self.focused == focused, self.notificationBadges == notificationBadges {
+    private func apply(
+        windows: [Win],
+        focused: Int?,
+        notificationBadges: [String: String],
+        connectionUnavailable: Bool
+    ) {
+        if self.windows == windows,
+           self.focused == focused,
+           self.notificationBadges == notificationBadges,
+           self.connectionUnavailable == connectionUnavailable
+        {
             return
         }
         self.windows = windows
         self.focused = focused
         self.notificationBadges = notificationBadges
+        self.connectionUnavailable = connectionUnavailable
         recomputeFrames()
         needsDisplay = true
     }
@@ -505,7 +532,8 @@ final class TabStripView: NSView {
                 apply(
                     windows: pendingModel.windows,
                     focused: pendingModel.focused,
-                    notificationBadges: pendingModel.badges
+                    notificationBadges: pendingModel.badges,
+                    connectionUnavailable: pendingModel.connectionUnavailable
                 )
             }
             needsDisplay = true
@@ -539,7 +567,8 @@ final class TabStripView: NSView {
             apply(
                 windows: pendingModel.windows,
                 focused: pendingModel.focused,
-                notificationBadges: pendingModel.badges
+                notificationBadges: pendingModel.badges,
+                connectionUnavailable: pendingModel.connectionUnavailable
             )
         }
         needsDisplay = true
@@ -792,6 +821,13 @@ final class TabStripView: NSView {
         rim.lineWidth = 1
         rim.stroke()
 
+        if connectionUnavailable {
+            frames = []
+            workspaceHeaders = []
+            drawConnectionStatus()
+            return
+        }
+
         let count = windows.count
         guard count > 0 else {
             frames = []
@@ -814,6 +850,33 @@ final class TabStripView: NSView {
             let rect = NSRect(x: dragX, y: home.minY, width: home.width, height: home.height)
             drawTab(windows[dragIndex], in: rect, selected: true, hovered: false, elevating: true)
         }
+    }
+
+    private func drawConnectionStatus() {
+        let label = "AeroSpace disconnected — retrying" as NSString
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        paragraph.lineBreakMode = .byTruncatingTail
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 11, weight: .semibold),
+            .foregroundColor: NSColor.white,
+            .paragraphStyle: paragraph,
+        ]
+        let measured = label.size(withAttributes: attributes)
+        let width = min(max(100, measured.width + 24), max(0, bounds.width - 12))
+        let rect = NSRect(
+            x: bounds.midX - width / 2,
+            y: bounds.minY + 3,
+            width: width,
+            height: max(0, bounds.height - 6)
+        )
+        let pill = NSBezierPath(roundedRect: rect, xRadius: rect.height / 2, yRadius: rect.height / 2)
+        NSColor(calibratedRed: 0.62, green: 0.12, blue: 0.12, alpha: 0.94).setFill()
+        pill.fill()
+        label.draw(
+            in: rect.insetBy(dx: 8, dy: 0),
+            withAttributes: attributes
+        )
     }
 
     private func drawWorkspaceHeader(_ header: WorkspaceHeaderFrame) {

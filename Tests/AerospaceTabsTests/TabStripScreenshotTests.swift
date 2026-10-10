@@ -65,7 +65,8 @@ final class TabStripScreenshotTests: XCTestCase {
         ]
         let frame = NSRect(x: 24, y: 22, width: size.width - 48, height: 34)
         let view = TabStripView(frame: frame)
-        view.set(windows: windows, focused: 1)
+        let disconnected = ProcessInfo.processInfo.environment["AEROSPACE_TABS_SCREENSHOT_DISCONNECTED"] == "1"
+        view.set(windows: windows, focused: 1, connectionUnavailable: disconnected)
 
         NSGraphicsContext.saveGraphicsState()
         let transform = NSAffineTransform()

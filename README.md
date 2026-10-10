@@ -16,12 +16,17 @@ See [CHARTER.md](CHARTER.md) for what this is, what it isn’t, and how support 
 - Control-Option-Tab / Control-Option-`` ` `` to cycle occupied spaces
 - Mirrors app notification badges from the Dock on matching tabs
 - The tab strip hides during native Mission Control / App Exposé
+- Shows a reconnecting status instead of stale tabs if AeroSpace becomes unavailable
 - Temporarily boosts AeroSpace `gaps.outer.top` so windows clear the strip; restores on quit
 - The right-click menu groups strip settings, AeroSpace config controls, and quit actions; quitting AeroSpace also closes its companion
 
 ![Aerospace Tabs strip grouped by AeroSpace workspace](Screenshots/aerospace-tabs-strip.png)
 
 Illustrative strip rendered from synthetic window data; it contains no live desktop content.
+
+![Aerospace Tabs reconnecting after AeroSpace becomes unavailable](Screenshots/aerospace-tabs-disconnected.png)
+
+Illustrative disconnected state rendered from synthetic data; the app retries automatically and hides stale tabs.
 
 Select **Choose Config Editor…** once from the AeroSpace submenu; **Open Config** uses that editor on later openings. Opening the config keeps Aerospace Tabs running with its current tab strips and gap boost active.
 

@@ -132,6 +132,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let badges = dockBadgeReader.badgesByApp
         var seen: Set<CGDirectDisplayID> = []
         let hidden = missionControl.isActive
+        let connectionUnavailable = session.isAerospaceUnavailable
 
         for (screen, windows) in zip(screens, windowsByScreen) {
             let displayID = screen.displayID
@@ -167,11 +168,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let showTabs = Self.shouldShowTabs(windows)
             strip.update(
                 screen: screen,
-                windows: windows,
-                focused: session.displayFocusedID,
-                hidden: hidden || !showTabs,
+                windows: connectionUnavailable ? [] : windows,
+                focused: connectionUnavailable ? nil : session.displayFocusedID,
+                hidden: hidden || !(showTabs || connectionUnavailable),
                 gaps: gaps,
-                notificationBadges: badges
+                notificationBadges: badges,
+                connectionUnavailable: connectionUnavailable
             )
         }
 
