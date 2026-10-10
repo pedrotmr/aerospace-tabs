@@ -19,6 +19,10 @@ See [CHARTER.md](CHARTER.md) for what this is, what it isn’t, and how support 
 - Temporarily boosts AeroSpace `gaps.outer.top` so windows clear the strip; restores on quit
 - The right-click menu groups strip settings, AeroSpace config controls, and quit actions; quitting AeroSpace also closes its companion
 
+![Aerospace Tabs strip grouped by AeroSpace workspace](Screenshots/aerospace-tabs-strip.png)
+
+Illustrative strip rendered from synthetic window data; it contains no live desktop content.
+
 Select **Choose Config Editor…** once from the AeroSpace submenu; **Open Config** uses that editor on later openings. Opening the config keeps Aerospace Tabs running with its current tab strips and gap boost active.
 
 ## Requirements
@@ -35,11 +39,12 @@ Right-click a visible strip and choose **Open Window Overview** to open it direc
 ## Run
 
 ```bash
+git clone https://github.com/pedrotmr/aerospace-tabs.git
 cd aerospace-tabs
 make run
 ```
 
-Grant Accessibility when macOS asks.
+This builds and opens `AerospaceTabs.app`. On first launch, grant Accessibility access when macOS asks; it enables global shortcuts and notification badges. Screen Recording is optional and enables live window previews in Window Overview. Without it, app icons are shown instead.
 
 ## Gaps
 
