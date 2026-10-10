@@ -15,7 +15,7 @@ final class TabStripScreenshotTests: XCTestCase {
             samplesPerPixel: 4,
             hasAlpha: true,
             isPlanar: false,
-            colorSpaceName: .deviceRGB,
+            colorSpaceName: .calibratedRGB,
             bytesPerRow: 0,
             bitsPerPixel: 0
         ))
