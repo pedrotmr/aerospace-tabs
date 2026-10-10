@@ -126,16 +126,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func render() {
         overview.update(windows: session.windows, focusedID: session.focusedID)
         let grouped = Dictionary(grouping: session.windows, by: \.screenIndex)
+        let screens = NSScreen.screens
+        let windowsByScreen = screens.map { grouped[$0.aerospaceScreenIndex] ?? [] }
+        let shouldBoostGaps = SessionPolicy.shouldBoostGaps(windowsByScreen: windowsByScreen)
         let badges = dockBadgeReader.badgesByApp
         var seen: Set<CGDirectDisplayID> = []
         let hidden = missionControl.isActive
-        var anyStripVisible = false
 
-        for screen in NSScreen.screens {
+        for (screen, windows) in zip(screens, windowsByScreen) {
             let displayID = screen.displayID
             seen.insert(displayID)
-            let screenIndex = screen.aerospaceScreenIndex
-            let windows = grouped[screenIndex] ?? []
             let strip = strips[displayID] ?? {
                 let created = TabStrip(
                     onPick: { [weak self] id in
@@ -165,7 +165,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let gaps = GapsConfig.shared.gaps(for: screen)
             // Show an overview when this monitor has at least two occupied windows.
             let showTabs = Self.shouldShowTabs(windows)
-            if showTabs { anyStripVisible = true }
             strip.update(
                 screen: screen,
                 windows: windows,
@@ -184,9 +183,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Boost follows strip *eligibility*, not chrome visibility. Dropping the
         // boost while Mission Control hides the strip reloads AeroSpace and nudges
         // every tiled window — keep outer.top stable across MC enter/exit.
-        GapBoost.shared.sync(
-            shouldBoost: SessionPolicy.shouldBoostGaps(anyStripVisible: anyStripVisible)
-        )
+        GapBoost.shared.sync(shouldBoost: shouldBoostGaps)
     }
 
     private func syncSwipeMonitor() {
