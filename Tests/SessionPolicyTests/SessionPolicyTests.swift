@@ -10,6 +10,15 @@ final class SessionPolicyTests: XCTestCase {
             window(1, workspace: "1"),
             window(2, workspace: "1"),
         ]))
+        XCTAssertTrue(SessionPolicy.shouldShowTabs([
+            window(1, workspace: "1", layout: "h_accordion"),
+            window(2, workspace: "1", layout: "h_accordion"),
+        ]))
+    }
+
+    func testGapBoostFollowsStripEligibility() {
+        XCTAssertTrue(SessionPolicy.shouldBoostGaps(anyStripVisible: true))
+        XCTAssertFalse(SessionPolicy.shouldBoostGaps(anyStripVisible: false))
     }
 
     func testWindowCyclePoolStaysOnFocusedWorkspaceAndMonitor() {
@@ -79,7 +88,8 @@ final class SessionPolicyTests: XCTestCase {
     private func window(
         _ id: Int,
         workspace: String,
-        screen: Int = 1
+        screen: Int = 1,
+        layout: String = "h_tiles"
     ) -> Win {
         Win(
             id: id,
@@ -89,7 +99,7 @@ final class SessionPolicyTests: XCTestCase {
             bundlePath: "/Applications/Test.app",
             workspace: workspace,
             screenIndex: screen,
-            parentLayout: "h_tiles"
+            parentLayout: layout
         )
     }
 }

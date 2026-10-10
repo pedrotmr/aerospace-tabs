@@ -75,6 +75,11 @@ public enum SessionPolicy {
         windows.count >= 2
     }
 
+    /// Keep outer.top boosted while any strip is eligible, including during Mission Control.
+    public static func shouldBoostGaps(anyStripVisible: Bool) -> Bool {
+        anyStripVisible
+    }
+
     public static func focusedWorkspaceName(
         windows: [Win],
         focusedID: Int?,

@@ -6,24 +6,6 @@ import SessionPolicy
 final class MissionControlTests: XCTestCase {
     private let screenSizes = [CGSize(width: 1_440, height: 900)]
 
-    @MainActor
-    func testGapBoostStaysOnWhileMissionControlHidesStrip() {
-        // Opening Mission Control must not restore outer.top — that reloads
-        // AeroSpace and shifts every tiled window by the boost amount.
-        XCTAssertTrue(
-            AppDelegate.shouldBoostGaps(anyStripVisible: true, missionControlActive: true)
-        )
-        XCTAssertTrue(
-            AppDelegate.shouldBoostGaps(anyStripVisible: true, missionControlActive: false)
-        )
-        XCTAssertFalse(
-            AppDelegate.shouldBoostGaps(anyStripVisible: false, missionControlActive: true)
-        )
-        XCTAssertFalse(
-            AppDelegate.shouldBoostGaps(anyStripVisible: false, missionControlActive: false)
-        )
-    }
-
     func testThirdPartyWindowNamesDoNotTriggerDetection() {
         let windows = [
             window(owner: "Notes", name: "Mission Control"),
