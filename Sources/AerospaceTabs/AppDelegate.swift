@@ -129,11 +129,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let screens = NSScreen.screens
         let firstScreenDisplayID = screens.first?.displayID
         let windowsByScreen = screens.map { grouped[$0.aerospaceScreenIndex] ?? [] }
-        let shouldBoostGaps = SessionPolicy.shouldBoostGaps(windowsByScreen: windowsByScreen)
+        let connectionUnavailable = session.isAerospaceUnavailable
+        let anyEligibleTabs = SessionPolicy.shouldBoostGaps(windowsByScreen: windowsByScreen)
+        let connectionBannerOnPrimary = connectionUnavailable && !anyEligibleTabs
+        let shouldBoostGaps = SessionPolicy.shouldBoostGaps(
+            windowsByScreen: windowsByScreen,
+            connectionStatusVisible: connectionBannerOnPrimary
+        )
         let badges = dockBadgeReader.badgesByApp
         var seen: Set<CGDirectDisplayID> = []
         let hidden = missionControl.isActive
-        let connectionUnavailable = session.isAerospaceUnavailable
 
         for (screen, windows) in zip(screens, windowsByScreen) {
             let displayID = screen.displayID
@@ -168,7 +173,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Show an overview when this monitor has at least two occupied windows.
             let showTabs = Self.shouldShowTabs(windows)
             let showConnectionStatus = connectionUnavailable && (
-                showTabs || (!shouldBoostGaps && displayID == firstScreenDisplayID)
+                showTabs || (connectionBannerOnPrimary && displayID == firstScreenDisplayID)
             )
             strip.update(
                 screen: screen,
