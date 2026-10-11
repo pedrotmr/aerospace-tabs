@@ -10,11 +10,9 @@ import SessionPolicy
 /// enabled) hides the strip whenever the Dock appears.
 final class MissionControlWatcher {
     var onChange: ((Bool) -> Void)?
-    private(set) var isActive = false
+    private var debouncer = MissionControlDebouncer()
+    var isActive: Bool { debouncer.isActive }
     private var timer: Timer?
-    private var hitStreak = 0
-    /// ~0.45s at 0.15s poll — ignores brief Dock reveal animations.
-    private let hitsNeeded = 3
 
     func start() {
         let center = NSWorkspace.shared.notificationCenter
@@ -33,14 +31,7 @@ final class MissionControlWatcher {
 
     @objc private func check() {
         let raw = Self.detect()
-        if raw {
-            hitStreak = min(hitStreak + 1, hitsNeeded)
-        } else {
-            hitStreak = 0
-        }
-        let next = isActive ? raw : (hitStreak >= hitsNeeded)
-        guard next != isActive else { return }
-        isActive = next
+        guard let next = debouncer.update(detected: raw) else { return }
         onChange?(next)
     }
 

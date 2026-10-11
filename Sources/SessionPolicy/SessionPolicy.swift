@@ -180,6 +180,31 @@ public enum SessionPolicy {
     }
 }
 
+/// Debounces Mission Control detection before hiding the tab strip.
+public struct MissionControlDebouncer {
+    /// Active space checks run every 0.15s; three hits retain the ~0.45s entry delay.
+    private let hitsNeeded = 3
+    private var hitStreak = 0
+    public private(set) var isActive = false
+
+    public init() {}
+
+    /// Returns a state change when one occurs. Entry requires three consecutive hits;
+    /// a miss resets the entry streak and clears an active state immediately.
+    public mutating func update(detected: Bool) -> Bool? {
+        if detected {
+            hitStreak = min(hitStreak + 1, hitsNeeded)
+        } else {
+            hitStreak = 0
+        }
+
+        let next = isActive ? detected : (hitStreak >= hitsNeeded)
+        guard next != isActive else { return nil }
+        isActive = next
+        return next
+    }
+}
+
 /// Pure Mission Control / App Exposé classification over captured window values.
 public enum MissionControlPolicy {
     public static func detect(windows: [MissionControlWindowInfo], screenSizes: [CGSize]) -> Bool {
