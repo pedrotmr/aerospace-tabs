@@ -8,6 +8,7 @@ import SessionPolicy
 /// fullscreen Dock window for an always-visible Dock *and* for a hover
 /// reveal when auto-hide is on. Keying off it (even only when autohide is
 /// enabled) hides the strip whenever the Dock appears.
+@MainActor
 final class MissionControlWatcher {
     var onChange: ((Bool) -> Void)?
     private var debouncer = MissionControlDebouncer()
@@ -23,7 +24,9 @@ final class MissionControlWatcher {
             object: nil
         )
         timer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in
-            self?.check()
+            MainActor.assumeIsolated {
+                self?.check()
+            }
         }
         timer?.tolerance = 0.05
         check()
@@ -33,6 +36,15 @@ final class MissionControlWatcher {
         let raw = Self.detect()
         guard let next = debouncer.update(detected: raw) else { return }
         onChange?(next)
+    }
+
+    deinit {
+        timer?.invalidate()
+        NSWorkspace.shared.notificationCenter.removeObserver(
+            self,
+            name: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil
+        )
     }
 
     private static func detect() -> Bool {

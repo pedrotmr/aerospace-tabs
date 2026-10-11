@@ -183,7 +183,7 @@ public enum SessionPolicy {
 /// Debounces Mission Control detection before hiding the tab strip.
 public struct MissionControlDebouncer {
     /// Active space checks run every 0.15s; three detections retain the ~0.45s entry delay.
-    private let detectionsNeededToActivate = 3
+    private static let detectionsNeededToActivate = 3
     private var consecutiveDetectionCount = 0
     public private(set) var isActive = false
 
@@ -193,12 +193,12 @@ public struct MissionControlDebouncer {
     /// a miss resets the entry streak and clears an active state immediately.
     public mutating func update(detected: Bool) -> Bool? {
         if detected {
-            consecutiveDetectionCount = min(consecutiveDetectionCount + 1, detectionsNeededToActivate)
+            consecutiveDetectionCount = min(consecutiveDetectionCount + 1, Self.detectionsNeededToActivate)
         } else {
             consecutiveDetectionCount = 0
         }
 
-        let next = isActive ? detected : (consecutiveDetectionCount >= detectionsNeededToActivate)
+        let next = isActive ? detected : (consecutiveDetectionCount >= Self.detectionsNeededToActivate)
         guard next != isActive else { return nil }
         isActive = next
         return next
