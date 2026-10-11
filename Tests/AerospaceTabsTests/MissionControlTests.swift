@@ -1,27 +1,10 @@
 import CoreGraphics
 import XCTest
+import SessionPolicy
 @testable import AerospaceTabs
 
 final class MissionControlTests: XCTestCase {
     private let screenSizes = [CGSize(width: 1_440, height: 900)]
-
-    @MainActor
-    func testGapBoostStaysOnWhileMissionControlHidesStrip() {
-        // Opening Mission Control must not restore outer.top — that reloads
-        // AeroSpace and shifts every tiled window by the boost amount.
-        XCTAssertTrue(
-            AppDelegate.shouldBoostGaps(anyStripVisible: true, missionControlActive: true)
-        )
-        XCTAssertTrue(
-            AppDelegate.shouldBoostGaps(anyStripVisible: true, missionControlActive: false)
-        )
-        XCTAssertFalse(
-            AppDelegate.shouldBoostGaps(anyStripVisible: false, missionControlActive: true)
-        )
-        XCTAssertFalse(
-            AppDelegate.shouldBoostGaps(anyStripVisible: false, missionControlActive: false)
-        )
-    }
 
     func testThirdPartyWindowNamesDoNotTriggerDetection() {
         let windows = [
@@ -30,13 +13,13 @@ final class MissionControlTests: XCTestCase {
             window(owner: "Demo", name: "App Exposé"),
         ]
 
-        XCTAssertFalse(MissionControlWatcher.detect(windows: windows, screenSizes: screenSizes))
+        XCTAssertFalse(MissionControlPolicy.detect(windows: windows, screenSizes: screenSizes))
     }
 
     func testSystemOwnerAndActivityNameTriggerDetection() {
         let windows = [window(owner: "Dock", name: "App Exposé")]
 
-        XCTAssertTrue(MissionControlWatcher.detect(windows: windows, screenSizes: screenSizes))
+        XCTAssertTrue(MissionControlPolicy.detect(windows: windows, screenSizes: screenSizes))
     }
 
     func testWindowManagerSurfaceStillTriggersDetection() {
@@ -49,7 +32,7 @@ final class MissionControlTests: XCTestCase {
             ),
         ]
 
-        XCTAssertTrue(MissionControlWatcher.detect(windows: windows, screenSizes: screenSizes))
+        XCTAssertTrue(MissionControlPolicy.detect(windows: windows, screenSizes: screenSizes))
     }
 
     func testDockLayerTwentyAloneDoesNotTriggerDetection() {
@@ -62,7 +45,7 @@ final class MissionControlTests: XCTestCase {
             ),
         ]
 
-        XCTAssertFalse(MissionControlWatcher.detect(windows: windows, screenSizes: screenSizes))
+        XCTAssertFalse(MissionControlPolicy.detect(windows: windows, screenSizes: screenSizes))
     }
 
     private func window(

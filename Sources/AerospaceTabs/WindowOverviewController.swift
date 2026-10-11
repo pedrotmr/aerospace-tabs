@@ -1,4 +1,5 @@
 import AppKit
+import SessionPolicy
 import SwiftUI
 
 @MainActor

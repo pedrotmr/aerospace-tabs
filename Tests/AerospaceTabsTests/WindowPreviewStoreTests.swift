@@ -1,5 +1,6 @@
 import AppKit
 import XCTest
+import SessionPolicy
 @testable import AerospaceTabs
 
 final class WindowPreviewStoreTests: XCTestCase {

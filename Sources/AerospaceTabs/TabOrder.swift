@@ -1,4 +1,5 @@
 import Foundation
+import SessionPolicy
 
 /// Local tab order per AeroSpace workspace. Does not change tiling — only the strip.
 final class TabOrder {
@@ -16,64 +17,13 @@ final class TabOrder {
     }
 
     func apply(_ windows: [Win]) -> [Win] {
-        guard !windows.isEmpty else { return windows }
-        // Visible set can span one workspace per monitor; order within each workspace.
-        var result: [Win] = []
-        let grouped = Dictionary(grouping: windows, by: \.workspace)
-        // AeroSpace can return workspaces in focus-dependent order. Keep numeric
-        // workspace names in ascending order, then preserve order for named ones.
-        var seenWS: [String] = []
-        for win in windows where !seenWS.contains(win.workspace) {
-            seenWS.append(win.workspace)
-        }
-        let firstSeenIndex = Dictionary(
-            uniqueKeysWithValues: seenWS.enumerated().map { ($0.element, $0.offset) }
-        )
-        seenWS.sort { lhs, rhs in
-            let lhsNumber = Int(lhs)
-            let rhsNumber = Int(rhs)
-            switch (lhsNumber, rhsNumber) {
-            case let (.some(left), .some(right)) where left != right:
-                return left < right
-            case (.some, .none):
-                return true
-            case (.none, .some):
-                return false
-            default:
-                return firstSeenIndex[lhs, default: 0] < firstSeenIndex[rhs, default: 0]
-            }
-        }
-        for ws in seenWS {
-            let members = grouped[ws] ?? []
-            result.append(contentsOf: sort(members, workspace: ws))
-        }
-        return result
+        SessionPolicy.applyTabOrder(windows, preferredIDsByWorkspace: byWorkspace)
     }
 
     func setOrder(ids: [Int], workspace: String) {
         guard !workspace.isEmpty else { return }
         byWorkspace[workspace] = ids
         persist()
-    }
-
-    private func sort(_ windows: [Win], workspace: String) -> [Win] {
-        guard let preferred = byWorkspace[workspace], !preferred.isEmpty else {
-            return windows
-        }
-        var remaining = Dictionary(uniqueKeysWithValues: windows.map { ($0.id, $0) })
-        var ordered: [Win] = []
-        ordered.reserveCapacity(windows.count)
-        for id in preferred {
-            if let win = remaining.removeValue(forKey: id) {
-                ordered.append(win)
-            }
-        }
-        // New windows keep AeroSpace relative order at the end.
-        for win in windows where remaining[win.id] != nil {
-            ordered.append(win)
-            remaining.removeValue(forKey: win.id)
-        }
-        return ordered
     }
 
     private func persist() {

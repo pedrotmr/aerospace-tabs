@@ -1,4 +1,5 @@
 import AppKit
+import SessionPolicy
 import CoreGraphics
 @preconcurrency import ScreenCaptureKit
 import Darwin

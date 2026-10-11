@@ -1,4 +1,5 @@
 import AppKit
+import SessionPolicy
 
 @main
 enum AerospaceTabsMain {
@@ -125,16 +126,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func render() {
         overview.update(windows: session.windows, focusedID: session.focusedID)
         let grouped = Dictionary(grouping: session.windows, by: \.screenIndex)
+        let screens = NSScreen.screens
+        let firstScreenDisplayID = screens.first?.displayID
+        let windowsByScreen = screens.map { grouped[$0.aerospaceScreenIndex] ?? [] }
+        let connectionUnavailable = session.isAerospaceUnavailable
+        let anyEligibleTabs = SessionPolicy.shouldBoostGaps(windowsByScreen: windowsByScreen)
+        let connectionBannerOnPrimary = connectionUnavailable && !anyEligibleTabs
+        let shouldBoostGaps = SessionPolicy.shouldBoostGaps(
+            windowsByScreen: windowsByScreen,
+            connectionStatusVisible: connectionBannerOnPrimary
+        )
         let badges = dockBadgeReader.badgesByApp
         var seen: Set<CGDirectDisplayID> = []
         let hidden = missionControl.isActive
-        var anyStripVisible = false
 
-        for screen in NSScreen.screens {
+        for (screen, windows) in zip(screens, windowsByScreen) {
             let displayID = screen.displayID
             seen.insert(displayID)
-            let screenIndex = screen.aerospaceScreenIndex
-            let windows = grouped[screenIndex] ?? []
             let strip = strips[displayID] ?? {
                 let created = TabStrip(
                     onPick: { [weak self] id in
@@ -164,14 +172,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let gaps = GapsConfig.shared.gaps(for: screen)
             // Show an overview when this monitor has at least two occupied windows.
             let showTabs = Self.shouldShowTabs(windows)
-            if showTabs { anyStripVisible = true }
+            let showConnectionStatus = connectionUnavailable && (
+                showTabs || (connectionBannerOnPrimary && displayID == firstScreenDisplayID)
+            )
             strip.update(
                 screen: screen,
-                windows: windows,
-                focused: session.displayFocusedID,
-                hidden: hidden || !showTabs,
+                windows: connectionUnavailable ? [] : windows,
+                focused: connectionUnavailable ? nil : session.displayFocusedID,
+                hidden: hidden || !(showTabs || showConnectionStatus),
                 gaps: gaps,
-                notificationBadges: badges
+                notificationBadges: badges,
+                connectionUnavailable: connectionUnavailable
             )
         }
 
@@ -183,12 +194,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Boost follows strip *eligibility*, not chrome visibility. Dropping the
         // boost while Mission Control hides the strip reloads AeroSpace and nudges
         // every tiled window — keep outer.top stable across MC enter/exit.
-        GapBoost.shared.sync(
-            shouldBoost: Self.shouldBoostGaps(
-                anyStripVisible: anyStripVisible,
-                missionControlActive: hidden
-            )
-        )
+        GapBoost.shared.sync(shouldBoost: shouldBoostGaps)
     }
 
     private func syncSwipeMonitor() {
@@ -225,14 +231,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Strip visibility: two or more windows across this monitor's occupied workspaces.
     private static func shouldShowTabs(_ windows: [Win]) -> Bool {
-        windows.count >= 2
-    }
-
-    /// Whether AeroSpace `outer.top` should stay boosted for the strip.
-    ///
-    /// Mission Control only hides chrome; the boost must not toggle with it.
-    static func shouldBoostGaps(anyStripVisible: Bool, missionControlActive _: Bool) -> Bool {
-        anyStripVisible
+        SessionPolicy.shouldShowTabs(windows)
     }
 }
 

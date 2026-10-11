@@ -1,13 +1,6 @@
 import AppKit
 import CoreGraphics
-
-struct MissionControlWindowInfo {
-    let owner: String
-    let name: String
-    let layer: Int
-    let width: CGFloat
-    let height: CGFloat
-}
+import SessionPolicy
 
 /// Hides overlays while Mission Control / App Exposé is up.
 ///
@@ -68,44 +61,6 @@ final class MissionControlWatcher {
                 height: bounds["Height"] ?? 0
             )
         }
-        return detect(windows: windows, screenSizes: screenSizes)
-    }
-
-    static func detect(windows: [MissionControlWindowInfo], screenSizes: [CGSize]) -> Bool {
-        var dockExposeLayers: Set<Int> = []
-        let activityNames: Set<String> = ["Mission Control", "Window Switcher", "App Exposé"]
-        let systemUIOwners: Set<String> = ["Dock", "WindowManager", "Mission Control"]
-
-        for window in windows {
-            if window.owner == "Mission Control"
-                || systemUIOwners.contains(window.owner) && activityNames.contains(window.name)
-            {
-                return true
-            }
-
-            let coversScreen = screenSizes.contains { size in
-                window.width >= size.width * 0.95 && window.height >= size.height * 0.95
-            }
-
-            // Newer macOS: exposé surface owned by WindowManager.
-            if window.owner == "WindowManager", (16...19).contains(window.layer), coversScreen {
-                return true
-            }
-
-            guard window.owner == "Dock", window.name.isEmpty else { continue }
-
-            // Fullscreen layer 18 is the exposé surface — not used by a normal Dock.
-            if window.layer == 18, coversScreen {
-                return true
-            }
-
-            // Collect Dock expose-ish layers; MC often shows 18 + 20 together.
-            // Layer 20 alone (always-visible Dock or hover reveal) must not win.
-            if (18...20).contains(window.layer), coversScreen || window.height > 120 {
-                dockExposeLayers.insert(window.layer)
-            }
-        }
-
-        return dockExposeLayers.contains(18) && dockExposeLayers.count >= 2
+        return MissionControlPolicy.detect(windows: windows, screenSizes: screenSizes)
     }
 }

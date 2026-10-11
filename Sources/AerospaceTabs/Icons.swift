@@ -1,4 +1,5 @@
 import AppKit
+import SessionPolicy
 
 final class Icons {
     static let shared = Icons()

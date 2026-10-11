@@ -1,6 +1,7 @@
 import AppKit
 import CoreGraphics
 import SwiftUI
+import SessionPolicy
 
 struct OverviewDisplayDescriptor: Identifiable, Equatable {
     let id: CGDirectDisplayID
