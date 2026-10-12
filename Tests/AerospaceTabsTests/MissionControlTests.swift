@@ -48,6 +48,38 @@ final class MissionControlTests: XCTestCase {
         XCTAssertFalse(MissionControlPolicy.detect(windows: windows, screenSizes: screenSizes))
     }
 
+    func testMissionControlDebouncerEntersAfterThreeConsecutiveDetections() {
+        var debouncer = MissionControlDebouncer()
+
+        XCTAssertNil(debouncer.update(detected: true))
+        XCTAssertNil(debouncer.update(detected: true))
+        XCTAssertEqual(debouncer.update(detected: true), true)
+        XCTAssertTrue(debouncer.isActive)
+    }
+
+    func testMissionControlDebouncerMissResetsEntryStreak() {
+        var debouncer = MissionControlDebouncer()
+
+        XCTAssertNil(debouncer.update(detected: true))
+        XCTAssertNil(debouncer.update(detected: false))
+        XCTAssertNil(debouncer.update(detected: true))
+        XCTAssertNil(debouncer.update(detected: true))
+        XCTAssertFalse(debouncer.isActive)
+        XCTAssertEqual(debouncer.update(detected: true), true)
+        XCTAssertTrue(debouncer.isActive)
+    }
+
+    func testMissionControlDebouncerClearsOnFirstMissAfterActivation() {
+        var debouncer = MissionControlDebouncer()
+        _ = debouncer.update(detected: true)
+        _ = debouncer.update(detected: true)
+        _ = debouncer.update(detected: true)
+        XCTAssertTrue(debouncer.isActive)
+
+        XCTAssertEqual(debouncer.update(detected: false), false)
+        XCTAssertFalse(debouncer.isActive)
+    }
+
     private func window(
         owner: String,
         name: String = "",
