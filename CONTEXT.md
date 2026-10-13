@@ -37,5 +37,5 @@ Aerospace Tabs’ full-screen view of open windows across occupied AeroSpace wor
 _Avoid_: native Spaces manager, layout editor
 
 **Preview policy**:
-Window previews use exact AeroSpace window IDs. Cached images appear immediately; ScreenCaptureKit streams target 30 fps while their thumbnails are visible, rendered directly through AVSampleBufferDisplayLayer without per-frame SwiftUI updates. All streams stop on close, retaining their final frames in a 96 MB image cache. Stream resolution follows thumbnail size, using the display backing scale, capped at 3200 pixels per edge and a 20-megapixel total across displays, with three capture buffers per stream. Snapshots and preview timers run only while the overview is open; closing it drops queued snapshots and releases its panels and hosting views. Up to three already-started snapshots may finish and enter the cache after close. Failed streams fall back to periodic snapshots of visible thumbnails and retry. Closed-window images are removed, and nothing is saved to disk or sent off-device. Layout uses window bounds independently of incoming frames.
-_Avoid_: background video capture, saved screenshots
+Previews use AeroSpace window IDs, stay in memory, and start only while the overview is open. See [Window Overview](WINDOW-OVERVIEW.md#preview-lifecycle-and-privacy) for capture limits, fallbacks, and cleanup.
+_Avoid_: background capture, saved screenshots, sending preview data off-device

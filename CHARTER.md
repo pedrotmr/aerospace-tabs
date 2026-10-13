@@ -40,4 +40,4 @@ Fail any → no (or file an issue and move on).
 2. **Feel**: strip when **2+** windows; overview stays responsive with many windows and shows window content; intentional visual language; then share
 3. **Share**: public GitHub repo (MIT), stranger-ready README + Accessibility notes, screenshot/GIF, GitHub Release with `.app`/zip. Homebrew and notarization come later.
 
-This file is the durable north star for the project. The wayfinder map under `.scratch/aerospace-tabs-horizon/` is the process for getting here and past remaining fog — not a substitute for this charter.
+This file is the durable north star for the project.
