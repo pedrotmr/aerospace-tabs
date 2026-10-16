@@ -367,7 +367,7 @@ final class TabStripView: NSView {
 
     private var windows: [Win] = []
     private var focused: Int?
-    private var hover: Int?
+    private(set) var hoveredWindowIndex: Int?
     private var frames: [CGRect] = []
     private var workspaceHeaders: [WorkspaceHeaderFrame] = []
 
@@ -443,8 +443,8 @@ final class TabStripView: NSView {
 
     override func mouseExited(with event: NSEvent) {
         guard !dragging else { return }
-        if hover != nil {
-            hover = nil
+        if hoveredWindowIndex != nil {
+            hoveredWindowIndex = nil
             needsDisplay = true
         }
     }
@@ -482,7 +482,7 @@ final class TabStripView: NSView {
             guard dx > Self.dragThreshold || dy > Self.dragThreshold else { return }
             dragging = true
             dragIndex = from
-            hover = nil
+            hoveredWindowIndex = nil
         }
 
         guard let dragIndex else { return }
@@ -561,7 +561,7 @@ final class TabStripView: NSView {
         draggedWindowID = nil
         dragOffsetX = 0
         dragX = 0
-        hover = nil
+        hoveredWindowIndex = nil
 
         if let pendingModel {
             apply(
@@ -792,10 +792,13 @@ final class TabStripView: NSView {
     }
 
     private func hoverAt(_ event: NSEvent) {
-        let point = convert(event.locationInWindow, from: nil)
+        updateHover(at: convert(event.locationInWindow, from: nil))
+    }
+
+    func updateHover(at point: CGPoint) {
         let next = index(at: point)
-        if next != hover {
-            hover = next
+        if next != hoveredWindowIndex {
+            hoveredWindowIndex = next
             needsDisplay = true
         }
     }
@@ -842,7 +845,12 @@ final class TabStripView: NSView {
 
         for (i, win) in windows.enumerated() {
             if dragging, i == dragIndex { continue }
-            drawTab(win, in: frames[i], selected: win.id == focused, hovered: i == hover && !dragging)
+            drawTab(
+                win,
+                in: frames[i],
+                selected: win.id == focused,
+                hovered: i == hoveredWindowIndex && !dragging
+            )
         }
 
         if dragging, let dragIndex, windows.indices.contains(dragIndex) {
@@ -925,13 +933,14 @@ final class TabStripView: NSView {
         let radius = min(Self.tabRadius, rect.height / 2)
         let path = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
 
+        let accent = NSColor.controlAccentColor
         let fill: NSColor
         if elevating {
-            fill = NSColor(calibratedWhite: 0.48, alpha: 0.58)
+            fill = accent.withAlphaComponent(0.38)
         } else if selected {
-            fill = NSColor(calibratedWhite: 0.58, alpha: 0.42)
+            fill = accent.withAlphaComponent(0.30)
         } else if hovered {
-            fill = NSColor(calibratedWhite: 0.38, alpha: 0.30)
+            fill = NSColor(calibratedWhite: 1, alpha: 0.12)
         } else {
             // Every tab is a chip so inactive ones still separate visually.
             fill = NSColor(calibratedWhite: 0.28, alpha: 0.26)
@@ -939,9 +948,17 @@ final class TabStripView: NSView {
         fill.setFill()
         path.fill()
 
-        // Hairline on all chips; stronger on the active one.
-        let strokeAlpha: CGFloat = (selected || elevating) ? 0.22 : 0.10
-        NSColor(calibratedWhite: 1, alpha: strokeAlpha).setStroke()
+        let strokeColor: NSColor
+        if elevating {
+            strokeColor = accent.withAlphaComponent(0.9)
+        } else if selected {
+            strokeColor = accent.withAlphaComponent(0.78)
+        } else if hovered {
+            strokeColor = NSColor(calibratedWhite: 1, alpha: 0.52)
+        } else {
+            strokeColor = NSColor(calibratedWhite: 1, alpha: 0.10)
+        }
+        strokeColor.setStroke()
         let stroke = NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5), xRadius: radius, yRadius: radius)
         stroke.lineWidth = 1
         stroke.stroke()
@@ -951,7 +968,10 @@ final class TabStripView: NSView {
         let iconSize = min(14, contentWidth)
         let fontSize: CGFloat = 12
         let gap = min(6, max(0, contentWidth - iconSize))
-        let font = NSFont.systemFont(ofSize: fontSize, weight: selected || elevating ? .medium : .regular)
+        let font = NSFont.systemFont(
+            ofSize: fontSize,
+            weight: selected || hovered || elevating ? .medium : .regular
+        )
         let color = selected || elevating
             ? NSColor.white
             : NSColor(calibratedWhite: 0.86, alpha: 1)

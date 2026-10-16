@@ -52,6 +52,19 @@ final class TabStripTests: XCTestCase {
         XCTAssertTrue(frames.allSatisfy { $0.minX >= bounds.minX && $0.maxX <= bounds.maxX })
     }
 
+    func testHoverStateTracksTheTabUnderPointer() {
+        let view = makeView()
+        let windows = [makeWindow(id: 1), makeWindow(id: 2)]
+        view.set(windows: windows, focused: 1)
+        let frames = TabStripLayout(bounds: view.bounds, windows: windows).frames
+
+        view.updateHover(at: CGPoint(x: frames[1].midX, y: frames[1].midY))
+        XCTAssertEqual(view.hoveredWindowIndex, 1)
+
+        view.updateHover(at: CGPoint(x: view.bounds.minX, y: view.bounds.minY))
+        XCTAssertNil(view.hoveredWindowIndex)
+    }
+
     func testLastCompactTabCanBePickedAndReachedByDragging() {
         let view = TabStripView(frame: CGRect(x: 0, y: 0, width: 120, height: 34))
         let windows = (1...100).map { makeWindow(id: $0) }
