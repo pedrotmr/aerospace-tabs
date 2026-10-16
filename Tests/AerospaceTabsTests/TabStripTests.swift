@@ -4,6 +4,25 @@ import SessionPolicy
 @testable import AerospaceTabs
 
 final class TabStripTests: XCTestCase {
+    func testVisualStateEasesToItsTarget() {
+        var amount = TabStripAnimatedAmount(value: 0)
+        amount.transition(to: 1, at: 10, duration: 0.2, animated: true)
+
+        XCTAssertTrue(amount.isAnimating)
+        XCTAssertEqual(amount.presentationValue(at: 10.1, duration: 0.2), 0.875, accuracy: 0.001)
+        XCTAssertTrue(amount.advance(at: 10.1, duration: 0.2))
+        XCTAssertFalse(amount.advance(at: 10.21, duration: 0.2))
+        XCTAssertEqual(amount.value, 1)
+    }
+
+    func testVisualStateCanFinishImmediately() {
+        var amount = TabStripAnimatedAmount(value: 0)
+        amount.transition(to: 1, at: 10, duration: 0.2, animated: false)
+
+        XCTAssertFalse(amount.isAnimating)
+        XCTAssertEqual(amount.value, 1)
+    }
+
     func testStripSitsAboveWindowsWithOnlyClearanceBelow() {
         // Boosted outer.top = user 20 + strip 34 + clearance 6.
         let y = TabStrip.originY(visibleMaxY: 1000, gapsTop: 60, height: 34, clearance: 6)
