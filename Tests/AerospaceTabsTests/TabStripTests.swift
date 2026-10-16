@@ -84,6 +84,20 @@ final class TabStripTests: XCTestCase {
         XCTAssertNil(view.hoveredWindowIndex)
     }
 
+    func testModelReorderClearsHoverWhenHoveredTabMovesAwayFromPointer() {
+        let view = makeView()
+        let windows = [makeWindow(id: 1), makeWindow(id: 2)]
+        view.set(windows: windows, focused: 1)
+        let firstTab = TabStripLayout(bounds: view.bounds, windows: windows).frames[0]
+
+        view.updateHover(at: CGPoint(x: firstTab.midX, y: firstTab.midY))
+        XCTAssertEqual(view.hoveredWindowIndex, 0)
+
+        view.set(windows: [windows[1], windows[0]], focused: 1)
+
+        XCTAssertNil(view.hoveredWindowIndex)
+    }
+
     @MainActor
     func testCancelInteractionClearsHoverTintEvenWithoutAPress() throws {
         let view = makeView()

@@ -485,17 +485,27 @@ final class TabStripView: NSView {
         {
             return
         }
-        let hoveredWindowID = hoveredWindowIndex.flatMap { index in
-            self.windows.indices.contains(index) ? self.windows[index].id : nil
+        let hoveredTab = hoveredWindowIndex.flatMap { index -> (id: Int, frame: CGRect)? in
+            guard self.windows.indices.contains(index), self.frames.indices.contains(index) else {
+                return nil
+            }
+            return (self.windows[index].id, self.frames[index])
         }
         self.windows = windows
         self.focused = focused
-        hoveredWindowIndex = connectionUnavailable
-            ? nil
-            : hoveredWindowID.flatMap { id in windows.firstIndex(where: { $0.id == id }) }
         self.notificationBadges = notificationBadges
         self.connectionUnavailable = connectionUnavailable
         recomputeFrames()
+        if !connectionUnavailable,
+           let hoveredTab,
+           let index = windows.firstIndex(where: { $0.id == hoveredTab.id }),
+           frames.indices.contains(index),
+           frames[index] == hoveredTab.frame
+        {
+            hoveredWindowIndex = index
+        } else {
+            hoveredWindowIndex = nil
+        }
         updateVisualTargets(animated: hasAppliedInitialModel)
         hasAppliedInitialModel = true
         needsDisplay = true
