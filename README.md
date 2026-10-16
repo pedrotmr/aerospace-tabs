@@ -66,7 +66,6 @@ make restore-gaps
 ## Project notes
 
 - [Window Overview behavior and implementation](WINDOW-OVERVIEW.md)
-- [Reliability dogfood checklist](DOGFOOD.md)
 
 ## License
 
