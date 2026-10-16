@@ -428,6 +428,7 @@ final class TabStripView: NSView {
     private var windows: [Win] = []
     private var focused: Int?
     private(set) var hoveredWindowIndex: Int?
+    private var lastPointerLocation: CGPoint?
     private var tabVisualStates: [Int: TabVisualState] = [:]
     private var hasAppliedInitialModel = false
     private var visualAnimationTimer: Timer?
@@ -485,27 +486,14 @@ final class TabStripView: NSView {
         {
             return
         }
-        let hoveredTab = hoveredWindowIndex.flatMap { index -> (id: Int, frame: CGRect)? in
-            guard self.windows.indices.contains(index), self.frames.indices.contains(index) else {
-                return nil
-            }
-            return (self.windows[index].id, self.frames[index])
-        }
         self.windows = windows
         self.focused = focused
         self.notificationBadges = notificationBadges
         self.connectionUnavailable = connectionUnavailable
         recomputeFrames()
-        if !connectionUnavailable,
-           let hoveredTab,
-           let index = windows.firstIndex(where: { $0.id == hoveredTab.id }),
-           frames.indices.contains(index),
-           frames[index] == hoveredTab.frame
-        {
-            hoveredWindowIndex = index
-        } else {
-            hoveredWindowIndex = nil
-        }
+        hoveredWindowIndex = connectionUnavailable
+            ? nil
+            : lastPointerLocation.flatMap { index(at: $0) }
         updateVisualTargets(animated: hasAppliedInitialModel)
         hasAppliedInitialModel = true
         needsDisplay = true
@@ -527,8 +515,14 @@ final class TabStripView: NSView {
         hoverAt(event)
     }
 
+    override func mouseEntered(with event: NSEvent) {
+        guard !dragging else { return }
+        hoverAt(event)
+    }
+
     override func mouseExited(with event: NSEvent) {
         guard !dragging else { return }
+        lastPointerLocation = nil
         setHoveredWindowIndex(nil, animated: true)
     }
 
@@ -538,6 +532,7 @@ final class TabStripView: NSView {
     }
 
     func beginPress(at point: CGPoint) {
+        lastPointerLocation = point
         guard let index = index(at: point) else {
             pressIndex = nil
             return
@@ -560,11 +555,13 @@ final class TabStripView: NSView {
         guard let from = pressIndex else { return }
 
         if !dragging {
+            lastPointerLocation = point
             let dx = abs(point.x - pressPoint.x)
             let dy = abs(point.y - pressPoint.y)
             guard dx > Self.dragThreshold || dy > Self.dragThreshold else { return }
             dragging = true
             dragIndex = from
+            lastPointerLocation = nil
             setHoveredWindowIndex(nil, animated: false)
         }
 
@@ -604,6 +601,9 @@ final class TabStripView: NSView {
             needsDisplay = true
             return
         }
+        if !dragging {
+            lastPointerLocation = point
+        }
 
         defer {
             pressIndex = nil
@@ -633,13 +633,19 @@ final class TabStripView: NSView {
     }
 
     func cancelInteraction() {
-        guard pressIndex != nil || dragging || pendingModel != nil || hoveredWindowIndex != nil else { return }
+        guard pressIndex != nil
+            || dragging
+            || pendingModel != nil
+            || hoveredWindowIndex != nil
+            || lastPointerLocation != nil
+        else { return }
 
         let pendingModel = pendingModel
         self.pendingModel = nil
         pressIndex = nil
         pressPoint = .zero
         dragging = false
+        lastPointerLocation = nil
         dragIndex = nil
         draggedWindowID = nil
         dragOffsetX = 0
@@ -879,6 +885,7 @@ final class TabStripView: NSView {
     }
 
     func updateHover(at point: CGPoint, animated: Bool = false) {
+        lastPointerLocation = point
         setHoveredWindowIndex(index(at: point), animated: animated)
     }
 
