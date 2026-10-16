@@ -4,6 +4,25 @@ import SessionPolicy
 @testable import AerospaceTabs
 
 final class TabStripTests: XCTestCase {
+    func testVisualStateEasesToItsTarget() {
+        var amount = TabStripAnimatedAmount(value: 0)
+        amount.transition(to: 1, at: 10, duration: 0.2, animated: true)
+
+        XCTAssertTrue(amount.isAnimating)
+        XCTAssertEqual(amount.presentationValue(at: 10.1, duration: 0.2), 0.875, accuracy: 0.001)
+        XCTAssertTrue(amount.advance(at: 10.1, duration: 0.2))
+        XCTAssertFalse(amount.advance(at: 10.21, duration: 0.2))
+        XCTAssertEqual(amount.value, 1)
+    }
+
+    func testVisualStateCanFinishImmediately() {
+        var amount = TabStripAnimatedAmount(value: 0)
+        amount.transition(to: 1, at: 10, duration: 0.2, animated: false)
+
+        XCTAssertFalse(amount.isAnimating)
+        XCTAssertEqual(amount.value, 1)
+    }
+
     func testStripSitsAboveWindowsWithOnlyClearanceBelow() {
         // Boosted outer.top = user 20 + strip 34 + clearance 6.
         let y = TabStrip.originY(visibleMaxY: 1000, gapsTop: 60, height: 34, clearance: 6)
@@ -50,6 +69,86 @@ final class TabStripTests: XCTestCase {
         XCTAssertEqual(frames.count, windows.count)
         XCTAssertTrue(frames.allSatisfy { $0.width >= 7.9 })
         XCTAssertTrue(frames.allSatisfy { $0.minX >= bounds.minX && $0.maxX <= bounds.maxX })
+    }
+
+    func testHoverStateTracksTheTabUnderPointer() {
+        let view = makeView()
+        let windows = [makeWindow(id: 1), makeWindow(id: 2)]
+        view.set(windows: windows, focused: 1)
+        let frames = TabStripLayout(bounds: view.bounds, windows: windows).frames
+
+        view.updateHover(at: CGPoint(x: frames[1].midX, y: frames[1].midY))
+        XCTAssertEqual(view.hoveredWindowIndex, 1)
+
+        view.updateHover(at: CGPoint(x: view.bounds.minX, y: view.bounds.minY))
+        XCTAssertNil(view.hoveredWindowIndex)
+    }
+
+    func testModelReorderTracksTabUnderStationaryPointer() throws {
+        let view = makeView()
+        let windows = [makeWindow(id: 1), makeWindow(id: 2)]
+        view.set(windows: windows, focused: 1)
+        let firstTab = TabStripLayout(bounds: view.bounds, windows: windows).frames[0]
+        let pointer = CGPoint(x: firstTab.midX, y: firstTab.midY)
+
+        view.updateHover(at: pointer)
+        XCTAssertEqual(view.hoveredWindowIndex, 0)
+
+        let reorderedWindows = [windows[1], windows[0]]
+        let expectedIndex = try XCTUnwrap(
+            TabStripLayout(bounds: view.bounds, windows: reorderedWindows)
+                .frames.firstIndex(where: { $0.contains(pointer) })
+        )
+        view.set(windows: reorderedWindows, focused: 1)
+
+        XCTAssertEqual(view.hoveredWindowIndex, expectedIndex)
+        let hoveredIndex = try XCTUnwrap(view.hoveredWindowIndex)
+        XCTAssertEqual(reorderedWindows[hoveredIndex].id, windows[1].id)
+    }
+
+    func testModelResizeKeepsHoverOnWindowUnderStationaryPointer() {
+        let view = makeView()
+        let windows = [makeWindow(id: 1), makeWindow(id: 2)]
+        view.set(windows: windows, focused: 1)
+        let firstFrame = TabStripLayout(bounds: view.bounds, windows: windows).frames[0]
+        let pointer = CGPoint(x: firstFrame.minX + 2, y: firstFrame.midY)
+        view.updateHover(at: pointer)
+        XCTAssertEqual(view.hoveredWindowIndex, 0)
+
+        let updatedWindows = [windows[0], windows[1], makeWindow(id: 3)]
+        let updatedFrames = TabStripLayout(bounds: view.bounds, windows: updatedWindows).frames
+        XCTAssertTrue(updatedFrames[0].contains(pointer))
+        view.set(windows: updatedWindows, focused: 1)
+
+        XCTAssertEqual(view.hoveredWindowIndex, 0)
+    }
+
+    @MainActor
+    func testCancelInteractionClearsHoverTintEvenWithoutAPress() throws {
+        let view = makeView()
+        let windows = [makeWindow(id: 1), makeWindow(id: 2)]
+        view.set(windows: windows, focused: 1)
+        let frames = TabStripLayout(bounds: view.bounds, windows: windows).frames
+        let hoverPoint = CGPoint(x: frames[1].midX, y: frames[1].midY)
+        let unhoveredImage = try renderedImage(of: view)
+
+        view.updateHover(at: hoverPoint)
+        XCTAssertNotEqual(try renderedImage(of: view), unhoveredImage)
+
+        view.cancelInteraction()
+
+        XCTAssertNil(view.hoveredWindowIndex)
+        XCTAssertEqual(try renderedImage(of: view), unhoveredImage)
+
+        view.updateHover(at: hoverPoint)
+        view.beginPress(at: hoverPoint)
+        view.cancelInteraction()
+
+        XCTAssertNil(view.hoveredWindowIndex)
+        XCTAssertEqual(try renderedImage(of: view), unhoveredImage)
+
+        view.set(windows: [windows[0], windows[1], makeWindow(id: 3)], focused: 1)
+        XCTAssertNil(view.hoveredWindowIndex)
     }
 
     func testLastCompactTabCanBePickedAndReachedByDragging() {
@@ -163,6 +262,31 @@ final class TabStripTests: XCTestCase {
 
     private func makeView() -> TabStripView {
         TabStripView(frame: CGRect(x: 0, y: 0, width: 200, height: 34))
+    }
+
+    @MainActor
+    private func renderedImage(of view: TabStripView) throws -> Data {
+        let image = try XCTUnwrap(NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: Int(view.bounds.width),
+            pixelsHigh: Int(view.bounds.height),
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .calibratedRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        ))
+        image.size = view.bounds.size
+
+        let context = try XCTUnwrap(NSGraphicsContext(bitmapImageRep: image))
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        NSGraphicsContext.current = context
+        view.draw(view.bounds)
+
+        return try XCTUnwrap(image.representation(using: .png, properties: [:]))
     }
 
     private func makeWindow(id: Int, workspace: String = "main") -> Win {

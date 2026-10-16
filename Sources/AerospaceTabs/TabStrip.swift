@@ -2,6 +2,65 @@ import AppKit
 import SessionPolicy
 import ApplicationServices
 
+struct TabStripAnimatedAmount {
+    private(set) var value: CGFloat
+    private(set) var isAnimating = false
+    private var startValue: CGFloat
+    private var targetValue: CGFloat
+    private var startTime: TimeInterval = 0
+
+    init(value: CGFloat) {
+        self.value = value
+        startValue = value
+        targetValue = value
+    }
+
+    func presentationValue(at time: TimeInterval, duration: TimeInterval) -> CGFloat {
+        guard isAnimating, duration > 0 else { return value }
+        let progress = CGFloat(min(1, max(0, (time - startTime) / duration)))
+        let easedProgress = 1 - pow(1 - progress, 3)
+        return startValue + (targetValue - startValue) * easedProgress
+    }
+
+    mutating func transition(
+        to target: CGFloat,
+        at time: TimeInterval,
+        duration: TimeInterval,
+        animated: Bool
+    ) {
+        guard abs(targetValue - target) > 0.0001 else { return }
+
+        let current = presentationValue(at: time, duration: duration)
+        value = current
+        startValue = current
+        targetValue = target
+        startTime = time
+        isAnimating = animated && abs(current - target) > 0.0001
+        if !isAnimating {
+            value = target
+            startValue = target
+        }
+    }
+
+    @discardableResult
+    mutating func advance(at time: TimeInterval, duration: TimeInterval) -> Bool {
+        guard isAnimating else { return false }
+        value = presentationValue(at: time, duration: duration)
+        if time - startTime >= duration {
+            value = targetValue
+            startValue = targetValue
+            isAnimating = false
+        }
+        return isAnimating
+    }
+
+    mutating func finish() {
+        value = targetValue
+        startValue = targetValue
+        isAnimating = false
+    }
+}
+
 private struct WorkspaceHeaderFrame {
     let workspace: String
     let frame: CGRect
@@ -359,6 +418,7 @@ final class TabStripView: NSView {
     static let chromeRadius: CGFloat = 12
     private static let tabRadius: CGFloat = 9
     private static let dragThreshold: CGFloat = 4
+    private static let visualTransitionDuration: TimeInterval = 0.2
 
     var onPick: ((Int) -> Void)?
     var onReorder: (([Int], String) -> Void)?
@@ -367,7 +427,11 @@ final class TabStripView: NSView {
 
     private var windows: [Win] = []
     private var focused: Int?
-    private var hover: Int?
+    private(set) var hoveredWindowIndex: Int?
+    private var lastPointerLocation: CGPoint?
+    private var tabVisualStates: [Int: TabVisualState] = [:]
+    private var hasAppliedInitialModel = false
+    private var visualAnimationTimer: Timer?
     private var frames: [CGRect] = []
     private var workspaceHeaders: [WorkspaceHeaderFrame] = []
 
@@ -381,6 +445,11 @@ final class TabStripView: NSView {
     private var pendingModel: (windows: [Win], focused: Int?, badges: [String: String], connectionUnavailable: Bool)?
     private var notificationBadges: [String: String] = [:]
     private var connectionUnavailable = false
+
+    private struct TabVisualState {
+        var selection: TabStripAnimatedAmount
+        var hover: TabStripAnimatedAmount
+    }
 
     override var isOpaque: Bool { false }
     override var isFlipped: Bool { true }
@@ -422,6 +491,11 @@ final class TabStripView: NSView {
         self.notificationBadges = notificationBadges
         self.connectionUnavailable = connectionUnavailable
         recomputeFrames()
+        hoveredWindowIndex = connectionUnavailable
+            ? nil
+            : lastPointerLocation.flatMap { index(at: $0) }
+        updateVisualTargets(animated: hasAppliedInitialModel)
+        hasAppliedInitialModel = true
         needsDisplay = true
     }
 
@@ -441,12 +515,15 @@ final class TabStripView: NSView {
         hoverAt(event)
     }
 
+    override func mouseEntered(with event: NSEvent) {
+        guard !dragging else { return }
+        hoverAt(event)
+    }
+
     override func mouseExited(with event: NSEvent) {
         guard !dragging else { return }
-        if hover != nil {
-            hover = nil
-            needsDisplay = true
-        }
+        lastPointerLocation = nil
+        setHoveredWindowIndex(nil, animated: true)
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -455,6 +532,7 @@ final class TabStripView: NSView {
     }
 
     func beginPress(at point: CGPoint) {
+        lastPointerLocation = point
         guard let index = index(at: point) else {
             pressIndex = nil
             return
@@ -477,12 +555,14 @@ final class TabStripView: NSView {
         guard let from = pressIndex else { return }
 
         if !dragging {
+            lastPointerLocation = point
             let dx = abs(point.x - pressPoint.x)
             let dy = abs(point.y - pressPoint.y)
             guard dx > Self.dragThreshold || dy > Self.dragThreshold else { return }
             dragging = true
             dragIndex = from
-            hover = nil
+            lastPointerLocation = nil
+            setHoveredWindowIndex(nil, animated: false)
         }
 
         guard let dragIndex else { return }
@@ -521,6 +601,9 @@ final class TabStripView: NSView {
             needsDisplay = true
             return
         }
+        if !dragging {
+            lastPointerLocation = point
+        }
 
         defer {
             pressIndex = nil
@@ -550,18 +633,24 @@ final class TabStripView: NSView {
     }
 
     func cancelInteraction() {
-        guard pressIndex != nil || dragging || pendingModel != nil else { return }
+        guard pressIndex != nil
+            || dragging
+            || pendingModel != nil
+            || hoveredWindowIndex != nil
+            || lastPointerLocation != nil
+        else { return }
 
         let pendingModel = pendingModel
         self.pendingModel = nil
         pressIndex = nil
         pressPoint = .zero
         dragging = false
+        lastPointerLocation = nil
         dragIndex = nil
         draggedWindowID = nil
         dragOffsetX = 0
         dragX = 0
-        hover = nil
+        setHoveredWindowIndex(nil, animated: false)
 
         if let pendingModel {
             apply(
@@ -792,11 +881,91 @@ final class TabStripView: NSView {
     }
 
     private func hoverAt(_ event: NSEvent) {
-        let point = convert(event.locationInWindow, from: nil)
-        let next = index(at: point)
-        if next != hover {
-            hover = next
-            needsDisplay = true
+        updateHover(at: convert(event.locationInWindow, from: nil), animated: true)
+    }
+
+    func updateHover(at point: CGPoint, animated: Bool = false) {
+        lastPointerLocation = point
+        setHoveredWindowIndex(index(at: point), animated: animated)
+    }
+
+    private func setHoveredWindowIndex(_ index: Int?, animated: Bool) {
+        guard index != hoveredWindowIndex else { return }
+        hoveredWindowIndex = index
+        updateVisualTargets(animated: animated)
+        needsDisplay = true
+    }
+
+    private func updateVisualTargets(animated: Bool) {
+        let now = ProcessInfo.processInfo.systemUptime
+        let shouldAnimate = animated && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        let windowIDs = Set(windows.map(\.id))
+        tabVisualStates = tabVisualStates.filter { windowIDs.contains($0.key) }
+
+        for (index, window) in windows.enumerated() {
+            let selectionTarget: CGFloat = window.id == focused ? 1 : 0
+            let hoverTarget: CGFloat = index == hoveredWindowIndex && !dragging && !connectionUnavailable ? 1 : 0
+            if var state = tabVisualStates[window.id] {
+                state.selection.transition(
+                    to: selectionTarget,
+                    at: now,
+                    duration: Self.visualTransitionDuration,
+                    animated: shouldAnimate
+                )
+                state.hover.transition(
+                    to: hoverTarget,
+                    at: now,
+                    duration: Self.visualTransitionDuration,
+                    animated: shouldAnimate
+                )
+                tabVisualStates[window.id] = state
+            } else {
+                tabVisualStates[window.id] = TabVisualState(
+                    selection: TabStripAnimatedAmount(value: selectionTarget),
+                    hover: TabStripAnimatedAmount(value: hoverTarget)
+                )
+            }
+        }
+
+        if tabVisualStates.values.contains(where: { $0.selection.isAnimating || $0.hover.isAnimating }) {
+            startVisualAnimationTimer()
+        }
+    }
+
+    private func startVisualAnimationTimer() {
+        guard visualAnimationTimer == nil else { return }
+        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] timer in
+            guard let self else {
+                timer.invalidate()
+                return
+            }
+            self.advanceVisualStates()
+        }
+        visualAnimationTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func advanceVisualStates() {
+        let now = ProcessInfo.processInfo.systemUptime
+        let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        var isAnimating = false
+        for id in Array(tabVisualStates.keys) {
+            guard var state = tabVisualStates[id] else { continue }
+            if reduceMotion {
+                state.selection.finish()
+                state.hover.finish()
+            } else {
+                _ = state.selection.advance(at: now, duration: Self.visualTransitionDuration)
+                _ = state.hover.advance(at: now, duration: Self.visualTransitionDuration)
+            }
+            isAnimating = isAnimating || state.selection.isAnimating || state.hover.isAnimating
+            tabVisualStates[id] = state
+        }
+        needsDisplay = true
+
+        if !isAnimating {
+            visualAnimationTimer?.invalidate()
+            visualAnimationTimer = nil
         }
     }
 
@@ -842,13 +1011,27 @@ final class TabStripView: NSView {
 
         for (i, win) in windows.enumerated() {
             if dragging, i == dragIndex { continue }
-            drawTab(win, in: frames[i], selected: win.id == focused, hovered: i == hover && !dragging)
+            let visual = tabVisualStates[win.id]
+            drawTab(
+                win,
+                in: frames[i],
+                selected: win.id == focused,
+                selectionAmount: visual?.selection.value ?? (win.id == focused ? 1 : 0),
+                hoverAmount: dragging ? 0 : visual?.hover.value ?? (i == hoveredWindowIndex ? 1 : 0)
+            )
         }
 
         if dragging, let dragIndex, windows.indices.contains(dragIndex) {
             let home = frames[dragIndex]
             let rect = NSRect(x: dragX, y: home.minY, width: home.width, height: home.height)
-            drawTab(windows[dragIndex], in: rect, selected: true, hovered: false, elevating: true)
+            drawTab(
+                windows[dragIndex],
+                in: rect,
+                selected: true,
+                selectionAmount: 1,
+                hoverAmount: 0,
+                elevating: true
+            )
         }
     }
 
@@ -919,39 +1102,52 @@ final class TabStripView: NSView {
         _ win: Win,
         in rect: NSRect,
         selected: Bool,
-        hovered: Bool,
+        selectionAmount: CGFloat,
+        hoverAmount: CGFloat,
         elevating: Bool = false
     ) {
         let radius = min(Self.tabRadius, rect.height / 2)
         let path = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
 
-        let fill: NSColor
-        if elevating {
-            fill = NSColor(calibratedWhite: 0.48, alpha: 0.58)
-        } else if selected {
-            fill = NSColor(calibratedWhite: 0.58, alpha: 0.42)
-        } else if hovered {
-            fill = NSColor(calibratedWhite: 0.38, alpha: 0.30)
-        } else {
-            // Every tab is a chip so inactive ones still separate visually.
-            fill = NSColor(calibratedWhite: 0.28, alpha: 0.26)
-        }
-        fill.setFill()
+        // Keep the neutral chip surface, then layer system selection and hover tints over it.
+        NSColor(calibratedWhite: 0.28, alpha: 0.26).setFill()
         path.fill()
+        if hoverAmount > 0 {
+            NSColor.tertiaryLabelColor.withAlphaComponent(0.06 * hoverAmount)
+                .setFill()
+            path.fill()
+        }
+        if selectionAmount > 0 {
+            NSColor.unemphasizedSelectedContentBackgroundColor
+                .withAlphaComponent((elevating ? 0.30 : 0.18) * selectionAmount)
+                .setFill()
+            path.fill()
+        }
 
-        // Hairline on all chips; stronger on the active one.
-        let strokeAlpha: CGFloat = (selected || elevating) ? 0.22 : 0.10
-        NSColor(calibratedWhite: 1, alpha: strokeAlpha).setStroke()
         let stroke = NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5), xRadius: radius, yRadius: radius)
         stroke.lineWidth = 1
+        NSColor(calibratedWhite: 1, alpha: 0.08).setStroke()
         stroke.stroke()
+        if hoverAmount > 0 {
+            NSColor.separatorColor.withAlphaComponent(0.08 * hoverAmount).setStroke()
+            stroke.stroke()
+        }
+        if selectionAmount > 0 {
+            NSColor.separatorColor
+                .withAlphaComponent((elevating ? 0.34 : 0.20) * selectionAmount)
+                .setStroke()
+            stroke.stroke()
+        }
 
         let sidePad = min(10, max(0, rect.width * 0.15))
         let contentWidth = max(0, rect.width - sidePad * 2)
         let iconSize = min(14, contentWidth)
         let fontSize: CGFloat = 12
         let gap = min(6, max(0, contentWidth - iconSize))
-        let font = NSFont.systemFont(ofSize: fontSize, weight: selected || elevating ? .medium : .regular)
+        let font = NSFont.systemFont(
+            ofSize: fontSize,
+            weight: selected || elevating ? .medium : .regular
+        )
         let color = selected || elevating
             ? NSColor.white
             : NSColor(calibratedWhite: 0.86, alpha: 1)

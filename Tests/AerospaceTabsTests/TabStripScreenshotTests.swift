@@ -67,6 +67,10 @@ final class TabStripScreenshotTests: XCTestCase {
         let view = TabStripView(frame: frame)
         let disconnected = ProcessInfo.processInfo.environment["AEROSPACE_TABS_SCREENSHOT_DISCONNECTED"] == "1"
         view.set(windows: windows, focused: 1, connectionUnavailable: disconnected)
+        if !disconnected {
+            let hoverFrame = TabStripLayout(bounds: view.bounds, windows: windows).frames[1]
+            view.updateHover(at: CGPoint(x: hoverFrame.midX, y: hoverFrame.midY))
+        }
 
         NSGraphicsContext.saveGraphicsState()
         let transform = NSAffineTransform()
