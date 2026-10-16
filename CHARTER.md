@@ -36,7 +36,7 @@ Fail any → no (or file an issue and move on).
 
 ## Milestone order
 
-1. **Reliability** (+ minimal feel polish for daily dogfood): strip does not vanish spuriously; gaps always restore; Mission Control / Dock detection stays honest  
+1. **Reliability**: strip does not vanish spuriously; gaps always restore; Mission Control / Dock detection stays honest
 2. **Feel**: strip when **2+** windows; overview stays responsive with many windows and shows window content; intentional visual language; then share
 3. **Share**: public GitHub repo (MIT), stranger-ready README + Accessibility notes, screenshot/GIF, GitHub Release with `.app`/zip. Homebrew and notarization come later.
 
