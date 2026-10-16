@@ -970,7 +970,7 @@ final class TabStripView: NSView {
         let gap = min(6, max(0, contentWidth - iconSize))
         let font = NSFont.systemFont(
             ofSize: fontSize,
-            weight: selected || hovered || elevating ? .medium : .regular
+            weight: selected || elevating ? .medium : .regular
         )
         let color = selected || elevating
             ? NSColor.white
