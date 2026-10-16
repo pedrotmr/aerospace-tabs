@@ -84,6 +84,31 @@ final class TabStripTests: XCTestCase {
         XCTAssertNil(view.hoveredWindowIndex)
     }
 
+    @MainActor
+    func testCancelInteractionClearsHoverTintEvenWithoutAPress() throws {
+        let view = makeView()
+        let windows = [makeWindow(id: 1), makeWindow(id: 2)]
+        view.set(windows: windows, focused: 1)
+        let frames = TabStripLayout(bounds: view.bounds, windows: windows).frames
+        let hoverPoint = CGPoint(x: frames[1].midX, y: frames[1].midY)
+        let unhoveredImage = try renderedImage(of: view)
+
+        view.updateHover(at: hoverPoint)
+        XCTAssertNotEqual(try renderedImage(of: view), unhoveredImage)
+
+        view.cancelInteraction()
+
+        XCTAssertNil(view.hoveredWindowIndex)
+        XCTAssertEqual(try renderedImage(of: view), unhoveredImage)
+
+        view.updateHover(at: hoverPoint)
+        view.beginPress(at: hoverPoint)
+        view.cancelInteraction()
+
+        XCTAssertNil(view.hoveredWindowIndex)
+        XCTAssertEqual(try renderedImage(of: view), unhoveredImage)
+    }
+
     func testLastCompactTabCanBePickedAndReachedByDragging() {
         let view = TabStripView(frame: CGRect(x: 0, y: 0, width: 120, height: 34))
         let windows = (1...100).map { makeWindow(id: $0) }
@@ -195,6 +220,31 @@ final class TabStripTests: XCTestCase {
 
     private func makeView() -> TabStripView {
         TabStripView(frame: CGRect(x: 0, y: 0, width: 200, height: 34))
+    }
+
+    @MainActor
+    private func renderedImage(of view: TabStripView) throws -> Data {
+        let image = try XCTUnwrap(NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: Int(view.bounds.width),
+            pixelsHigh: Int(view.bounds.height),
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .calibratedRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        ))
+        image.size = view.bounds.size
+
+        let context = try XCTUnwrap(NSGraphicsContext(bitmapImageRep: image))
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        NSGraphicsContext.current = context
+        view.draw(view.bounds)
+
+        return try XCTUnwrap(image.representation(using: .png, properties: [:]))
     }
 
     private func makeWindow(id: Int, workspace: String = "main") -> Win {

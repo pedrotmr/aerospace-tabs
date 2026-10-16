@@ -623,7 +623,7 @@ final class TabStripView: NSView {
     }
 
     func cancelInteraction() {
-        guard pressIndex != nil || dragging || pendingModel != nil else { return }
+        guard pressIndex != nil || dragging || pendingModel != nil || hoveredWindowIndex != nil else { return }
 
         let pendingModel = pendingModel
         self.pendingModel = nil
@@ -634,7 +634,7 @@ final class TabStripView: NSView {
         draggedWindowID = nil
         dragOffsetX = 0
         dragX = 0
-        hoveredWindowIndex = nil
+        setHoveredWindowIndex(nil, animated: false)
 
         if let pendingModel {
             apply(
