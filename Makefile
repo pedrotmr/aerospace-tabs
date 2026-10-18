@@ -1,17 +1,36 @@
 APP := AerospaceTabs.app
 BIN := .build/release/AerospaceTabs
+ARM64_BUILD_PATH := .build/release-arm64
+INTEL_BUILD_PATH := .build/release-x86_64
+UNIVERSAL_BIN := .build/release-universal/AerospaceTabs
+APP_BINARY ?= $(BIN)
 SIGNING_IDENTITY ?= $(shell security find-identity -v -p codesigning 2>/dev/null | awk '/^[[:space:]]*[0-9]+[^0-9]/ && $$2 ~ /^[[:xdigit:]]+$$/ { print $$2; exit }')
 ifeq ($(strip $(SIGNING_IDENTITY)),)
 SIGNING_IDENTITY := -
 endif
 
-.PHONY: build run kill restore-gaps
+.PHONY: build build-universal assemble-app run kill restore-gaps
 
 build:
 	swift build -c release
+	$(MAKE) assemble-app APP_BINARY="$(BIN)"
+
+build-universal:
+	swift build -c release --triple arm64-apple-macosx14.0 --scratch-path $(ARM64_BUILD_PATH)
+	swift build -c release --triple x86_64-apple-macosx14.0 --scratch-path $(INTEL_BUILD_PATH)
+	mkdir -p .build/release-universal
+	lipo -create \
+		"$$(swift build -c release --triple arm64-apple-macosx14.0 --scratch-path $(ARM64_BUILD_PATH) --show-bin-path)/AerospaceTabs" \
+		"$$(swift build -c release --triple x86_64-apple-macosx14.0 --scratch-path $(INTEL_BUILD_PATH) --show-bin-path)/AerospaceTabs" \
+		-output "$(UNIVERSAL_BIN)"
+	lipo -verify_arch arm64 "$(UNIVERSAL_BIN)"
+	lipo -verify_arch x86_64 "$(UNIVERSAL_BIN)"
+	$(MAKE) assemble-app APP_BINARY="$(UNIVERSAL_BIN)"
+
+assemble-app:
 	rm -rf $(APP)
 	mkdir -p $(APP)/Contents/MacOS
-	cp $(BIN) $(APP)/Contents/MacOS/AerospaceTabs
+	cp "$(APP_BINARY)" $(APP)/Contents/MacOS/AerospaceTabs
 	cp Resources/Info.plist $(APP)/Contents/Info.plist
 ifdef APP_VERSION
 	/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $(APP_VERSION)" $(APP)/Contents/Info.plist

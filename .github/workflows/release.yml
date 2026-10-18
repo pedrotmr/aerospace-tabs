@@ -9,39 +9,70 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  create-draft-release:
-    name: Build app and draft release
+  build-release:
+    name: Build universal app
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag }}
           fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ inputs.tag }}
 
       - name: Build and zip app
         run: ./scripts/package-release.sh "$RELEASE_TAG"
         env:
           RELEASE_TAG: ${{ inputs.tag }}
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-package
+          path: .build/AerospaceTabs.zip
+          if-no-files-found: error
+          retention-days: 1
+
+  create-draft-release:
+    name: Create draft release
+    runs-on: ubuntu-latest
+    needs: build-release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-package
+          path: release-package
+
       - name: Create draft release with generated notes
         env:
+          GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
           notes="$(cat <<'NOTES'
           ## Install
 
-          Download and unzip `AerospaceTabs.zip`, then move `AerospaceTabs.app` to Applications. Requires macOS 14 or later and AeroSpace.
+          Download and unzip AerospaceTabs.zip, then move AerospaceTabs.app to Applications. The universal app supports Apple Silicon and Intel Macs running macOS 14 or later, and requires AeroSpace.
 
-          Grant Accessibility access for global shortcuts and Dock badges. Screen Recording is optional and enables window thumbnails. If macOS asks you to confirm opening the app, Control-click it and choose Open.
+          Grant Accessibility access for global shortcuts and Dock badges. Screen Recording is optional and enables window thumbnails.
+
+          This workflow does not configure a stable Developer ID signing identity or notarization. Without stable signing, macOS may ask you to grant Accessibility or Screen Recording again after an update. If macOS blocks the app, try opening it once, then open System Settings > Privacy & Security, scroll to Security, choose Open Anyway, and confirm Open.
+
+          ## AeroSpace gaps
+
+          Aerospace Tabs temporarily increases AeroSpace gaps.outer.top while it runs and restores the previous value when it quits normally. Quit the app before removing it. If it was force-quit and removed before cleanup, put AerospaceTabs.app back in /Applications and run this command in Terminal:
+
+              /Applications/AerospaceTabs.app/Contents/MacOS/AerospaceTabs --restore-gaps
           NOTES
           )"
 
-          gh release create "$RELEASE_TAG" .build/AerospaceTabs.zip \
+          gh release create "$RELEASE_TAG" release-package/AerospaceTabs.zip \
             --verify-tag \
             --draft \
             --title "Aerospace Tabs $RELEASE_TAG" \

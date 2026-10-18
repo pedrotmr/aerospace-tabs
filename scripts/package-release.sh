@@ -27,7 +27,13 @@ if ! git tag --points-at HEAD | grep -Fqx "$release_tag"; then
   exit 1
 fi
 
-make build SIGNING_IDENTITY=- APP_VERSION="$release_version" BUILD_NUMBER="$build_number"
+worktree_status=$(git status --porcelain --untracked-files=all)
+if [[ -n "$worktree_status" ]]; then
+  printf 'Package releases from a clean working tree.\n' >&2
+  exit 1
+fi
+
+make build-universal APP_VERSION="$release_version" BUILD_NUMBER="$build_number"
 
 archive_path="$repo_root/.build/AerospaceTabs.zip"
 rm -f "$archive_path"
