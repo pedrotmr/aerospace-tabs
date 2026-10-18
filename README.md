@@ -67,6 +67,18 @@ make restore-gaps
 
 - [Window Overview behavior and implementation](WINDOW-OVERVIEW.md)
 
+## Releases
+
+Releases are prepared from the Conventional Commit titles used for merged pull requests:
+
+- `fix:` requests a patch version bump.
+- `feat:` requests a minor version bump.
+- `!` after the type, such as `feat!:`, or a `BREAKING CHANGE:` footer marks a breaking change and requests a major bump.
+
+After changes reach `main`, Release Please opens or updates a release pull request with the version and release notes. Review and merge that pull request when the release is ready. The workflow creates a draft GitHub Release, signs the universal app, and attaches `AerospaceTabs.zip`. Review the draft and publish it when ready. You do not create a tag or write the release title or notes yourself.
+
+Before the first release, enable **Allow GitHub Actions to create and approve pull requests** under the repository’s **Settings → Actions → General**. Add the `DEVELOPER_ID_CERTIFICATE_P12_BASE64` and `DEVELOPER_ID_CERTIFICATE_PASSWORD` repository secrets for Developer ID signing. The app is not notarized yet.
+
 ## License
 
 MIT
