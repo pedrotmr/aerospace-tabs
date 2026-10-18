@@ -13,6 +13,12 @@ build:
 	mkdir -p $(APP)/Contents/MacOS
 	cp $(BIN) $(APP)/Contents/MacOS/AerospaceTabs
 	cp Resources/Info.plist $(APP)/Contents/Info.plist
+ifdef APP_VERSION
+	/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $(APP_VERSION)" $(APP)/Contents/Info.plist
+endif
+ifdef BUILD_NUMBER
+	/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(BUILD_NUMBER)" $(APP)/Contents/Info.plist
+endif
 	codesign --force --sign "$(SIGNING_IDENTITY)" --identifier com.pedrotmr.AerospaceTabs $(APP)
 
 kill:
