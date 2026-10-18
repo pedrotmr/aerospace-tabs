@@ -1,0 +1,49 @@
+name: Draft Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to package (for example, v0.1.0)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  create-draft-release:
+    name: Build app and draft release
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+
+      - name: Build and zip app
+        run: ./scripts/package-release.sh "$RELEASE_TAG"
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+
+      - name: Create draft release with generated notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          notes="$(cat <<'NOTES'
+          ## Install
+
+          Download and unzip `AerospaceTabs.zip`, then move `AerospaceTabs.app` to Applications. Requires macOS 14 or later and AeroSpace.
+
+          Grant Accessibility access for global shortcuts and Dock badges. Screen Recording is optional and enables window thumbnails. If macOS asks you to confirm opening the app, Control-click it and choose Open.
+          NOTES
+          )"
+
+          gh release create "$RELEASE_TAG" .build/AerospaceTabs.zip \
+            --verify-tag \
+            --draft \
+            --title "Aerospace Tabs $RELEASE_TAG" \
+            --notes "$notes" \
+            --generate-notes
