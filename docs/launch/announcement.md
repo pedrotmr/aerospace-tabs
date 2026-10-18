@@ -8,17 +8,19 @@
 
 I built Aerospace Tabs as an independent companion app for people who use [AeroSpace](https://github.com/nikitabobko/AeroSpace) on macOS.
 
-AeroSpace tiles your windows. Aerospace Tabs adds a top strip that groups windows from occupied AeroSpace workspaces on each display. Click a tab to focus its window, or drag tabs to set a local order. Open Window Overview to browse previews grouped by workspace across connected displays.
+On each display with at least two windows total, Aerospace Tabs shows a top strip that groups windows from occupied AeroSpace workspaces. Click a tab to focus its window, or drag tabs to set a local order. Open Window Overview to browse previews grouped by workspace across connected displays.
 
 This app works alongside AeroSpace. It does not change AeroSpace's layout tree or manage native macOS Spaces. It requires macOS 14 or later and AeroSpace running.
 
-Accessibility access enables global shortcuts and Dock notification badges. Screen Recording access is optional and enables window previews. The app captures previews only while Window Overview is open and does not save screenshots or videos to disk. Without Screen Recording access, the overview shows app icons.
+Accessibility access enables global shortcuts and Dock notification badges. Screen Recording access is optional and enables window previews. Closing Window Overview stops new preview requests; work already in progress may finish and update the in-memory cache. Screenshots and videos are not saved to disk. Without Screen Recording access, the overview shows app icons.
+
+Three-finger swipe is enabled by default on compatible trackpads. It temporarily disables the matching macOS Mission Control gesture. You can turn it off from the strip’s right-click menu under **Activation → Three-Finger Swipe**. Aerospace Tabs restores the saved Mission Control setting on disable or clean quit only if it still matches the value the app applied; Dock may restart briefly when the override changes.
 
 While it runs, Aerospace Tabs temporarily adds to `gaps.outer.top` so windows clear the strip. It restores that change on a clean quit.
 
 **Download:** `FIRST_RELEASE_URL`
 
-**Source and setup:** [GitHub repository](https://github.com/pedrotmr/aerospace-tabs) · [README](../../README.md)
+**Source and setup:** [GitHub repository](https://github.com/pedrotmr/aerospace-tabs) · [README](https://github.com/pedrotmr/aerospace-tabs/blob/main/README.md)
 
 **License:** MIT
 
@@ -34,7 +36,7 @@ Target 12 to 15 seconds. Record the release build with AeroSpace running and use
 | 2–4 s | Click a tab and show its window come to the front. | Hold briefly after the focus change. |
 | 4–6 s | Drag a tab to a new position in its workspace. | Keep the drag within one workspace. |
 | 6–9 s | Open Window Overview and show previews grouped by workspace. | Show connected displays if available. Use the menu command for a repeatable capture; a three-finger swipe is optional. |
-| 9–11 s | Hover to reveal a window title, then use an arrow key and Return to focus it. | Press Escape to close the overview. |
+| 9–11 s | Hover to reveal a window title, then use an arrow key and Return to focus it. | Return closes the overview and focuses the selected window. |
 | 11–14 s | End card with the app name, release link, and repository. | Add the release URL after publishing the asset. |
 
 The existing [strip screenshot](../../Screenshots/aerospace-tabs-strip.png) and [disconnected-state screenshot](../../Screenshots/aerospace-tabs-disconnected.png) use synthetic data. They are illustrations, not recordings of a live desktop. Use the release build for the GIF.
@@ -71,6 +73,6 @@ Post only on Saturday from 00:00 to 23:59 UTC. Each user may make one promotiona
 
 Use the current month's App Pile unless the app and account qualify for a main-feed post under the current Trust or Transparency rules. At this check, the repository was about six weeks old with no stars, so it did not meet the repository-age or star-count route by itself. The App Pile asks for **Problem**, **Comparison** with a named alternative, and **Pricing** with amounts for every tier plus an app website link. Do not link directly to a `.zip` or `.dmg`. A screenshot or video is required for top-three consideration. Disclose that you are the developer, verify the Reddit email, earn 10 r/macapps comment karma before posting, and observe the once-per-30-days promotion limit. Promotion in the App Pile counts toward that limit.
 
-For the Comparison field, keep it factual and specific: [AeroTabs](https://github.com/nikitabobko/AeroSpace/discussions/2031) shows tabs for the current workspace; Aerospace Tabs groups occupied workspaces and includes a visual overview. Confirm the exact price before posting. Link the GitHub Release page rather than a binary file.
+For the Comparison field, keep it factual and specific: [AeroTabs](https://github.com/alexlazarian/aerotabs) shows tabs for the current workspace; Aerospace Tabs groups occupied workspaces and includes a visual overview. Confirm the exact price before posting. Link the GitHub Release page rather than a binary file.
 
 **Suggested title:** `[OS] Aerospace Tabs`
