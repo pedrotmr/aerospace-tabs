@@ -25,6 +25,42 @@ jobs:
           persist-credentials: false
           ref: ${{ inputs.tag }}
 
+      - name: Import Developer ID signing identity
+        env:
+          DEVELOPER_ID_CERTIFICATE_P12_BASE64: ${{ secrets.DEVELOPER_ID_CERTIFICATE_P12_BASE64 }}
+          DEVELOPER_ID_CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$DEVELOPER_ID_CERTIFICATE_P12_BASE64" || -z "$DEVELOPER_ID_CERTIFICATE_PASSWORD" ]]; then
+            echo "::error::Set DEVELOPER_ID_CERTIFICATE_P12_BASE64 and DEVELOPER_ID_CERTIFICATE_PASSWORD repository secrets."
+            exit 1
+          fi
+
+          keychain_path="$RUNNER_TEMP/aerospace-tabs-signing.keychain-db"
+          keychain_password="$(openssl rand -base64 32)"
+          certificate_path="$RUNNER_TEMP/developer-id.p12"
+
+          printf '%s' "$DEVELOPER_ID_CERTIFICATE_P12_BASE64" | base64 -D > "$certificate_path"
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$certificate_path" -k "$keychain_path" \
+            -P "$DEVELOPER_ID_CERTIFICATE_PASSWORD" -f pkcs12
+          security set-key-partition-list -S apple-tool:,apple: -s \
+            -k "$keychain_password" "$keychain_path" >/dev/null
+          security list-keychains -d user -s "$keychain_path"
+
+          signing_identity="$(security find-identity -v -p codesigning "$keychain_path" \
+            | awk '/Developer ID Application:/ { print $2; exit }')"
+          if [[ -z "$signing_identity" ]]; then
+            echo "::error::The imported certificate must include a Developer ID Application identity and private key."
+            exit 1
+          fi
+
+          echo "SIGNING_IDENTITY=$signing_identity" >> "$GITHUB_ENV"
+          rm -f "$certificate_path"
+
       - name: Build and zip app
         run: ./scripts/package-release.sh "$RELEASE_TAG"
         env:
@@ -36,6 +72,15 @@ jobs:
           path: .build/AerospaceTabs.zip
           if-no-files-found: error
           retention-days: 1
+
+      - name: Remove signing keychain
+        if: always()
+        run: |
+          keychain_path="$RUNNER_TEMP/aerospace-tabs-signing.keychain-db"
+          if [[ -e "$keychain_path" ]]; then
+            security delete-keychain "$keychain_path" || true
+          fi
+          rm -f "$RUNNER_TEMP/developer-id.p12"
 
   create-draft-release:
     name: Create draft release
@@ -62,7 +107,7 @@ jobs:
 
           Grant Accessibility access for global shortcuts and Dock badges. Screen Recording is optional and enables window thumbnails.
 
-          This workflow does not configure a stable Developer ID signing identity or notarization. Without stable signing, macOS may ask you to grant Accessibility or Screen Recording again after an update. If macOS blocks the app, try opening it once, then open System Settings > Privacy & Security, scroll to Security, choose Open Anyway, and confirm Open.
+          This app is signed with a stable Developer ID identity but is not notarized. If macOS blocks the app, try opening it once, then open System Settings > Privacy & Security, scroll to Security, choose Open Anyway, and confirm Open.
 
           ## AeroSpace gaps
 

@@ -23,6 +23,12 @@ if [[ ! "$build_number" =~ ^[0-9]+$ ]]; then
   exit 2
 fi
 
+signing_identity=${SIGNING_IDENTITY:-}
+if [[ -z "$signing_identity" || "$signing_identity" == "-" ]]; then
+  printf 'Release packaging requires a Developer ID Application signing identity.\n' >&2
+  exit 1
+fi
+
 if ! git tag --points-at HEAD | grep -Fqx "$release_tag"; then
   printf 'HEAD must be checked out at the existing %s tag.\n' "$release_tag" >&2
   exit 1
@@ -34,9 +40,18 @@ if [[ -n "$worktree_status" ]]; then
   exit 1
 fi
 
-make build-universal APP_VERSION="$release_version" BUILD_NUMBER="$build_number"
+make build-universal SIGNING_IDENTITY="$signing_identity" \
+  APP_VERSION="$release_version" BUILD_NUMBER="$build_number"
+
+app_path="$repo_root/AerospaceTabs.app"
+codesign --verify --deep --strict "$app_path"
+signature_details=$(codesign --display --verbose=4 "$app_path" 2>&1)
+if ! printf '%s\n' "$signature_details" | grep -q '^Authority=Developer ID Application:'; then
+  printf 'Release app must be signed with a Developer ID Application certificate.\n' >&2
+  exit 1
+fi
 
 archive_path="$repo_root/.build/AerospaceTabs.zip"
 rm -f "$archive_path"
-ditto -c -k --sequesterRsrc --keepParent "$repo_root/AerospaceTabs.app" "$archive_path"
+ditto -c -k --sequesterRsrc --keepParent "$app_path" "$archive_path"
 printf 'Created %s\n' "$archive_path"
