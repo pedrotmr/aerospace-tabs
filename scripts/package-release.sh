@@ -7,8 +7,9 @@ if [[ $# -ne 1 ]]; then
 fi
 
 release_tag=$1
-repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-cd "$repo_root"
+script_dir=$(dirname "${BASH_SOURCE[0]}")
+cd "$script_dir/.."
+repo_root=$PWD
 
 if [[ ! "$release_tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
   printf 'Release tag must use vMAJOR.MINOR.PATCH format (for example, v0.1.0).\n' >&2
