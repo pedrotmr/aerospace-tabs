@@ -27,7 +27,7 @@ cask "pedrotmr-aerospace-tabs" do
   desc "Window tabs and overview for AeroSpace"
   homepage "https://github.com/pedrotmr/aerospace-tabs"
 
-  depends_on macos: ">= :sonoma"
+  depends_on macos: :sonoma
 
   app "AerospaceTabs.app"
 
