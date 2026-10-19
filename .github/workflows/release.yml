@@ -3,6 +3,12 @@ name: Release
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing draft release tag to build, for example v0.1.0
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -22,7 +28,7 @@ jobs:
       pull-requests: write
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
+      tag_name: ${{ steps.release.outputs.tag_name || github.event.inputs.release_tag }}
       body: ${{ steps.release.outputs.body }}
     steps:
       - name: Create or update release PR
@@ -37,7 +43,7 @@ jobs:
   # relying on a second workflow triggered by that tag.
   build-release:
     name: Build, sign, and notarize universal app
-    if: needs.release-please.outputs.release_created == 'true'
+    if: needs.release-please.outputs.release_created == 'true' || (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '')
     needs: release-please
     runs-on: macos-15
     timeout-minutes: 90
@@ -75,7 +81,7 @@ jobs:
           security unlock-keychain -p "$keychain_password" "$keychain_path"
           security import "$certificate_path" -k "$keychain_path" \
             -P "$DEVELOPER_ID_CERTIFICATE_PASSWORD" -f pkcs12
-          security set-key-partition-list -S apple-tool:,apple: -s \
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
             -k "$keychain_password" "$keychain_path" >/dev/null
           security list-keychains -d user -s "$keychain_path"
 
