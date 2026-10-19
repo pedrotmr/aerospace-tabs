@@ -28,16 +28,40 @@ jobs:
       pull-requests: write
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name || github.event.inputs.release_tag }}
-      body: ${{ steps.release.outputs.body }}
+      tag_name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag || steps.release.outputs.tag_name }}
+      body: ${{ github.event_name == 'workflow_dispatch' && steps.retry_release.outputs.body || steps.release.outputs.body }}
     steps:
       - name: Create or update release PR
         id: release
+        if: github.event_name == 'push'
         uses: googleapis/release-please-action@v4
         with:
           config-file: .release-please-config.json
           manifest-file: .release-please-manifest.json
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate draft release and preserve its notes
+        id: retry_release
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+        run: |
+          set -euo pipefail
+
+          release_json=$(gh release view "$RELEASE_TAG" --json isDraft,body)
+          if [[ "$(jq -r '.isDraft' <<< "$release_json")" != "true" ]]; then
+            echo "::error::The selected release must be a draft."
+            exit 1
+          fi
+
+          delimiter="$(openssl rand -hex 16)"
+          {
+            printf 'body<<%s\n' "$delimiter"
+            jq -r '.body' <<< "$release_json"
+            printf '%s\n' "$delimiter"
+          } >> "$GITHUB_OUTPUT"
 
   # The tag is created with GITHUB_TOKEN, so package it in this run instead of
   # relying on a second workflow triggered by that tag.
