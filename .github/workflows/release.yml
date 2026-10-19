@@ -204,7 +204,16 @@ jobs:
           RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
           RELEASE_BODY: ${{ needs.release-please.outputs.body }}
         run: |
+          install_marker='<!-- aerospace-tabs-install-instructions:v1 -->'
+          # Recognize both new notes and older notes that predate the marker.
+          if [[ "$RELEASE_BODY" == *"$install_marker"* || "$RELEASE_BODY" == *"Download and unzip AerospaceTabs.zip"* ]]; then
+            echo "Install instructions are already present; leaving release notes unchanged."
+            exit 0
+          fi
+
           cat > release-notes.md <<'NOTES'
+          <!-- aerospace-tabs-install-instructions:v1 -->
+
           ## Install
 
           Download and unzip AerospaceTabs.zip, then move AerospaceTabs.app to Applications. The universal app supports Apple Silicon and Intel Macs running macOS 14 or later, and requires AeroSpace.
@@ -221,7 +230,7 @@ jobs:
 
           ## Changes
           NOTES
-          printf '%s\n' "$RELEASE_BODY" >> release-notes.md
+          printf '\n%s\n' "$RELEASE_BODY" >> release-notes.md
           gh release edit "$RELEASE_TAG" \
             --title "Aerospace Tabs $RELEASE_TAG" \
             --notes-file release-notes.md
