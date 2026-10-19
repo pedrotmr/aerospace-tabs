@@ -41,6 +41,7 @@ if [[ -n "$worktree_status" ]]; then
 fi
 
 make build-universal SIGNING_IDENTITY="$signing_identity" \
+  CODESIGN_FLAGS="--options runtime --timestamp" \
   APP_VERSION="$release_version" BUILD_NUMBER="$build_number"
 
 app_path="$repo_root/AerospaceTabs.app"
@@ -48,6 +49,14 @@ codesign --verify --deep --strict "$app_path"
 signature_details=$(codesign --display --verbose=4 "$app_path" 2>&1)
 if ! printf '%s\n' "$signature_details" | grep -q '^Authority=Developer ID Application:'; then
   printf 'Release app must be signed with a Developer ID Application certificate.\n' >&2
+  exit 1
+fi
+if ! printf '%s\n' "$signature_details" | grep -q 'flags=.*runtime'; then
+  printf 'Release app must be signed with the Hardened Runtime enabled.\n' >&2
+  exit 1
+fi
+if ! printf '%s\n' "$signature_details" | grep -q '^Timestamp='; then
+  printf 'Release app must include a secure code-signing timestamp.\n' >&2
   exit 1
 fi
 

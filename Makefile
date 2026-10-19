@@ -4,6 +4,7 @@ ARM64_BUILD_PATH := .build/release-arm64
 INTEL_BUILD_PATH := .build/release-x86_64
 UNIVERSAL_BIN := .build/release-universal/AerospaceTabs
 APP_BINARY ?= $(BIN)
+CODESIGN_FLAGS ?=
 SIGNING_IDENTITY ?= $(shell security find-identity -v -p codesigning 2>/dev/null | awk '/^[[:space:]]*[0-9]+[^0-9]/ && $$2 ~ /^[[:xdigit:]]+$$/ { print $$2; exit }')
 ifeq ($(strip $(SIGNING_IDENTITY)),)
 SIGNING_IDENTITY := -
@@ -38,7 +39,7 @@ endif
 ifdef BUILD_NUMBER
 	/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(BUILD_NUMBER)" $(APP)/Contents/Info.plist
 endif
-	codesign --force --sign "$(SIGNING_IDENTITY)" --identifier com.pedrotmr.AerospaceTabs $(APP)
+	codesign --force $(CODESIGN_FLAGS) --sign "$(SIGNING_IDENTITY)" --identifier com.pedrotmr.AerospaceTabs $(APP)
 
 kill:
 	-$(BIN) --restore-gaps 2>/dev/null || true

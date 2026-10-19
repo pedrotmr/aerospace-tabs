@@ -78,13 +78,16 @@ Release Please reads Conventional Commit messages from `main`:
 
 For squash merges, the pull request title becomes the commit message Release Please reads. For merge commits or rebase merges, it reads the individual commit messages instead. Use Conventional Commit messages so versioning and release notes are predictable.
 
-After changes reach `main`, Release Please opens or updates a release pull request with the version and release notes. Review and merge that pull request when the release is ready. The workflow creates a draft GitHub Release, signs the universal app, and attaches `AerospaceTabs.zip`. Review the draft and publish it when ready. You do not create a tag or write the release title or notes yourself.
+After changes reach `main`, Release Please opens or updates a release pull request with the version and release notes. Review and merge that pull request when the release is ready. The workflow creates a draft GitHub Release, signs the universal app with Developer ID, submits it to Apple's notary service, staples the accepted ticket to the app, and attaches the resulting `AerospaceTabs.zip`. Review the draft and publish it when ready. You do not create a tag or write the release title or notes yourself.
 
 Release Please uses GitHub's built-in token, so its generated metadata PR does not start the `pull_request` CI workflow. The app source is tested on its own PRs, and the release workflow runs `swift test` at the tagged commit before attaching the ZIP. If you later require CI checks on generated release PRs before merge, configure Release Please with a GitHub App or personal access token instead.
 
 If signing, the build, tests, or upload fail after the draft is created, open that failed run in Actions and choose **Re-run failed jobs**. This retries the existing release; a full rerun can skip packaging because Release Please has already created the draft.
 
-Before the first release, enable **Allow GitHub Actions to create and approve pull requests** under the repository’s **Settings → Actions → General**. Add the `DEVELOPER_ID_CERTIFICATE_P12_BASE64` and `DEVELOPER_ID_CERTIFICATE_PASSWORD` repository secrets for Developer ID signing. The app is not notarized yet.
+Before the first release, enable **Allow GitHub Actions to create and approve pull requests** under the repository’s **Settings → Actions → General**. Add these repository secrets:
+
+- `DEVELOPER_ID_CERTIFICATE_P12_BASE64` and `DEVELOPER_ID_CERTIFICATE_PASSWORD` for Developer ID signing.
+- `APPLE_NOTARY_KEY_P8_BASE64`, `APPLE_NOTARY_KEY_ID`, and `APPLE_NOTARY_ISSUER_ID` for Apple's notary service. Use a team App Store Connect API key with access to notarization.
 
 ## License
 

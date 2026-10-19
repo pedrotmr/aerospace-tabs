@@ -31,11 +31,11 @@ jobs:
   # The tag is created with GITHUB_TOKEN, so package it in this run instead of
   # relying on a second workflow triggered by that tag.
   build-release:
-    name: Build and sign universal app
+    name: Build, sign, and notarize universal app
     if: needs.release-please.outputs.release_created == 'true'
     needs: release-please
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 60
     permissions:
       contents: read
     steps:
@@ -89,11 +89,47 @@ jobs:
         env:
           RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
 
+      - name: Notarize and staple app
+        env:
+          APPLE_NOTARY_KEY_P8_BASE64: ${{ secrets.APPLE_NOTARY_KEY_P8_BASE64 }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$APPLE_NOTARY_KEY_P8_BASE64" || -z "$APPLE_NOTARY_KEY_ID" || -z "$APPLE_NOTARY_ISSUER_ID" ]]; then
+            echo "::error::Set APPLE_NOTARY_KEY_P8_BASE64, APPLE_NOTARY_KEY_ID, and APPLE_NOTARY_ISSUER_ID repository secrets."
+            exit 1
+          fi
+
+          app_path="$GITHUB_WORKSPACE/AerospaceTabs.app"
+          archive_path="$GITHUB_WORKSPACE/.build/AerospaceTabs.zip"
+          notary_key_path="$RUNNER_TEMP/apple-notary-api-key.p8"
+
+          umask 077
+          printf '%s' "$APPLE_NOTARY_KEY_P8_BASE64" | base64 -D > "$notary_key_path"
+          chmod 600 "$notary_key_path"
+
+          xcrun notarytool submit "$archive_path" \
+            --key "$notary_key_path" \
+            --key-id "$APPLE_NOTARY_KEY_ID" \
+            --issuer "$APPLE_NOTARY_ISSUER_ID" \
+            --wait \
+            --timeout 45m
+
+          xcrun stapler staple "$app_path"
+          xcrun stapler validate "$app_path"
+          spctl --assess --type execute --verbose=2 "$app_path"
+
+          rm -f "$archive_path"
+          ditto -c -k --sequesterRsrc --keepParent "$app_path" "$archive_path"
+
       - name: Upload ZIP as workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: aerospace-tabs-release
           path: .build/AerospaceTabs.zip
+          include-hidden-files: true
           if-no-files-found: error
 
       - name: Remove signing keychain
@@ -103,7 +139,7 @@ jobs:
           if [[ -e "$keychain_path" ]]; then
             security delete-keychain "$keychain_path" || true
           fi
-          rm -f "$RUNNER_TEMP/developer-id.p12"
+          rm -f "$RUNNER_TEMP/developer-id.p12" "$RUNNER_TEMP/apple-notary-api-key.p8"
 
   # Keep repository write access out of the job that runs build scripts.
   publish-release:
@@ -140,7 +176,7 @@ jobs:
 
           Grant Accessibility access for global shortcuts and Dock badges. Screen Recording is optional and enables window thumbnails.
 
-          This app is signed with a stable Developer ID identity but is not notarized. If macOS blocks the app, try opening it once, then open System Settings > Privacy & Security, scroll to Security, choose Open Anyway, and confirm Open.
+          This app is signed with a Developer ID identity and notarized by Apple. Its notarization ticket is stapled to the app.
 
           ## AeroSpace gaps
 
