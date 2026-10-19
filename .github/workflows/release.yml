@@ -1,0 +1,197 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    name: Prepare release
+    runs-on: ubuntu-latest
+    # Serialize updates to the shared release branch without holding the queue
+    # while the separate build and notarization jobs run.
+    concurrency:
+      group: release-please-${{ github.ref }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      body: ${{ steps.release.outputs.body }}
+    steps:
+      - name: Create or update release PR
+        id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          config-file: .release-please-config.json
+          manifest-file: .release-please-manifest.json
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  # The tag is created with GITHUB_TOKEN, so package it in this run instead of
+  # relying on a second workflow triggered by that tag.
+  build-release:
+    name: Build, sign, and notarize universal app
+    if: needs.release-please.outputs.release_created == 'true'
+    needs: release-please
+    runs-on: macos-15
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ needs.release-please.outputs.tag_name }}
+
+      - name: Run tests
+        run: swift test
+
+      - name: Import Developer ID signing identity
+        env:
+          DEVELOPER_ID_CERTIFICATE_P12_BASE64: ${{ secrets.DEVELOPER_ID_CERTIFICATE_P12_BASE64 }}
+          DEVELOPER_ID_CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$DEVELOPER_ID_CERTIFICATE_P12_BASE64" || -z "$DEVELOPER_ID_CERTIFICATE_PASSWORD" ]]; then
+            echo "::error::Set DEVELOPER_ID_CERTIFICATE_P12_BASE64 and DEVELOPER_ID_CERTIFICATE_PASSWORD repository secrets."
+            exit 1
+          fi
+
+          keychain_path="$RUNNER_TEMP/aerospace-tabs-signing.keychain-db"
+          keychain_password="$(openssl rand -base64 32)"
+          certificate_path="$RUNNER_TEMP/developer-id.p12"
+
+          printf '%s' "$DEVELOPER_ID_CERTIFICATE_P12_BASE64" | base64 -D > "$certificate_path"
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$certificate_path" -k "$keychain_path" \
+            -P "$DEVELOPER_ID_CERTIFICATE_PASSWORD" -f pkcs12
+          security set-key-partition-list -S apple-tool:,apple: -s \
+            -k "$keychain_password" "$keychain_path" >/dev/null
+          security list-keychains -d user -s "$keychain_path"
+
+          signing_identity="$(security find-identity -v -p codesigning "$keychain_path" \
+            | awk '/Developer ID Application:/ { print $2; exit }')"
+          if [[ -z "$signing_identity" ]]; then
+            echo "::error::The imported certificate must include a Developer ID Application identity and private key."
+            exit 1
+          fi
+
+          echo "SIGNING_IDENTITY=$signing_identity" >> "$GITHUB_ENV"
+          rm -f "$certificate_path"
+
+      - name: Build and zip app
+        run: ./scripts/package-release.sh "$RELEASE_TAG"
+        env:
+          RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
+
+      - name: Notarize and staple app
+        env:
+          APPLE_NOTARY_KEY_P8_BASE64: ${{ secrets.APPLE_NOTARY_KEY_P8_BASE64 }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$APPLE_NOTARY_KEY_P8_BASE64" || -z "$APPLE_NOTARY_KEY_ID" || -z "$APPLE_NOTARY_ISSUER_ID" ]]; then
+            echo "::error::Set APPLE_NOTARY_KEY_P8_BASE64, APPLE_NOTARY_KEY_ID, and APPLE_NOTARY_ISSUER_ID repository secrets."
+            exit 1
+          fi
+
+          app_path="$GITHUB_WORKSPACE/AerospaceTabs.app"
+          archive_path="$GITHUB_WORKSPACE/.build/AerospaceTabs.zip"
+          notary_key_path="$RUNNER_TEMP/apple-notary-api-key.p8"
+
+          umask 077
+          printf '%s' "$APPLE_NOTARY_KEY_P8_BASE64" | base64 -D > "$notary_key_path"
+          chmod 600 "$notary_key_path"
+
+          xcrun notarytool submit "$archive_path" \
+            --key "$notary_key_path" \
+            --key-id "$APPLE_NOTARY_KEY_ID" \
+            --issuer "$APPLE_NOTARY_ISSUER_ID" \
+            --wait \
+            --timeout 60m
+
+          xcrun stapler staple "$app_path"
+          xcrun stapler validate "$app_path"
+          spctl --assess --type execute --verbose=2 "$app_path"
+
+          rm -f "$archive_path"
+          ditto -c -k --sequesterRsrc --keepParent "$app_path" "$archive_path"
+
+      - name: Upload ZIP as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aerospace-tabs-release
+          path: .build/AerospaceTabs.zip
+          include-hidden-files: true
+          if-no-files-found: error
+
+      - name: Remove signing keychain
+        if: always()
+        run: |
+          keychain_path="$RUNNER_TEMP/aerospace-tabs-signing.keychain-db"
+          if [[ -e "$keychain_path" ]]; then
+            security delete-keychain "$keychain_path" || true
+          fi
+          rm -f "$RUNNER_TEMP/developer-id.p12" "$RUNNER_TEMP/apple-notary-api-key.p8"
+
+  # Keep repository write access out of the job that runs build scripts.
+  publish-release:
+    name: Attach ZIP to draft release
+    needs: [release-please, build-release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download ZIP artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: aerospace-tabs-release
+          path: .build
+
+      - name: Attach ZIP to draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
+        run: gh release upload "$RELEASE_TAG" .build/AerospaceTabs.zip --clobber
+
+      - name: Add install instructions to generated release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
+          RELEASE_BODY: ${{ needs.release-please.outputs.body }}
+        run: |
+          cat > release-notes.md <<'NOTES'
+          ## Install
+
+          Download and unzip AerospaceTabs.zip, then move AerospaceTabs.app to Applications. The universal app supports Apple Silicon and Intel Macs running macOS 14 or later, and requires AeroSpace.
+
+          Grant Accessibility access for global shortcuts and Dock badges. Screen Recording is optional and enables window thumbnails.
+
+          This app is signed with a Developer ID identity and notarized by Apple. Its notarization ticket is stapled to the app.
+
+          ## AeroSpace gaps
+
+          Aerospace Tabs temporarily increases AeroSpace gaps.outer.top while it runs and restores the previous value when it quits normally. Quit the app before removing it. If it was force-quit and removed before cleanup, put AerospaceTabs.app back in /Applications and run this command in Terminal:
+
+              /Applications/AerospaceTabs.app/Contents/MacOS/AerospaceTabs --restore-gaps
+
+          ## Changes
+          NOTES
+          printf '%s\n' "$RELEASE_BODY" >> release-notes.md
+          gh release edit "$RELEASE_TAG" \
+            --title "Aerospace Tabs $RELEASE_TAG" \
+            --notes-file release-notes.md
