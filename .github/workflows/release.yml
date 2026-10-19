@@ -4,11 +4,6 @@ on:
   push:
     branches: [main]
 
-# Release Please updates a shared release branch, so process main pushes in order.
-concurrency:
-  group: release-please-${{ github.ref }}
-  cancel-in-progress: false
-
 permissions:
   contents: read
 
@@ -16,6 +11,11 @@ jobs:
   release-please:
     name: Prepare release
     runs-on: ubuntu-latest
+    # Serialize updates to the shared release branch without holding the queue
+    # while the separate build and notarization jobs run.
+    concurrency:
+      group: release-please-${{ github.ref }}
+      cancel-in-progress: false
     permissions:
       contents: write
       issues: write
