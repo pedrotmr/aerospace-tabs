@@ -35,7 +35,7 @@ jobs:
     if: needs.release-please.outputs.release_created == 'true'
     needs: release-please
     runs-on: macos-15
-    timeout-minutes: 60
+    timeout-minutes: 90
     permissions:
       contents: read
     steps:
@@ -115,7 +115,7 @@ jobs:
             --key-id "$APPLE_NOTARY_KEY_ID" \
             --issuer "$APPLE_NOTARY_ISSUER_ID" \
             --wait \
-            --timeout 45m
+            --timeout 60m
 
           xcrun stapler staple "$app_path"
           xcrun stapler validate "$app_path"
