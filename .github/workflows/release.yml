@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
 
+# Release Please updates a shared release branch, so process main pushes in order.
+concurrency:
+  group: release-please-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
