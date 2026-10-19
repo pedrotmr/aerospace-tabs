@@ -3,6 +3,12 @@ name: Release
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing draft release tag to build, for example v0.1.0
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -22,22 +28,46 @@ jobs:
       pull-requests: write
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
-      body: ${{ steps.release.outputs.body }}
+      tag_name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag || steps.release.outputs.tag_name }}
+      body: ${{ github.event_name == 'workflow_dispatch' && steps.retry_release.outputs.body || steps.release.outputs.body }}
     steps:
       - name: Create or update release PR
         id: release
+        if: github.event_name == 'push'
         uses: googleapis/release-please-action@v4
         with:
           config-file: .release-please-config.json
           manifest-file: .release-please-manifest.json
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Validate draft release and preserve its notes
+        id: retry_release
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+        run: |
+          set -euo pipefail
+
+          release_json=$(gh release view "$RELEASE_TAG" --json isDraft,body)
+          if [[ "$(jq -r '.isDraft' <<< "$release_json")" != "true" ]]; then
+            echo "::error::The selected release must be a draft."
+            exit 1
+          fi
+
+          delimiter="$(openssl rand -hex 16)"
+          {
+            printf 'body<<%s\n' "$delimiter"
+            jq -r '.body' <<< "$release_json"
+            printf '%s\n' "$delimiter"
+          } >> "$GITHUB_OUTPUT"
+
   # The tag is created with GITHUB_TOKEN, so package it in this run instead of
   # relying on a second workflow triggered by that tag.
   build-release:
     name: Build, sign, and notarize universal app
-    if: needs.release-please.outputs.release_created == 'true'
+    if: needs.release-please.outputs.release_created == 'true' || (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '')
     needs: release-please
     runs-on: macos-15
     timeout-minutes: 90
@@ -75,7 +105,7 @@ jobs:
           security unlock-keychain -p "$keychain_password" "$keychain_path"
           security import "$certificate_path" -k "$keychain_path" \
             -P "$DEVELOPER_ID_CERTIFICATE_PASSWORD" -f pkcs12
-          security set-key-partition-list -S apple-tool:,apple: -s \
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
             -k "$keychain_password" "$keychain_path" >/dev/null
           security list-keychains -d user -s "$keychain_path"
 
@@ -174,7 +204,16 @@ jobs:
           RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
           RELEASE_BODY: ${{ needs.release-please.outputs.body }}
         run: |
+          install_marker='<!-- aerospace-tabs-install-instructions:v1 -->'
+          # Recognize both new notes and older notes that predate the marker.
+          if [[ "$RELEASE_BODY" == *"$install_marker"* || "$RELEASE_BODY" == *"Download and unzip AerospaceTabs.zip"* ]]; then
+            echo "Install instructions are already present; leaving release notes unchanged."
+            exit 0
+          fi
+
           cat > release-notes.md <<'NOTES'
+          <!-- aerospace-tabs-install-instructions:v1 -->
+
           ## Install
 
           Download and unzip AerospaceTabs.zip, then move AerospaceTabs.app to Applications. The universal app supports Apple Silicon and Intel Macs running macOS 14 or later, and requires AeroSpace.
@@ -191,7 +230,7 @@ jobs:
 
           ## Changes
           NOTES
-          printf '%s\n' "$RELEASE_BODY" >> release-notes.md
+          printf '\n%s\n' "$RELEASE_BODY" >> release-notes.md
           gh release edit "$RELEASE_TAG" \
             --title "Aerospace Tabs $RELEASE_TAG" \
             --notes-file release-notes.md
