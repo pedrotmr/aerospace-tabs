@@ -24,8 +24,7 @@ build-universal:
 		"$$(swift build -c release --triple arm64-apple-macosx14.0 --scratch-path $(ARM64_BUILD_PATH) --show-bin-path)/AerospaceTabs" \
 		"$$(swift build -c release --triple x86_64-apple-macosx14.0 --scratch-path $(INTEL_BUILD_PATH) --show-bin-path)/AerospaceTabs" \
 		-output "$(UNIVERSAL_BIN)"
-	lipo -verify_arch arm64 "$(UNIVERSAL_BIN)"
-	lipo -verify_arch x86_64 "$(UNIVERSAL_BIN)"
+	lipo "$(UNIVERSAL_BIN)" -verify_arch arm64 x86_64
 	$(MAKE) assemble-app APP_BINARY="$(UNIVERSAL_BIN)"
 
 assemble-app:
