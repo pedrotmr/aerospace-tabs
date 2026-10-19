@@ -41,6 +41,8 @@ end
 
 This uses the Cask Cookbook's required identity and download stanzas plus an `app` artifact. The versioned cask will be included in ordinary `brew upgrade` when the tap updates its version for each release. If the release uses a different tag format or asset name, update the URL to match it before publishing the tap. If the release is not universal, add architecture-specific URLs and real checksums rather than advertising support for both CPU families.
 
+CI extracts this block into a temporary local tap and runs `brew audit --cask --strict`. That checks the cask definition's syntax and style; it does not verify the future release asset, checksum, signing, or notarization.
+
 ## README install line
 
 Add this to the README's install section after the tap and its first release are available:
