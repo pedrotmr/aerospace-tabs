@@ -69,11 +69,14 @@ make restore-gaps
 
 ## Releases
 
-Releases are prepared from the Conventional Commit titles used for merged pull requests:
+Release Please reads Conventional Commit messages from `main`:
 
-- `fix:` requests a patch version bump.
+- `fix:`, `perf:`, and `revert:` request a patch version bump.
 - `feat:` requests a minor version bump.
-- `!` after the type, such as `feat!:`, or a `BREAKING CHANGE:` footer marks a breaking change and requests a major bump.
+- A `!` after a recognized type, such as `feat!:`, or a `BREAKING CHANGE:` footer requests a major bump.
+- `docs:`, `style:`, `chore:`, `refactor:`, `test:`, `build:`, and `ci:` do not create a release by themselves and are hidden from release notes. Their changes are included in the next release that has a release-worthy commit.
+
+For squash merges, the pull request title becomes the commit message Release Please reads. For merge commits or rebase merges, it reads the individual commit messages instead. Use Conventional Commit messages so versioning and release notes are predictable.
 
 After changes reach `main`, Release Please opens or updates a release pull request with the version and release notes. Review and merge that pull request when the release is ready. The workflow creates a draft GitHub Release, signs the universal app, and attaches `AerospaceTabs.zip`. Review the draft and publish it when ready. You do not create a tag or write the release title or notes yourself.
 
