@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/pedrotmr/aerospace-tabs/compare/v0.1.0...v0.1.1) (2026-10-19)
+
+
+### Bug Fixes
+
+* **ci:** grant codesign access to imported signing key ([#33](https://github.com/pedrotmr/aerospace-tabs/issues/33)) ([7bdb9a8](https://github.com/pedrotmr/aerospace-tabs/commit/7bdb9a89db22327267763a174f783e152c7249df))
+
 ## 0.1.0 (2026-10-19)
 
 
