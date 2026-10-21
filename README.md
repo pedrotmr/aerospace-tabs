@@ -32,9 +32,9 @@ Select **Choose Config Editor…** once from the AeroSpace submenu; **Open Confi
 
 ## Install
 
-Install the latest stable release from the [Homebrew tap](https://github.com/pedrotmr/homebrew-aerospace-tabs). Both commands install the same app.
+Install the latest stable release from the [Homebrew tap](https://github.com/pedrotmr/homebrew-aerospace-tabs). Both methods install the same app.
 
-One command adds the tap and installs the app:
+One option adds the tap and installs the app in a single command:
 
 ```sh
 brew install --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs

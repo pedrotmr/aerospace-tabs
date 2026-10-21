@@ -62,9 +62,9 @@ Publishing the GitHub Release leaves Homebrew on the cask pinned above until the
 
 ## README install line
 
-Use both forms in the README Install section. They install the same cask.
+Use both methods in the README Install section. They install the same cask.
 
-One command adds the tap and installs the app:
+One option adds the tap and installs the app in a single command:
 
 ```sh
 brew install --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
