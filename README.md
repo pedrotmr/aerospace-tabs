@@ -32,10 +32,19 @@ Select **Choose Config Editor…** once from the AeroSpace submenu; **Open Confi
 
 ## Install
 
-Install the latest stable release from the [Homebrew tap](https://github.com/pedrotmr/homebrew-aerospace-tabs):
+Install the latest stable release from the [Homebrew tap](https://github.com/pedrotmr/homebrew-aerospace-tabs). Both commands install the same app.
+
+One command adds the tap and installs the app:
 
 ```sh
 brew install --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
+```
+
+Or add the tap once, then install with the shorter name:
+
+```sh
+brew tap pedrotmr/aerospace-tabs
+brew install --cask pedrotmr-aerospace-tabs
 ```
 
 ## Requirements
@@ -87,6 +96,13 @@ Release Please reads Conventional Commit messages from `main`:
 For squash merges, the pull request title becomes the commit message Release Please reads. For merge commits or rebase merges, it reads the individual commit messages instead. Use Conventional Commit messages so versioning and release notes are predictable.
 
 After changes reach `main`, Release Please opens or updates a release pull request with the version and release notes. Review and merge that pull request when the release is ready. The workflow creates a draft GitHub Release, signs the universal app with Developer ID, submits it to Apple's notary service, staples the accepted ticket to the app, and attaches the resulting `AerospaceTabs.zip`. Review the draft and publish it when ready. You do not create a tag or write the release title or notes yourself.
+
+After you publish that release, update Homebrew before announcing the version. Set `version` to the release number without the leading `v`, and set `sha256` to the checksum of the published `AerospaceTabs.zip`, in both of these files:
+
+- [`Casks/pedrotmr-aerospace-tabs.rb`](https://github.com/pedrotmr/homebrew-aerospace-tabs/blob/HEAD/Casks/pedrotmr-aerospace-tabs.rb) in [pedrotmr/homebrew-aerospace-tabs](https://github.com/pedrotmr/homebrew-aerospace-tabs)
+- the cask block in [docs/launch/homebrew-tap.md](docs/launch/homebrew-tap.md#after-each-published-release)
+
+The install commands above stay the same. `brew upgrade` follows the version pinned in the tap cask. The steps and the `shasum` command are in [After each published release](docs/launch/homebrew-tap.md#after-each-published-release).
 
 Release Please uses GitHub's built-in token, so its generated metadata PR does not start the `pull_request` CI workflow. The app source is tested on its own PRs, and the release workflow runs `swift test` at the tagged commit before attaching the ZIP. If you later require CI checks on generated release PRs before merge, configure Release Please with a GitHub App or personal access token instead.
 
