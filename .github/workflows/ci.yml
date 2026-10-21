@@ -29,7 +29,7 @@ jobs:
             in_cask && /^```$/ { closed=1; exit }
             in_cask { print }
             END { if (!in_cask || !closed) exit 1 }
-          ' docs/launch/homebrew-tap.md > "$tap_dir/Casks/pedrotmr-aerospace-tabs.rb"
+          ' docs/launch/homebrew-tap.md > "${tap_dir}/Casks/aerospace-tabs.rb"
 
           brew audit --cask --strict --tap pedrotmr/aerospace-tabs
 
