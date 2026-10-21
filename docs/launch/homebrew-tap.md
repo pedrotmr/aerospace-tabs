@@ -6,7 +6,7 @@ Use a personal tap for the first Homebrew distribution. Homebrew's shared Packag
 
 Issue [#10](https://github.com/pedrotmr/aerospace-tabs/issues/10) remains open for install and run acceptance. The first stable GitHub Release is now published as [v0.1.1](https://github.com/pedrotmr/aerospace-tabs/releases/tag/v0.1.1), with `AerospaceTabs.zip` as its asset. The checked SHA-256 is `69bbad1776bb5a49d8efcbcf8f65607bb032f3de908d5d5866b9bf5f846e2e5f`. Use this release contract for future cask updates:
 
-- Publish a non-prerelease GitHub Release with a `v<version>` tag and `AerospaceTabs.zip` as an asset. The published app version is `0.1.1`; update the cask's version and checksum together for each later release.
+- Publish a non-prerelease GitHub Release with a `v<version>` tag and `AerospaceTabs.zip` as an asset. `.github/workflows/release.yml` runs `scripts/package-release.sh` at that tag; it passes the tag version to the universal build, so the app bundle version matches the release even though the development default in `Resources/Info.plist` is `0.1.0`. The published app version is `0.1.1`; update the cask version and checksum together for each later release.
 - Put `AerospaceTabs.app` at the root of the zip. Sign and notarize the app before packaging it.
 - The v0.1.1 release app is universal for Apple silicon and Intel. Local `make build` output remains architecture-specific, so use the release workflow artifact for the cask.
 - Keep the asset filename stable across releases. Update the tap cask's version and SHA-256 for each release so ordinary `brew upgrade` can detect and install updates.
