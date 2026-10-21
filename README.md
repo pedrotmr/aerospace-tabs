@@ -35,10 +35,8 @@ Select **Choose Config Editor…** once from the AeroSpace submenu; **Open Confi
 Install the latest stable release from the [Homebrew tap](https://github.com/pedrotmr/homebrew-aerospace-tabs):
 
 ```sh
-brew install --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
+brew install --cask pedrotmr/aerospace-tabs/aerospace-tabs
 ```
-
-Requires macOS 14 or later and AeroSpace. Grant Accessibility permission on first launch; Screen Recording is optional for window previews.
 
 ## Requirements
 
