@@ -30,6 +30,14 @@ Illustrative disconnected state rendered from synthetic data; the app retries au
 
 Select **Choose Config Editor…** once from the AeroSpace submenu; **Open Config** uses that editor on later openings. Opening the config keeps Aerospace Tabs running with its current tab strips and gap boost active.
 
+## Install
+
+Install the latest stable release from the [Homebrew tap](https://github.com/pedrotmr/homebrew-aerospace-tabs):
+
+```sh
+brew install --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
+```
+
 ## Requirements
 
 - macOS 14 or later
@@ -41,7 +49,7 @@ Trackpad swipe detection uses the macOS MultitouchSupport private framework at r
 
 Right-click a visible strip and choose **Open Window Overview** to open it directly. Use the arrow keys to move, Return to focus a window, and Escape to close immediately. Clicking the empty background also closes the overview. Previews are captured while the overview is open and kept in a bounded memory cache between openings. While the overview is open, visible windows stream live at up to 30 fps at a resolution matched to the display’s backing scale; streams stop when it closes. Closing also stops preview timers, drops queued captures, and releases the overview views. No screenshots or videos are saved to disk.
 
-## Run
+## Build and run from source
 
 ```bash
 git clone https://github.com/pedrotmr/aerospace-tabs.git
