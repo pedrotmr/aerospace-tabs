@@ -4,23 +4,23 @@
 
 Use a personal tap for the first Homebrew distribution. Homebrew's shared Package Acceptance Policy says software that does not meet the official-tap criteria can generally be maintained in a third-party tap; that tap is maintained by its owner and is not endorsed or supported by Homebrew. The official self-submission notability threshold is 225 stars, 90 forks, or 90 watchers, with case-by-case exceptions. See [Package Acceptance Policy](https://docs.brew.sh/Package-Acceptance-Policy) and [Acceptable Casks](https://docs.brew.sh/Acceptable-Casks).
 
-Issue [#10](https://github.com/pedrotmr/aerospace-tabs/issues/10) is still open, and there is no GitHub Release yet. It calls for an `.app` or zip but does not settle the asset name, release tag, checksum, or supported CPU architectures. Use this release contract so the cask URL stays stable:
+Issue [#10](https://github.com/pedrotmr/aerospace-tabs/issues/10) remains open for install and run acceptance. The first stable GitHub Release is now published as [v0.1.1](https://github.com/pedrotmr/aerospace-tabs/releases/tag/v0.1.1), with `AerospaceTabs.zip` as its asset. The checked SHA-256 is `69bbad1776bb5a49d8efcbcf8f65607bb032f3de908d5d5866b9bf5f846e2e5f`. Use this release contract for future cask updates:
 
-- Publish a non-prerelease GitHub Release with a `v<version>` tag and `AerospaceTabs.zip` as an asset. The current `Resources/Info.plist` version is `0.1.0`, so `v0.1.0` is the proposed first tag.
+- Publish a non-prerelease GitHub Release with a `v<version>` tag and `AerospaceTabs.zip` as an asset. The published app version is `0.1.1`; update the cask's version and checksum together for each later release.
 - Put `AerospaceTabs.app` at the root of the zip. Sign and notarize the app before packaging it.
-- Make the app universal for Apple silicon and Intel, or publish separate architecture-specific assets and use matching cask URL and checksum blocks. The current `make build` builds for the machine running Swift; it does not create a universal binary.
+- The v0.1.1 release app is universal for Apple silicon and Intel. Local `make build` output remains architecture-specific, so use the release workflow artifact for the cask.
 - Keep the asset filename stable across releases. Update the tap cask's version and SHA-256 for each release so ordinary `brew upgrade` can detect and install updates.
 
-The tap repository name is `homebrew-aerospace-tabs`, which Homebrew maps from `brew tap pedrotmr/aerospace-tabs`. This task prepares the cask content only; the tap repository and release remain separate launch steps.
+The public tap repository is [pedrotmr/homebrew-aerospace-tabs](https://github.com/pedrotmr/homebrew-aerospace-tabs). Homebrew maps its name from `brew tap pedrotmr/aerospace-tabs`.
 
 ## Cask file for the tap
 
-Save as `Casks/pedrotmr-aerospace-tabs.rb` in `pedrotmr/homebrew-aerospace-tabs`. The username prefix gives the cask a globally distinctive token, as recommended by Homebrew's tap naming guide. This uses the current app version as a starting point and assumes the proposed `v<version>` tag format. The first GitHub Release does not exist yet, so `sha256 :no_check` is only a placeholder for this preparation draft: calculate the SHA-256 from the final release zip and replace it before publishing the tap. Update `version`, URL, and checksum together for every release.
+Save as `Casks/pedrotmr-aerospace-tabs.rb` in `pedrotmr/homebrew-aerospace-tabs`. The username prefix gives the cask a globally distinctive token, as recommended by Homebrew's tap naming guide. This cask is pinned to the published v0.1.1 tag and its verified asset checksum. Update `version`, URL, and checksum together for every release.
 
 ```ruby
 cask "pedrotmr-aerospace-tabs" do
-  version "0.1.0"
-  sha256 :no_check
+  version "0.1.1"
+  sha256 "69bbad1776bb5a49d8efcbcf8f65607bb032f3de908d5d5866b9bf5f846e2e5f"
 
   url "https://github.com/pedrotmr/aerospace-tabs/releases/download/v#{version}/AerospaceTabs.zip"
   name "Aerospace Tabs"
@@ -41,11 +41,11 @@ end
 
 This uses the Cask Cookbook's required identity and download stanzas plus an `app` artifact. The versioned cask will be included in ordinary `brew upgrade` when the tap updates its version for each release. If the release uses a different tag format or asset name, update the URL to match it before publishing the tap. If the release is not universal, add architecture-specific URLs and real checksums rather than advertising support for both CPU families.
 
-CI extracts this block into a temporary local tap and runs `brew audit --cask --strict`. That checks the cask definition's syntax and style; it does not verify the future release asset, checksum, signing, or notarization.
+CI extracts this block into a temporary local tap and runs `brew audit --cask --strict`. That checks cask syntax and style; it does not download or verify the v0.1.1 asset, checksum, signing, or notarization. Those release artifact checks were performed separately.
 
 ## README install line
 
-Add this to the README's install section after the tap and its first release are available:
+Use this in the README's Install section:
 
 ```sh
 brew install --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
@@ -57,7 +57,7 @@ The fully qualified cask name installs the requested item from the third-party t
 
 [Acceptable Casks](https://docs.brew.sh/Acceptable-Casks) requires macOS apps in the official cask tap to pass Gatekeeper checks and forbids requiring Gatekeeper or System Integrity Protection to be disabled or bypassed. That is an official-tap acceptance rule, but the same Gatekeeper behavior affects people installing from a personal tap. Do not ask users to remove quarantine or turn off Gatekeeper to launch this app.
 
-The current [Makefile](../../Makefile) signs the app with the first local codesigning identity it finds, or ad-hoc (`-`) when none is installed. That is suitable for local development, not the release artifact. Its signing command also does not enable the hardened runtime or perform notarization. Before publishing the zip:
+The local [Makefile](../../Makefile) signs with the first local codesigning identity it finds, or ad-hoc (`-`) if none is installed; that path is for development. The release workflow signs with Developer ID, notarizes, staples the ticket, and builds the distribution zip. The v0.1.1 asset passed signature, stapler, and Gatekeeper checks. For future release updates, keep this process:
 
 1. Sign the app with an Apple Developer ID Application certificate, hardened runtime, and a secure timestamp. Include only the entitlements the app needs.
 2. Create a temporary ZIP and submit it with `notarytool`; Apple accepts ZIP archives, but not a bare `.app` bundle:
