@@ -8,7 +8,7 @@ Este arquivo fica em `pedrotmr/aerospace-tabs`. Termina quando o pull request ex
 
 Pare se qualquer item falhar.
 
-1. https://github.com/pedrotmr/aerospace-tabs/releases/tag/v0.1.1 está publicada, sem o rótulo Draft, com o arquivo `AerospaceTabs.zip`. Esta é a release estável. A tag `v0.1.0` não tem página nem ZIP.
+1. https://github.com/pedrotmr/aerospace-tabs/releases/tag/v0.1.1 está publicada, sem o rótulo Draft, com o arquivo `AerospaceTabs.zip`. Esta é a release estável. A tag `v0.1.0` não é uma GitHub Release e não inclui `AerospaceTabs.zip`.
 2. Num Mac com macOS 14+ e o AeroSpace já em execução: baixar o ZIP, mover `AerospaceTabs.app` para Aplicativos, abrir, permitir Acessibilidade, recusar Gravação de Tela, abrir duas janelas e ver a faixa no topo. Sair por **Quit Aerospace Tabs**.
 
 ## Enviar
