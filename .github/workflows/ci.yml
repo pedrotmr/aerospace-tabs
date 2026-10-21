@@ -15,6 +15,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Extract and audit documented cask
         shell: bash
         run: |
@@ -31,6 +33,7 @@ jobs:
             END { if (!in_cask || !closed) exit 1 }
           ' docs/launch/homebrew-tap.md > "${tap_dir}/Casks/aerospace-tabs.rb"
 
+          brew trust --cask pedrotmr/aerospace-tabs/aerospace-tabs
           brew audit --cask --strict --tap pedrotmr/aerospace-tabs
 
   test:
