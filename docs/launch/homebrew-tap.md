@@ -15,10 +15,10 @@ The public tap repository is [pedrotmr/homebrew-aerospace-tabs](https://github.c
 
 ## Cask file for the tap
 
-Save as `Casks/aerospace-tabs.rb` in `pedrotmr/homebrew-aerospace-tabs`. The tap name already provides the namespace, so the cask token can stay short. This cask is pinned to the published v0.1.1 tag and its verified asset checksum. Update `version`, URL, and checksum together for every release.
+Save as `Casks/pedrotmr-aerospace-tabs.rb` in `pedrotmr/homebrew-aerospace-tabs`. Casks need globally unique names. Homebrew's tap naming guide recommends prefixing a tap cask with the GitHub username, so this token uses `pedrotmr-`. This cask is pinned to the published v0.1.1 tag and its verified asset checksum. Update `version`, URL, and checksum together for every release.
 
 ```ruby
-cask "aerospace-tabs" do
+cask "pedrotmr-aerospace-tabs" do
   version "0.1.1"
   sha256 "69bbad1776bb5a49d8efcbcf8f65607bb032f3de908d5d5866b9bf5f846e2e5f"
 
@@ -48,7 +48,7 @@ CI extracts this block into a temporary local tap and runs `brew audit --cask --
 Use this in the README's Install section:
 
 ```sh
-brew install --cask pedrotmr/aerospace-tabs/aerospace-tabs
+brew install --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
 ```
 
 The fully qualified cask name installs the requested item from the third-party tap. A separate `brew tap pedrotmr/aerospace-tabs` is optional. Homebrew's tap naming and trust behavior are documented in [Taps](https://docs.brew.sh/Taps) and [Tap Trust](https://docs.brew.sh/Tap-Trust). Cask definitions are Ruby code and can run with the user's privileges, so users should only install a tap they trust.
