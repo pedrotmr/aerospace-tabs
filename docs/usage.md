@@ -11,7 +11,7 @@ The strip appears on a display when AeroSpace reports at least two windows there
 
 Three-finger swipe is enabled by default: swipe up to open the overview and down to close it. The optional hot corner starts disabled and can be selected from the strip's right-click menu. The gestures use the private macOS `MultitouchSupport` framework, so swipe detection may stop working after a macOS change. The strip menu remains available whenever the strip is visible.
 
-Global shortcuts are **Option-Tab** and **Option-`** to cycle windows in the focused workspace, and **Control-Option-Tab** and **Control-Option-`** to cycle occupied workspaces. Hold a shortcut to repeat; release Tab or backtick to stop.
+Global shortcuts are **Option-Tab** and **Option-Backtick** to cycle windows in the focused workspace, and **Control-Option-Tab** and **Control-Option-Backtick** to cycle occupied workspaces. Hold a shortcut to repeat; release Tab or backtick to stop.
 
 ## AeroSpace configuration and recovery
 
@@ -23,7 +23,7 @@ make restore-gaps
 
 When three-finger swipe is enabled, the app temporarily disables the matching native Mission Control gesture. A selected hot corner is also disabled while the app owns it. The Dock briefly restarts to apply these settings. On quit, saved values are restored only if they still match the values Aerospace Tabs applied.
 
-Choose **Choose Config Editor…** from the AeroSpace submenu once; **Open Config** uses that editor later. Opening the config leaves Aerospace Tabs and its gap adjustment running.
+Select **Choose Config Editor…** from the AeroSpace submenu once; **Open Config** uses that editor later. Opening the config leaves Aerospace Tabs and its gap adjustment running.
 
 ## Previews and privacy
 

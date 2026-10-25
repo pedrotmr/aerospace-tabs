@@ -15,7 +15,7 @@ After a release-worthy change reaches `main`, Release Please opens or updates a 
 
 The Release Please PR uses GitHub's built-in token, so it does not trigger the `pull_request` CI workflow. Source changes are tested on their PRs; the release workflow tests the tagged commit. If generated release PRs need CI checks before merge, configure Release Please with a GitHub App or personal access token.
 
-If signing, tests, or upload fail after the draft is created, rerun the failed jobs in Actions. A full workflow rerun can skip packaging because the draft already exists.
+If a job fails, use **Re-run failed jobs** from that run when available. To build an existing draft in a fresh run, open **Actions → Release → Run workflow** on `main`, enter its tag in `release_tag`, and run it. The workflow verifies the release is still a draft, then reruns tests, packaging, signing, notarization, and ZIP upload; the ZIP is replaced on the draft. Review and publish the draft manually after success.
 
 Before the first release, enable **Allow GitHub Actions to create and approve pull requests** in repository **Settings → Actions → General**. Configure these repository secrets:
 
