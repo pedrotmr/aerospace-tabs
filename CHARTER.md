@@ -19,11 +19,12 @@ Requires a running AeroSpace. If AeroSpace’s socket/subscribe API changes, we 
 
 AeroSpace users (the maintainer included).
 
-## Support and ceiling
+## Support and maintenance
 
-- Public repository: yes
-- Issues and PRs: welcome, **best-effort**, no SLA
-- **Performance** beats new features
+- The repository remains public, and the latest published release is `v0.1.1`.
+- Development is paused as of 2026-10-25. Occasional maintenance may happen, but no replies or new releases are promised.
+- Issues and pull requests are welcome on a best-effort basis, with no SLA.
+- **Performance** beats new features.
 
 New ideas must pass the feature fence:
 
@@ -34,10 +35,4 @@ New ideas must pass the feature fence:
 
 Fail any → no (or file an issue and move on).
 
-## Milestone order
-
-1. **Reliability**: strip does not vanish spuriously; gaps always restore; Mission Control / Dock detection stays honest
-2. **Feel**: strip when **2+** windows; overview stays responsive with many windows and shows window content; intentional visual language; then share
-3. **Share**: public GitHub repo (MIT), stranger-ready README + Accessibility notes, screenshot/GIF, GitHub Release with `.app`/zip. Homebrew and notarization come later.
-
-This file is the durable north star for the project.
+This file records the project's scope and support expectations.

@@ -29,9 +29,10 @@ build-universal:
 
 assemble-app:
 	rm -rf $(APP)
-	mkdir -p $(APP)/Contents/MacOS
+	mkdir -p $(APP)/Contents/MacOS $(APP)/Contents/Resources
 	cp "$(APP_BINARY)" $(APP)/Contents/MacOS/AerospaceTabs
 	cp Resources/Info.plist $(APP)/Contents/Info.plist
+	cp Resources/AerospaceTabs.icns $(APP)/Contents/Resources/AerospaceTabs.icns
 ifdef APP_VERSION
 	/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $(APP_VERSION)" $(APP)/Contents/Info.plist
 endif
