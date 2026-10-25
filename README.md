@@ -1,120 +1,42 @@
 # Aerospace Tabs
 
-A companion for people who already run [AeroSpace](https://github.com/nikitabobko/AeroSpace). AeroSpace tiles; this app lists and focuses windows, keeps a local tab order, and shows a visual overview grouped by AeroSpace workspace.
+A small macOS companion for [AeroSpace](https://github.com/nikitabobko/AeroSpace). AeroSpace tiles windows; Aerospace Tabs adds a tab strip for finding and focusing them, plus a visual overview grouped by AeroSpace workspace.
 
-See [CHARTER.md](CHARTER.md) for what this is, what it isn’t, and how support works (**best-effort**, no SLA).
+> **Maintenance:** Development is paused. Issues and pull requests are welcome on a best-effort basis, but replies and new releases are not promised.
 
-## Features
+![Placeholder: real multi-workspace screenshot pending](Screenshots/aerospace-tabs-workspaces-placeholder.svg)
 
-- Top tab strip groups windows from every occupied AeroSpace workspace on each screen, with numbered spaces in ascending order (shown when that screen has **2+** windows total)
-- Click a tab to focus; drag to reorder within its workspace
-- Window Overview shows image-only previews from all occupied AeroSpace workspaces, grouped by workspace across every connected display
-- Hover to reveal a window’s title without zooming; click a preview or use the keyboard to focus its window
-- Three-finger swipe up opens the overview, and swipe down closes it; choose an optional hot corner from the strip’s right-click menu
-- Cached previews appear immediately, then visible windows stream live at up to 30 fps while the overview is open
-- Option-Tab / Option-`` ` `` to cycle windows in the focused space (hold to repeat; release Tab/`` ` `` to stop)
-- Control-Option-Tab / Control-Option-`` ` `` to cycle occupied spaces
-- Mirrors app notification badges from the Dock on matching tabs
-- The tab strip hides during native Mission Control / App Exposé
-- Shows a reconnecting status instead of stale tabs if AeroSpace becomes unavailable
-- Temporarily boosts AeroSpace `gaps.outer.top` so windows clear the strip; restores on quit
-- The right-click menu groups strip settings, AeroSpace config controls, and quit actions; quitting AeroSpace also closes its companion
+*This is a labeled placeholder, not a screenshot of the app. See [capture notes](docs/SCREENSHOT.md).*
 
-![Aerospace Tabs strip grouped by AeroSpace workspace](Screenshots/aerospace-tabs-strip.png)
+## Quick start
 
-Illustrative strip rendered from synthetic window data; it contains no live desktop content.
+1. Install and start [AeroSpace](https://github.com/nikitabobko/AeroSpace).
+2. Install Aerospace Tabs:
 
-![Aerospace Tabs reconnecting after AeroSpace becomes unavailable](Screenshots/aerospace-tabs-disconnected.png)
+   ```sh
+   brew install --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
+   ```
 
-Illustrative disconnected state rendered from synthetic data; the app retries automatically and hides stale tabs.
+3. Open **Aerospace Tabs** from Applications. Allow **Accessibility** when macOS asks.
+4. With two or more windows open on that display, right-click the strip and choose **Open Window Overview**. Use the arrow keys and Return to focus a window; Escape closes the overview.
 
-Select **Choose Config Editor…** once from the AeroSpace submenu; **Open Config** uses that editor on later openings. Opening the config keeps Aerospace Tabs running with its current tab strips and gap boost active.
+Alternatively, add the tap once with `brew tap pedrotmr/aerospace-tabs`, then run `brew install --cask pedrotmr-aerospace-tabs`.
 
-## Install
+## What it does
 
-Install the latest stable release from the [Homebrew tap](https://github.com/pedrotmr/homebrew-aerospace-tabs). Both methods install the same app.
+- Lists AeroSpace windows from occupied workspaces on each display. The strip appears when that display has two or more windows.
+- Click a tab to focus its window; drag to change its local order.
+- Shows a full-screen overview grouped by workspace. Three-finger swipe opens it by default; an optional hot corner is available from the strip menu.
+- Keeps AeroSpace responsible for tiling and layout.
 
-One option adds the tap and installs the app in a single command:
+## Requirements and limits
 
-```sh
-brew install --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
-```
+- macOS 14 or later, with AeroSpace installed and running.
+- Accessibility enables global shortcuts and Dock notification badges. Screen Recording is optional and enables window previews.
+- The app temporarily increases AeroSpace's `gaps.outer.top` while running, then restores it on quit. Recovery instructions are in [usage notes](docs/usage.md).
+- Trackpad swipe detection uses macOS's private `MultitouchSupport` framework and may break after system updates. Window previews stay in memory and are not saved or sent off-device.
+- This is not a window manager and does not manage native macOS Spaces.
 
-Or add the tap once, then install with the shorter name:
+## Help and development
 
-```sh
-brew tap pedrotmr/aerospace-tabs
-brew install --cask pedrotmr-aerospace-tabs
-```
-
-## Requirements
-
-- macOS 14 or later
-- [AeroSpace](https://github.com/nikitabobko/AeroSpace) running
-- Accessibility permission (for global shortcuts and Dock notification badges)
-- Screen Recording permission (optional, for window thumbnails; app icons remain as placeholders without it)
-
-Trackpad swipe detection uses the macOS MultitouchSupport private framework at runtime and retries when a compatible trackpad is temporarily unavailable at launch or after wake. While the three-finger trigger is enabled, Aerospace Tabs temporarily disables the matching macOS Mission Control gesture. A selected hot corner is temporarily disabled in Dock settings while Aerospace Tabs owns it. Dock restarts briefly to apply these changes. On disable or quit, saved settings are restored only if the native value still matches the value Aerospace Tabs applied; otherwise the changed setting is left alone. A force-quit keeps saved values for restoration on the next clean exit. The optional hot corner is configured from the strip’s right-click menu and starts disabled.
-
-Right-click a visible strip and choose **Open Window Overview** to open it directly. Use the arrow keys to move, Return to focus a window, and Escape to close immediately. Clicking the empty background also closes the overview. Previews are captured while the overview is open and kept in a bounded memory cache between openings. While the overview is open, visible windows stream live at up to 30 fps at a resolution matched to the display’s backing scale; streams stop when it closes. Closing also stops preview timers, drops queued captures, and releases the overview views. No screenshots or videos are saved to disk.
-
-## Build and run from source
-
-```bash
-git clone https://github.com/pedrotmr/aerospace-tabs.git
-cd aerospace-tabs
-make run
-```
-
-This builds and opens `AerospaceTabs.app`. On first launch, grant Accessibility access when macOS asks; it enables global shortcuts and notification badges. Screen Recording is optional and enables live window previews in Window Overview. Without it, app icons are shown instead.
-
-## Gaps
-
-On launch the app adds strip height to your `gaps.outer.top`, keeps a backup next to your AeroSpace config, and restores on quit.
-
-If Aerospace Tabs is force-quit before cleanup, the next launch restores any leftover gap boost automatically. To restore it manually without opening the app, run:
-
-```bash
-make restore-gaps
-# or
-./.build/release/AerospaceTabs --restore-gaps
-```
-
-## Project notes
-
-- [Window Overview behavior and implementation](WINDOW-OVERVIEW.md)
-
-## Releases
-
-Release Please reads Conventional Commit messages from `main`:
-
-- `fix:`, `perf:`, and `revert:` request a patch version bump.
-- `feat:` requests a minor version bump.
-- A `!` after a recognized type, such as `feat!:`, or a `BREAKING CHANGE:` footer requests a major bump.
-- `docs:`, `style:`, `chore:`, `refactor:`, `test:`, `build:`, and `ci:` do not create a release by themselves and are hidden from release notes. Their changes are included in the next release that has a release-worthy commit.
-
-For squash merges, the pull request title becomes the commit message Release Please reads. For merge commits or rebase merges, it reads the individual commit messages instead. Use Conventional Commit messages so versioning and release notes are predictable.
-
-After changes reach `main`, Release Please opens or updates a release pull request with the version and release notes. Review and merge that pull request when the release is ready. The workflow creates a draft GitHub Release, signs the universal app with Developer ID, submits it to Apple's notary service, staples the accepted ticket to the app, and attaches the resulting `AerospaceTabs.zip`. Review the draft and publish it when ready. You do not create a tag or write the release title or notes yourself.
-
-After you publish that release, update Homebrew before announcing the version. Set `version` to the release number without the leading `v`, and set `sha256` to the checksum of the published `AerospaceTabs.zip`, in both of these files:
-
-- [`Casks/pedrotmr-aerospace-tabs.rb`](https://github.com/pedrotmr/homebrew-aerospace-tabs/blob/HEAD/Casks/pedrotmr-aerospace-tabs.rb) in [pedrotmr/homebrew-aerospace-tabs](https://github.com/pedrotmr/homebrew-aerospace-tabs)
-- the cask block in [docs/launch/homebrew-tap.md](docs/launch/homebrew-tap.md#after-each-published-release)
-
-The install commands above stay the same. `brew upgrade` follows the version pinned in the tap cask. The steps and the `shasum` command are in [After each published release](docs/launch/homebrew-tap.md#after-each-published-release).
-
-Release Please uses GitHub's built-in token, so its generated metadata PR does not start the `pull_request` CI workflow. The app source is tested on its own PRs, and the release workflow runs `swift test` at the tagged commit before attaching the ZIP. If you later require CI checks on generated release PRs before merge, configure Release Please with a GitHub App or personal access token instead.
-
-If signing, the build, tests, or upload fail after the draft is created, open that failed run in Actions and choose **Re-run failed jobs**. This retries the existing release; a full rerun can skip packaging because Release Please has already created the draft.
-
-Before the first release, enable **Allow GitHub Actions to create and approve pull requests** under the repository’s **Settings → Actions → General**. Add these repository secrets:
-
-- `DEVELOPER_ID_CERTIFICATE_P12_BASE64` and `DEVELOPER_ID_CERTIFICATE_PASSWORD` for Developer ID signing.
-- `APPLE_NOTARY_KEY_P8_BASE64`, `APPLE_NOTARY_KEY_ID`, and `APPLE_NOTARY_ISSUER_ID` for Apple's notary service. Use a team App Store Connect API key with access to notarization.
-
-## License
-
-MIT
-
-See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for the AeroKit multitouch-layout attribution.
+Report a problem in [GitHub Issues](https://github.com/pedrotmr/aerospace-tabs/issues). See [contribution and build instructions](CONTRIBUTING.md), [project scope](CHARTER.md), and [Window Overview details](WINDOW-OVERVIEW.md). The project is MIT licensed.

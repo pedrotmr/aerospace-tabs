@@ -6,6 +6,8 @@
   	<string>en</string>
   	<key>CFBundleExecutable</key>
   	<string>AerospaceTabs</string>
+	<key>CFBundleIconFile</key>
+	<string>AerospaceTabs.icns</string>
   	<key>CFBundleIdentifier</key>
   	<string>com.pedrotmr.AerospaceTabs</string>
   	<key>CFBundleInfoDictionaryVersion</key>
