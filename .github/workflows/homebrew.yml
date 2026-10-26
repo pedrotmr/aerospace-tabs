@@ -1,0 +1,104 @@
+name: Sync Homebrew tap
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: homebrew-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  sync-cask:
+    if: github.event.release.draft == false && github.event.release.prerelease == false
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+
+      - name: Require the tap token
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$HOMEBREW_TAP_TOKEN" ]]; then
+            echo "::error::Add HOMEBREW_TAP_TOKEN with Contents: Read and write access to pedrotmr/homebrew-aerospace-tabs."
+            exit 1
+          fi
+
+      - name: Check stable release and download ZIP
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::Only vMAJOR.MINOR.PATCH releases can update Homebrew."
+            exit 1
+          fi
+          release_json=$(gh release view "$RELEASE_TAG" --repo "pedrotmr/aerospace-tabs" --json isDraft,isPrerelease)
+          if [[ "$(jq -r '.isDraft' <<< "$release_json")" != false || "$(jq -r '.isPrerelease' <<< "$release_json")" != false ]]; then
+            echo "::error::Only published stable releases can update the Homebrew tap."
+            exit 1
+          fi
+          version=${RELEASE_TAG#v}
+          mkdir -p "$RUNNER_TEMP/release"
+          gh release download "$RELEASE_TAG" --repo "pedrotmr/aerospace-tabs" \
+            --pattern "AerospaceTabs-$version.zip" --dir "$RUNNER_TEMP/release"
+          archive="$RUNNER_TEMP/release/AerospaceTabs-$version.zip"
+          scripts/verify-release-zip.sh "$archive" "$RELEASE_TAG"
+          sha256=$(shasum -a 256 "$archive" | awk '{ print $1 }')
+          echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
+          echo "RELEASE_SHA256=$sha256" >> "$GITHUB_ENV"
+
+      - name: Check out tap
+        uses: actions/checkout@v7
+        with:
+          repository: pedrotmr/homebrew-aerospace-tabs
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Create and audit the cask
+        env:
+          VERSION: ${{ env.RELEASE_VERSION }}
+          SHA256: ${{ env.RELEASE_SHA256 }}
+        run: |
+          set -euo pipefail
+          trust_config=$(mktemp -d)
+          trap 'rm -rf "$trust_config"' EXIT
+          export XDG_CONFIG_HOME="$trust_config"
+          export HOMEBREW_NO_AUTO_UPDATE=1
+          python3 scripts/update-cask.py \
+            --tap-dir tap \
+            --version "$VERSION" \
+            --sha256 "$SHA256" \
+            --owner "pedrotmr" \
+            --slug "aerospace-tabs" \
+            --cask-token "pedrotmr-aerospace-tabs" \
+            --bundle-id "com.pedrotmr.AerospaceTabs" \
+            --app-name "AerospaceTabs" \
+            --app-display-name "AeroSpace Tabs" \
+            --description "Window tabs and overview for AeroSpace" \
+            --min-macos "14.0" \
+            --sparkle "yes"
+          cd tap
+          tap_name="pedrotmr/aerospace-tabs"
+          brew tap --custom-remote "$tap_name" "file://$PWD"
+          tap_dir=$(brew --repository "$tap_name")
+          mkdir -p "$tap_dir/Casks"
+          cp "Casks/pedrotmr-aerospace-tabs.rb" "$tap_dir/Casks/pedrotmr-aerospace-tabs.rb"
+          brew trust --cask "$tap_name/pedrotmr-aerospace-tabs"
+          brew style --cask "$tap_name/pedrotmr-aerospace-tabs"
+          brew audit --cask --strict --online "$tap_name/pedrotmr-aerospace-tabs"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "Casks/pedrotmr-aerospace-tabs.rb"
+          if ! git diff --cached --quiet; then
+            git commit -m "Update AeroSpace Tabs to $VERSION"
+            git push
+          fi

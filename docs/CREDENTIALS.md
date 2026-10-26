@@ -1,84 +1,112 @@
 # Release credentials
 
-## The short answer
+Normal local work needs no credentials. Signed release checks use Apple keys. Sparkle and Homebrew need extra keys when those modules are enabled.
 
-Each app repository needs six GitHub settings:
+## Settings for one app
 
-- Four secrets. GitHub hides their values after you save them.
-- Two variables. These are public Apple IDs.
+| Name | GitHub type | Scope | What it does | Where to get it |
+| --- | --- | --- | --- | --- |
+| `APPLE_NOTARY_KEY_P8_BASE64` | Secret | Apple team | Sends the app to Apple's notary service | Base64 text from a Team API `.p8` key |
+| `APPLE_NOTARY_KEY_ID` | Variable | Apple team | Names the `.p8` key | App Store Connect API page |
+| `APPLE_NOTARY_ISSUER_ID` | Variable | Apple team | Names the Apple team | App Store Connect API page |
+| `DEVELOPER_ID_CERTIFICATE_P12_BASE64` | Secret | Apple team | Signs the app | Base64 text from a Developer ID `.p12` file |
+| `DEVELOPER_ID_CERTIFICATE_PASSWORD` | Secret | Apple team | Opens the `.p12` file | Password used when exporting the certificate |
+| `SPARKLE_PRIVATE_KEY` | Secret | This app | Signs this app's update feed | Sparkle `generate_keys` tool |
+| `HOMEBREW_TAP_TOKEN` | Secret | This tap | Lets this app update one cask | Fine-grained GitHub token for the tap |
 
-The apps share three Apple secrets and both Apple IDs. Each app has its own Sparkle key. Across both apps, that is five secret values and two public IDs.
+An app with Sparkle and Homebrew uses five secrets and two variables. The three Apple secrets and two Apple IDs can be shared by apps on the same Apple team. Each app needs its own Sparkle key. Each tap needs its own Homebrew token.
 
-Each app has an ignored `.env` file with the same six release names. Fill the files before you add values to GitHub. Keep each file private. GitHub cannot show a saved secret again.
+GitHub creates `GITHUB_TOKEN` for Actions. Do not add that token.
 
-## The six settings
+## Keep a local copy
 
-| Name | GitHub type | What it is | Shared? |
-| --- | --- | --- | --- |
-| `DEVELOPER_ID_CERTIFICATE_P12_BASE64` | Secret | Base64 text from a `.p12` file. It holds your Developer ID certificate and private key. | Yes |
-| `DEVELOPER_ID_CERTIFICATE_PASSWORD` | Secret | Password used when you export that certificate file. | Yes |
-| `APPLE_NOTARY_KEY_P8_BASE64` | Secret | Base64 text from the private `.p8` file for your App Store Connect Team key. | Yes |
-| `SPARKLE_PRIVATE_KEY` | Secret | Private key that signs this app's update feed. | No |
-| `APPLE_NOTARY_KEY_ID` | Variable | Public ID for the App Store Connect key. | Yes |
-| `APPLE_NOTARY_ISSUER_ID` | Variable | Public ID for your Apple team. | Yes |
+Each project has a private, ignored `.env` file. `make setup` creates it if it is missing. Put one value on each line and use it as your local copy before adding values to GitHub. Do not commit it or send it in chat. Base64 is encoding. It does not encrypt a key.
 
-## Get the Apple values
+The wizard lists only the values this app uses:
 
-The two local `.env` files now contain a password-protected export of your valid Developer ID certificate. The export came from your Keychain. You do not need a new certificate.
-
-A local `Apple Auth Key.p8` file was found. Its Base64 copy is now in both `.env` files. In App Store Connect, check that the file belongs to a **Team API key**. A Team key works with Apple's notarization tool; an individual key does not. If this is not a Team key, create one under **Users and Access → Integrations → App Store Connect API → Team Keys**. An Account Holder or Admin may need to create it. The Account Holder must request access if API access is off. Download the Team `.p8` file once and keep a safe backup. See [Apple API key help](https://developer.apple.com/help/app-store-connect/get-started/app-store-connect-api/).
-
-Copy the matching Key ID to `APPLE_NOTARY_KEY_ID`. Copy the Issuer ID shown near the top of **Users and Access → Integrations → App Store Connect API** to `APPLE_NOTARY_ISSUER_ID`. Use the same two IDs in both apps. See [Apple certificate help](https://developer.apple.com/help/account/certificates/certificates-overview/).
-
-## Get the Sparkle key
-
-The AeroSpace Tabs Sparkle key is in your Keychain. Its public key matches this app's `Config/App.xcconfig`. A private copy is now saved in this ignored `.env` file. Use this value for the GitHub secret. Do not use it for GitBar.
-
-GitHub hides the old secret value, so I could not compare it. If you need to export the Keychain key again, use:
-
-```sh
-.build/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys --account aerospace-tabs -x /private/path/aerospace-tabs-sparkle-key
+```text
+APPLE_NOTARY_KEY_P8_BASE64=
+APPLE_NOTARY_KEY_ID=
+APPLE_NOTARY_ISSUER_ID=
+DEVELOPER_ID_CERTIFICATE_P12_BASE64=
+DEVELOPER_ID_CERTIFICATE_PASSWORD=
+SPARKLE_PRIVATE_KEY=
+HOMEBREW_TAP_TOKEN=
 ```
 
-The command writes the private key to the file. Keep that file private.
-
-Do not use this key for GitBar. The public key is already in `Config/App.xcconfig`. It is not a GitHub secret. See [Sparkle's key and update guide](https://sparkle-project.org/documentation/publishing/).
-
-## Put the six values in GitHub
-
-Open **Settings → Secrets and variables → Actions** in this repository.
-
-Add these four names under **Secrets**:
-
-- `DEVELOPER_ID_CERTIFICATE_P12_BASE64`
-- `DEVELOPER_ID_CERTIFICATE_PASSWORD`
-- `APPLE_NOTARY_KEY_P8_BASE64`
-- `SPARKLE_PRIVATE_KEY`
-
-Add these two names under **Variables**:
-
-- `APPLE_NOTARY_KEY_ID`
-- `APPLE_NOTARY_ISSUER_ID`
-
-## Keep the values safe
-
-The `.env` file is plain text. Keep it on this Mac. Its GitHub ignore rule is already set. Keep its file permission at `600`. Store the original `.p12`, `.p8`, passwords, and private keys in encrypted storage. Base64 does not protect a secret.
-
-Other local app keys may also be in `.env`. They are not part of these six GitHub release settings.
-
-If you lose the `.p8` file, create a new Team key. Update the `.p8`, Key ID, and Issuer ID in both app repositories. If the Developer ID certificate expires, export a new `.p12` and update its password in both repositories. Keep a different Sparkle key for each app.
-
-`GITHUB_TOKEN` is created by GitHub Actions. Do not add it. `CODESIGN_IDENTITY` is an optional local setting. It is not a GitHub secret.
-
-## Check the settings
-
-Before a signed check, confirm that all six values are set in `.env`. The Key ID must belong to the `.p8` file. If both apps use the same Team API key, use the same Key ID and Issuer ID in both repositories.
-
-`make check` does not need release credentials. `make release-check APP_BUILD_NUMBER=<new-number>` signs a test build and sends it to Apple for notarization. It checks the Sparkle feed and does not publish a release.
-
-Check setting names without viewing secret values:
+To copy a file as Base64 without printing it in Terminal:
 
 ```sh
-gh secret list --repo pedrotmr/aerospace-tabs
-gh variable list --repo pedrotmr/aerospace-tabs
+base64 -i ~/Downloads/AuthKey_<KEY_ID>.p8 | tr -d '\n' | pbcopy
+base64 -i ~/Downloads/DeveloperID.p12 | tr -d '\n' | pbcopy
 ```
+
+Paste the clipboard text into the matching `.env` line. Keep the original `.p8` and `.p12` files in encrypted storage.
+
+## Get Apple values
+
+### Notary key
+
+1. In App Store Connect, open **Users and Access → Integrations → App Store Connect API**.
+2. Create or select a **Team API key**. Save its `.p8` file once.
+3. Put the file's Base64 text in `APPLE_NOTARY_KEY_P8_BASE64`.
+4. Put its Key ID in `APPLE_NOTARY_KEY_ID` and the team Issuer ID in `APPLE_NOTARY_ISSUER_ID`.
+
+Use the same `.p8`, Key ID, and Issuer ID for apps on the same Apple team.
+
+### Developer ID certificate
+
+1. Open Keychain Access. Find the **Developer ID Application** identity with its private key.
+2. Export it as a `.p12` file. Set a password and save that password in a password manager.
+3. Put the file's Base64 text in `DEVELOPER_ID_CERTIFICATE_P12_BASE64`.
+4. Put the export password in `DEVELOPER_ID_CERTIFICATE_PASSWORD`.
+
+Use the same certificate and password for apps signed by that Apple team. Update both values together if you export it again.
+
+## Get optional module values
+
+### Sparkle
+
+Run `make setup`, then use Sparkle's `generate_keys` tool once for this app:
+
+```sh
+tool=.build/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys
+"$tool" --account <app-slug>
+"$tool" --account <app-slug> -x /private/path/<app-slug>-sparkle-key
+```
+
+Save the private key in `SPARKLE_PRIVATE_KEY`. Put the matching public key in `Config/App.xcconfig`. Back up the private key. Do not reuse it for another app.
+
+Do not add a `SPARKLE_PUBLIC_KEY` GitHub setting. The public key is named `SPARKLE_PUBLIC_ED_KEY`. Keep it in `Config/App.xcconfig`.
+
+### Homebrew
+
+1. Create the tap repository `homebrew-aerospace-tabs` under `pedrotmr`.
+2. On GitHub, open **Settings → Developer settings → Personal access tokens → Fine-grained tokens** and create a token.
+3. Choose `pedrotmr` as the owner. Give the token access only to `homebrew-aerospace-tabs`.
+4. Give it **Contents: Read and write** permission.
+5. Save the token in `HOMEBREW_TAP_TOKEN` and add it to this app repository as a secret.
+
+Each tap needs its own token. The app workflow uses it only to push the cask update after a stable release. It does not need a token in the tap repository.
+
+## Add values to GitHub
+
+Open this app repository. Go to **Settings → Secrets and variables → Actions**.
+
+1. Add secret values under **Secrets**.
+2. Add `APPLE_NOTARY_KEY_ID` and `APPLE_NOTARY_ISSUER_ID` under **Variables**.
+3. Add `SPARKLE_PRIVATE_KEY` and `HOMEBREW_TAP_TOKEN` only when those modules are enabled.
+
+GitHub hides secret values after you save them. Keep the local `.env` as your copy. Check names without showing values:
+
+```sh
+cut -d= -f1 .env
+gh secret list --repo <owner>/<app-repo>
+gh variable list --repo <owner>/<app-repo>
+```
+
+## Back up and replace keys
+
+Keep the `.p8`, `.p12`, export password, Sparkle private key, and tap token in encrypted storage. If an Apple API key changes, update the `.p8`, Key ID, and Issuer ID in each app repository. If the signing certificate changes, update the `.p12` and password together. If a Sparkle key changes, update only that app and plan the change before shipping it. If a tap token expires, create a new token for that tap and replace the secret in the app repository.
+
+`make check` needs no secrets. For a local signed check, import the Developer ID identity into Keychain Access. `make release-check APP_BUILD_NUMBER=<new-number>` reads `APPLE_NOTARY_*` and, when enabled, `SPARKLE_PRIVATE_KEY` from `.env`. GitHub Actions reads the P12 and password from GitHub and imports them into a temporary keychain. The Homebrew token is used only by the stable-release workflow.

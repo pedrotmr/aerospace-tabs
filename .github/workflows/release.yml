@@ -30,7 +30,7 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || steps.release.outputs.tag_name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: github.event_name == 'push'
         with:
           persist-credentials: false
@@ -38,7 +38,7 @@ jobs:
       - name: Create or update Release Please draft PR
         id: release
         if: github.event_name == 'push'
-        uses: googleapis/release-please-action@v4
+        uses: googleapis/release-please-action@v5
         with:
           config-file: .release-please-config.json
           manifest-file: .release-please-manifest.json
@@ -84,7 +84,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -133,7 +133,7 @@ jobs:
         run: make release-check APP_BUILD_NUMBER="${GITHUB_RUN_NUMBER}"
 
       - name: Upload verified files from this draft build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: aerospace-tabs-release-${{ github.run_number }}
           path: |
@@ -160,7 +160,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: aerospace-tabs-release-${{ github.run_number }}
           path: .build/release

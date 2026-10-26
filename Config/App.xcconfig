@@ -16,6 +16,7 @@ GENERATE_INFOPLIST_FILE = NO
 APP_COPYRIGHT = Copyright © 2026 pedrotmr
 RELEASE_OWNER = pedrotmr
 RELEASE_SLUG = aerospace-tabs
+SPARKLE_ENABLED = YES
 SPARKLE_FEED_URL = https:/$()/github.com/$(RELEASE_OWNER)/$(RELEASE_SLUG)/releases/latest/download/appcast.xml
 SPARKLE_PUBLIC_ED_KEY = XwofBdNg9v/sbXo3mTnl7hr4a3dKPJr8dZ+CQIPq4Cg=
 
