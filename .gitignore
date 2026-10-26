@@ -4,3 +4,4 @@ AerospaceTabs.app/
 .DS_Store
 .swiftpm/
 .env
+.env.*
