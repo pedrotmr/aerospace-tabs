@@ -129,6 +129,8 @@ appcast_dir="$release_dir/appcast"
 mkdir -p "$appcast_dir"
 
 hdiutil create -ov -format UDZO -volname "$APP_NAME" -srcfolder "$app_path" "$dmg_path"
+codesign --force --timestamp --sign "$identity" "$dmg_path"
+codesign --verify --verbose=2 "$dmg_path"
 notary_key_path=$(mktemp "${TMPDIR:-/tmp}/notary-key.XXXXXX")
 notary_result="$release_dir/notary-result.json"
 notary_log="$release_dir/notary-log.json"
@@ -162,7 +164,7 @@ xcrun stapler validate "$app_path"
 xcrun stapler staple "$dmg_path"
 xcrun stapler validate "$dmg_path"
 spctl --assess --type execute --verbose=2 "$app_path"
-spctl --assess --type open --verbose=2 "$dmg_path"
+spctl --assess --type open --context context:primary-signature --verbose=2 "$dmg_path"
 
 # Create the Sparkle archive only after the notarization ticket is stapled.
 ditto -c -k --sequesterRsrc --keepParent "$app_path" "$zip_path"
