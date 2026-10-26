@@ -1,39 +1,108 @@
 # Release credentials
 
-Never send credentials in chat, commit them, print them in logs, or place them in artifacts. Base64 is encoding, not encryption. Keep local values in an encrypted password manager or Keychain; `.env.example` contains names only. The local Developer ID identity can remain in Keychain and does not need to be copied into `.env`.
+## The short answer
 
-GitHub settings are under **Repository → Settings → Secrets and variables → Actions**. Add secret material with **New repository secret** and public identifiers with **New repository variable**. See [Apple API key instructions](https://developer.apple.com/help/app-store-connect/get-started/app-store-connect-api/), [Apple certificate instructions](https://developer.apple.com/help/account/certificates/certificates-overview/), and [GitHub Actions secret instructions](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets). Apple credentials may be shared by apps on the same Developer ID team. The Sparkle key is exclusive to Aerospace Tabs.
+Each app repository needs six GitHub settings:
 
-| Name | Purpose and type | Scope | Obtain and configure | Local use and safe verification | Backup, rotation, and loss |
-| --- | --- | --- | --- | --- | --- |
-| `DEVELOPER_ID_CERTIFICATE_P12_BASE64` | Secret. Encoded PKCS#12 Developer ID Application certificate and private key. | Apple Developer team; configure for this repository (or an approved organization secret). | In the Apple Developer account, open **Certificates, Identifiers & Profiles → Certificates**, create a **Developer ID Application** certificate with a CSR from Keychain Access, then download and install it. In Keychain Access, export that identity with its private key to a password-protected `.p12`. Encode the file without line breaks and add it as a repository secret. An Account Holder or Admin must create distribution certificates. | Locally import the `.p12` into login Keychain. `security find-identity -v -p codesigning` lists certificate names only. CI confirms it can import the identity. | Keep the original `.p12` and password in encrypted backup. Rotate before expiry or revocation and update both app repositories. Losing it blocks new signed updates; installed copies still run. |
-| `DEVELOPER_ID_CERTIFICATE_PASSWORD` | Secret. Password protecting the `.p12`. | Same Apple team and repository scope as the certificate. | Set the password chosen when exporting the certificate. Add it as a repository secret. | Not needed when the identity is already in local Keychain. A successful release check proves the password is valid without displaying it. | Store separately from the `.p12`. If lost, export a new archive from a valid Keychain identity and update the secret. |
-| `CODESIGN_IDENTITY` | Optional local setting; not a secret. | Mac user/keychain. | Use the certificate's SHA-1 identity printed by `security find-identity -v -p codesigning` only when more than one Developer ID identity is installed. | The local release check also selects the available Developer ID Application identity automatically. Do not add this setting to GitHub Actions. | No backup needed; it selects a certificate already in Keychain. |
-| `APPLE_NOTARY_KEY_P8_BASE64` | Secret. App Store Connect API private key used by `notarytool`. | Apple team/account; may serve both apps. | In App Store Connect, create a Team API key under Users and Access → Integrations → App Store Connect API → Team Keys. Individual API keys cannot use notaryTool. An Account Holder or Admin can create a Team key; the Account Holder must request API access first if it is not enabled. Download the `.p8` private key once, keep an encrypted backup, encode it without line breaks, and add it as this repository secret. | Local `.env` or process environment only. A successful `notarytool submit` and accepted log verifies it without printing the key. | Keep the `.p8` in encrypted backup. If lost, create a replacement key, update both repositories, validate it, and then revoke the old key. |
-| `APPLE_NOTARY_KEY_ID` | Public identifier; GitHub Actions variable, not a secret. | Apple team/account; shared for this notary API key. | Copy the Key ID shown when creating the App Store Connect API key. Add a repository variable. | May be in local `.env`. `gh variable list --repo pedrotmr/aerospace-tabs` displays names only; the release check verifies it with the private key. | Record it with the `.p8` backup. Update it when replacing the API key; it stops working when the old key is revoked. |
-| `APPLE_NOTARY_ISSUER_ID` | Public identifier; GitHub Actions variable, not a secret. | Apple team/account; shared across apps on that account. | Copy the Issuer ID from App Store Connect → Users and Access → Integrations → App Store Connect API. Add a repository variable. | May be in local `.env`; list configured names with `gh variable list`. A successful notary submission verifies it. | Record it with the API key details. Confirm it still matches the team after key rotation. |
-| `SPARKLE_PRIVATE_KEY` | Secret EdDSA key for signing this app's update feed. Do not reuse it for another product. | Aerospace Tabs app only, stored as this repository's secret. | `make setup` resolves Sparkle tools. Use `generate_keys --account aerospace-tabs` to create or inspect the app-specific Keychain entry. Back up the private key to encrypted storage without printing it, then add it as `SPARKLE_PRIVATE_KEY` in this repository's Actions secrets. Preserve the existing key for future releases. | Local release checks use the Keychain entry or ignored `.env`. `gh secret list --repo pedrotmr/aerospace-tabs` shows names only. `make release-check` verifies the generated EdDSA signature. | Keep a restricted encrypted backup. Rotation requires a tested transition and a public-key update. Losing the key prevents current Sparkle-enabled installs from trusting future feed signatures. |
-| `SPARKLE_PUBLIC_ED_KEY` | Public EdDSA key in `Config/App.xcconfig`; versioned, not a secret. | Aerospace Tabs app only. | `generate_keys -p --account aerospace-tabs` prints the public key. Store it in the xcconfig and check it against the signing key. | `make check` confirms it is present in the built bundle. It does not belong in GitHub Secrets. | Keep it in source control. Change only with a tested private-key rotation; an unplanned change breaks installed updater clients. |
-| `SPARKLE_KEYCHAIN_ACCOUNT` | Public local setting derived from `RELEASE_SLUG`; not a secret. | This app's local login Keychain. | The Makefile uses `aerospace-tabs` as the Sparkle Keychain account. Do not configure it separately in GitHub. | `make release-check` checks this account when no `SPARKLE_PRIVATE_KEY` is supplied locally. | No backup needed; it is the stable lookup name for the app-specific key. |
-| `GITHUB_TOKEN` | Built-in GitHub Actions token; no stored secret. | Generated per repository workflow run. | No setup. Workflows request only the permissions they use. | Workflow `gh` commands verify access. Do not copy a generated token into `.env`. | GitHub rotates it automatically; no backup is needed. |
+- Four secrets. GitHub hides their values after you save them.
+- Two variables. These are public Apple IDs.
 
-## Local configuration
+The apps share three Apple secrets and both Apple IDs. Each app has its own Sparkle key. Across both apps, that is five secret values and two public IDs.
 
-Copy `.env.example` to the ignored `.env` only for release values that are not in Keychain. Put values on one line with no quotes or inline comments. The release script reads only its allowlisted Apple and Sparkle settings; it does not source unrelated `.env` entries, and it removes private values from the Xcode build environment. Normal setup, build, run, test, bundle, and check commands do not need release credentials.
+Each app has an ignored `.env` file with the same six release names. Fill the files before you add values to GitHub. Keep each file private. GitHub cannot show a saved secret again.
 
-List configured names without reading values:
+## The six settings
+
+| Name | GitHub type | What it is | Shared? |
+| --- | --- | --- | --- |
+| `DEVELOPER_ID_CERTIFICATE_P12_BASE64` | Secret | Base64 text from a `.p12` file. It holds your Developer ID certificate and private key. | Yes |
+| `DEVELOPER_ID_CERTIFICATE_PASSWORD` | Secret | Password used when you export that certificate file. | Yes |
+| `APPLE_NOTARY_KEY_P8_BASE64` | Secret | Base64 text from the private `.p8` file for your App Store Connect Team key. | Yes |
+| `SPARKLE_PRIVATE_KEY` | Secret | Private key that signs this app's update feed. | No |
+| `APPLE_NOTARY_KEY_ID` | Variable | Public ID for the App Store Connect key. | Yes |
+| `APPLE_NOTARY_ISSUER_ID` | Variable | Public ID for your Apple team. | Yes |
+
+## Get the Apple values
+
+You already have a valid Developer ID Application certificate for the team used by both apps. Do not create a new certificate now.
+
+In Keychain Access, export that certificate with its private key as a password-protected `.p12` file. Choose a password. Save the password in `.env`. Make Base64 text without printing it to the terminal:
+
+```sh
+base64 -i /private/path/DeveloperID.p12 | tr -d '\n' > /private/path/DeveloperID.p12.base64
+```
+
+Open the new file and copy its text to `DEVELOPER_ID_CERTIFICATE_P12_BASE64` in each app's `.env`.
+
+Create an App Store Connect **Team API key** under **Users and Access → Integrations → App Store Connect API → Team Keys**. An Account Holder or Admin may need to create it. If API access is off, the Account Holder must request access. Download the `.p8` file once and keep a safe backup. Individual API keys do not work with Apple's notarization tool. See [Apple API key help](https://developer.apple.com/help/app-store-connect/get-started/app-store-connect-api/).
+
+Encode the `.p8` file in the same way. Copy its text to `APPLE_NOTARY_KEY_P8_BASE64` in both `.env` files. Copy the Key ID and Issuer ID from App Store Connect to `APPLE_NOTARY_KEY_ID` and `APPLE_NOTARY_ISSUER_ID`.
+
+See [Apple certificate help](https://developer.apple.com/help/account/certificates/certificates-overview/) for Developer ID certificates.
+
+## Get the Sparkle key
+
+The AeroSpace Tabs Sparkle key is in your Keychain. Its public key matches this app's `Config/App.xcconfig`. No new AeroSpace Tabs key is needed.
+
+The value in GitHub is hidden, so I could not check it. Export the Keychain key to a private file if you need a local copy:
+
+```sh
+.build/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys --account aerospace-tabs -x /private/path/aerospace-tabs-sparkle-key
+```
+
+Copy that file's text to `SPARKLE_PRIVATE_KEY` in this `.env` file. Keep a private backup.
+
+Do not use this key for GitBar. The public key is already in `Config/App.xcconfig`. It is not a GitHub secret. See [Sparkle's key and update guide](https://sparkle-project.org/documentation/publishing/).
+
+## Put the six values in GitHub
+
+Open **Settings → Secrets and variables → Actions** in this repository.
+
+Add these four names under **Secrets**:
+
+- `DEVELOPER_ID_CERTIFICATE_P12_BASE64`
+- `DEVELOPER_ID_CERTIFICATE_PASSWORD`
+- `APPLE_NOTARY_KEY_P8_BASE64`
+- `SPARKLE_PRIVATE_KEY`
+
+Add these two names under **Variables**:
+
+- `APPLE_NOTARY_KEY_ID`
+- `APPLE_NOTARY_ISSUER_ID`
+
+AeroSpace Tabs already has all four secret names. It has the two Apple IDs under Secrets by mistake. Add the IDs as Variables, then remove their old Secret entries.
+
+## Current status
+
+Checked on 26 October 2026. This is a snapshot. It becomes out of date after you change GitHub settings.
+
+- The six release values in this local `.env` are empty.
+- GitHub has all four secret names. The values are hidden, so they are not verified.
+- GitHub has no repository variables. Move the two Apple IDs from Secrets to Variables.
+- The local Developer ID certificate is valid for this team.
+- The local Sparkle key matches the public key in this app.
+
+You can check names without viewing values:
 
 ```sh
 gh secret list --repo pedrotmr/aerospace-tabs
 gh variable list --repo pedrotmr/aerospace-tabs
 ```
 
-As checked on 2026-10-26, GitHub lists `APPLE_NOTARY_KEY_ID` and `APPLE_NOTARY_ISSUER_ID` as legacy secrets, plus the `.p8`, Developer ID certificate/password, and `SPARKLE_PRIVATE_KEY` secrets; no repository variables are configured. This confirms only that entries exist, not that their values are valid. The release workflows now read the Key ID and Issuer ID only from repository variables. Copy those public identifiers from App Store Connect into **Variables**, verify the names are present, then remove the two old secret entries. The local `.env` has blank placeholders until configured. Encode binary secrets on macOS with `base64 -i /private/path/file.p12 | tr -d '\n' > /private/path/file.base64`, then configure them without printing the contents: `gh secret set SECRET_NAME < /private/path/file.base64`. Keep source and encoded files outside the repository with restricted permissions, retain the source in encrypted backup, and remove temporary encoded copies after setup.
+## Keep the values safe
 
-To configure GitHub, open **Settings → Secrets and variables → Actions**, keep the four actual secret names shown above in **Secrets**, and add `APPLE_NOTARY_KEY_ID` plus `APPLE_NOTARY_ISSUER_ID` in **Variables**. Remove the legacy copies from **Secrets** after the variables are in place. Keep the `.p8`, exported certificate, and certificate password in encrypted storage; Base64 only changes the encoding. Never paste secret values into an issue, terminal transcript, or commit. Export the app-scoped key with `generate_keys --account aerospace-tabs -x /private/path/aerospace-tabs-sparkle-key`, then configure it without printing the contents: `gh secret set SPARKLE_PRIVATE_KEY < /private/path/aerospace-tabs-sparkle-key`. Keep the file outside the repository with restricted permissions and retain an encrypted backup. The local release check and the signed-distribution workflow validate that the private and public keys match without printing them.
+The `.env` file is plain text. Keep it on this Mac. Its GitHub ignore rule is already set. Keep its file permission at `600`. Store the original `.p12`, `.p8`, passwords, and private keys in encrypted storage. Base64 does not protect a secret.
 
-`make release-check APP_BUILD_NUMBER=<new-increasing-number>` is the end-to-end verification. It signs the app, sends the DMG to Apple, validates notarization and stapling, and checks the appcast signature. It creates local files only.
+Other local app keys may also be in `.env`. They are not part of these six GitHub release settings.
 
-## Run a signed-distribution check
+If you lose the `.p8` file, create a new Team key. Update the `.p8`, Key ID, and Issuer ID in both app repositories. If the Developer ID certificate expires, export a new `.p12` and update its password in both repositories. Keep a different Sparkle key for each app.
 
-After the configuration is present and this workflow is on the default branch, open **GitHub → Actions → CI → Run workflow**. Select `main`, set `signed_distribution` to `true`, and enter a positive numeric `build_number` higher than the latest published build. Run this once for each app repository. The job imports the Developer ID certificate, runs `make release-check`, and stores the verified ZIP, DMG, and appcast as a short-lived artifact. It does not create or publish a release. If the appcast has no EdDSA signature, check that `SPARKLE_PRIVATE_KEY` matches `SPARKLE_PUBLIC_ED_KEY` in `Config/App.xcconfig`.
+`GITHUB_TOKEN` is created by GitHub Actions. Do not add it. `CODESIGN_IDENTITY` is an optional local setting. It is not a GitHub secret.
+
+## Test the settings
+
+Normal `make check` does not need release credentials. Local `make release-check APP_BUILD_NUMBER=<new-number>` uses your Keychain certificate and the Apple and Sparkle values in `.env`. GitHub uses the `.p12` and its password. The check sends the app to Apple and checks the Sparkle feed. It creates local files only.
+
+After this PR is merged, open **Actions → CI → Run workflow**. Set `signed_distribution` to `true`. Enter a build number higher than the latest published build. The job checks the credentials and stores a short-lived artifact. It does not publish a release.
+
+If Apple accepts the app but Sparkle reports an unsigned update, check that `SPARKLE_PRIVATE_KEY` matches the public key in `Config/App.xcconfig`.
