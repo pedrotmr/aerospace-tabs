@@ -41,6 +41,9 @@ done
 for name in APPLE_NOTARY_KEY_P8_BASE64 APPLE_NOTARY_KEY_ID APPLE_NOTARY_ISSUER_ID; do
   require_value "$name"
 done
+if [[ "${CI:-}" == true ]]; then
+  require_value SPARKLE_PRIVATE_KEY
+fi
 
 [[ "$APP_BUILD_NUMBER" =~ ^[0-9]+$ ]] || fail "APP_BUILD_NUMBER must be a positive integer."
 (( APP_BUILD_NUMBER > 0 )) || fail "APP_BUILD_NUMBER must be a positive integer."
@@ -113,6 +116,12 @@ for component in "$sparkle_version/Autoupdate" "$sparkle_version/Updater.app" "$
 done
 lipo "$app_path/Contents/MacOS/$APP_NAME" -verify_arch arm64
 lipo "$app_path/Contents/MacOS/$APP_NAME" -verify_arch x86_64
+for binary in "$sparkle_version/Sparkle" \
+  "$sparkle_version/Autoupdate" \
+  "$sparkle_version/Updater.app/Contents/MacOS/Updater"; do
+  lipo "$binary" -verify_arch arm64 || fail "${binary##*/} is missing arm64."
+  lipo "$binary" -verify_arch x86_64 || fail "${binary##*/} is missing x86_64."
+done
 
 dmg_path="$release_dir/$APP_NAME-$APP_VERSION.dmg"
 zip_path="$release_dir/$APP_NAME-$APP_VERSION.zip"
@@ -172,11 +181,15 @@ awk -v version="$APP_VERSION" '
   found { print }
   END { if (!found) exit 1 }
 ' CHANGELOG.md > "$notes_path" || fail "CHANGELOG.md has no release notes for $APP_VERSION."
-ditto "$zip_path" "$release_dir/verify-zip"
-xcrun stapler validate "$release_dir/verify-zip/$APP_NAME.app"
-codesign --verify --deep --strict --verbose=2 "$release_dir/verify-zip/$APP_NAME.app"
-spctl --assess --type execute --verbose=2 "$release_dir/verify-zip/$APP_NAME.app"
-rm -rf "$release_dir/verify-zip"
+verify_zip_dir="$release_dir/verify-zip"
+mkdir -p "$verify_zip_dir"
+ditto -x -k "$zip_path" "$verify_zip_dir"
+verified_app="$verify_zip_dir/$APP_NAME.app"
+[[ -d "$verified_app" ]] || fail "The distributed ZIP does not contain $APP_NAME.app at its root."
+xcrun stapler validate "$verified_app"
+codesign --verify --deep --strict --verbose=2 "$verified_app"
+spctl --assess --type execute --verbose=2 "$verified_app"
+rm -rf "$verify_zip_dir"
 
 download_prefix="https://github.com/$RELEASE_OWNER/$RELEASE_SLUG/releases/download/v$APP_VERSION/"
 if [[ -n "${SPARKLE_PRIVATE_KEY:-}" ]]; then
