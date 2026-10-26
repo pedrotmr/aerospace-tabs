@@ -1,7 +1,7 @@
 # Aerospace Tabs
 
 <p align="center">
-  <img src="Resources/AerospaceTabs-icon.png" alt="Aerospace Tabs app icon" width="180">
+  <img src="Resources/aerospace-tabs-icon.png" alt="Aerospace Tabs app icon" width="180">
 </p>
 
 A small macOS companion for [AeroSpace](https://github.com/nikitabobko/AeroSpace). AeroSpace tiles windows; Aerospace Tabs adds a tab strip for finding and focusing them, plus a visual overview grouped by AeroSpace workspace.
