@@ -33,7 +33,7 @@ assemble-app:
 	cp "$(APP_BINARY)" $(APP)/Contents/MacOS/AerospaceTabs
 	cp Resources/Info.plist $(APP)/Contents/Info.plist
 	cp Resources/AerospaceTabs.icns $(APP)/Contents/Resources/AerospaceTabs.icns
-	test "$$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' $(APP)/Contents/Info.plist)" = "AerospaceTabs.icns"
+	test "$$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$(APP)/Contents/Info.plist")" = "AerospaceTabs.icns"
 	test -s "$(APP)/Contents/Resources/AerospaceTabs.icns"
 ifdef APP_VERSION
 	/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $(APP_VERSION)" $(APP)/Contents/Info.plist
