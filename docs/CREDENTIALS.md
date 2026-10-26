@@ -42,15 +42,15 @@ See [Apple certificate help](https://developer.apple.com/help/account/certificat
 
 ## Get the Sparkle key
 
-The AeroSpace Tabs Sparkle key is in your Keychain. Its public key matches this app's `Config/App.xcconfig`. No new AeroSpace Tabs key is needed.
+The AeroSpace Tabs Sparkle key is in your Keychain. Its public key matches this app's `Config/App.xcconfig`. A private copy is now saved in this ignored `.env` file. Use this value for the GitHub secret. Do not use it for GitBar.
 
-The value in GitHub is hidden, so I could not check it. Export the Keychain key to a private file if you need a local copy:
+GitHub hides the old secret value, so I could not compare it. If you need to export the Keychain key again, use:
 
 ```sh
 .build/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys --account aerospace-tabs -x /private/path/aerospace-tabs-sparkle-key
 ```
 
-Copy that file's text to `SPARKLE_PRIVATE_KEY` in this `.env` file. Keep a private backup.
+The command writes the private key to the file. Keep that file private.
 
 Do not use this key for GitBar. The public key is already in `Config/App.xcconfig`. It is not a GitHub secret. See [Sparkle's key and update guide](https://sparkle-project.org/documentation/publishing/).
 
@@ -76,7 +76,7 @@ AeroSpace Tabs already has all four secret names. It has the two Apple IDs under
 
 Checked on 26 October 2026. This is a snapshot. It becomes out of date after you change GitHub settings.
 
-- The six release values in this local `.env` are empty.
+- `SPARKLE_PRIVATE_KEY` is saved in this local `.env`. The five Apple settings are empty.
 - GitHub has all four secret names. The values are hidden, so they are not verified.
 - GitHub has no repository variables. Move the two Apple IDs from Secrets to Variables.
 - The local Developer ID certificate is valid for this team.
