@@ -24,21 +24,11 @@ Each app has an ignored `.env` file with the same six release names. Fill the fi
 
 ## Get the Apple values
 
-You already have a valid Developer ID Application certificate for the team used by both apps. Do not create a new certificate now.
+The two local `.env` files now contain a password-protected export of your valid Developer ID certificate. The export came from your Keychain. You do not need a new certificate.
 
-In Keychain Access, export that certificate with its private key as a password-protected `.p12` file. Choose a password. Save the password in `.env`. Make Base64 text without printing it to the terminal:
+A local file named `Apple Auth Key.p8` was also saved in both `.env` files. In App Store Connect, check that this file belongs to a **Team API key**. A Team key works with Apple's notarization tool; an individual key does not. If this is not a Team key, create one under **Users and Access → Integrations → App Store Connect API → Team Keys**. An Account Holder or Admin may need to create it. The Account Holder must request access if API access is off. Download the Team `.p8` file once and keep a safe backup. See [Apple API key help](https://developer.apple.com/help/app-store-connect/get-started/app-store-connect-api/).
 
-```sh
-base64 -i /private/path/DeveloperID.p12 | tr -d '\n' > /private/path/DeveloperID.p12.base64
-```
-
-Open the new file and copy its text to `DEVELOPER_ID_CERTIFICATE_P12_BASE64` in each app's `.env`.
-
-Create an App Store Connect **Team API key** under **Users and Access → Integrations → App Store Connect API → Team Keys**. An Account Holder or Admin may need to create it. If API access is off, the Account Holder must request access. Download the `.p8` file once and keep a safe backup. Individual API keys do not work with Apple's notarization tool. See [Apple API key help](https://developer.apple.com/help/app-store-connect/get-started/app-store-connect-api/).
-
-Encode the `.p8` file in the same way. Copy its text to `APPLE_NOTARY_KEY_P8_BASE64` in both `.env` files. Copy the Key ID and Issuer ID from App Store Connect to `APPLE_NOTARY_KEY_ID` and `APPLE_NOTARY_ISSUER_ID`.
-
-See [Apple certificate help](https://developer.apple.com/help/account/certificates/certificates-overview/) for Developer ID certificates.
+Copy the matching Key ID to `APPLE_NOTARY_KEY_ID`. Copy the Issuer ID shown near the top of **Users and Access → Integrations → App Store Connect API** to `APPLE_NOTARY_ISSUER_ID`. Use the same two IDs in both apps. See [Apple certificate help](https://developer.apple.com/help/account/certificates/certificates-overview/).
 
 ## Get the Sparkle key
 
@@ -76,10 +66,10 @@ AeroSpace Tabs already has all four secret names. It has the two Apple IDs under
 
 Checked on 26 October 2026. This is a snapshot. It becomes out of date after you change GitHub settings.
 
-- `SPARKLE_PRIVATE_KEY` is saved in this local `.env`. The five Apple settings are empty.
-- GitHub has all four secret names. The values are hidden, so they are not verified.
-- GitHub has no repository variables. Move the two Apple IDs from Secrets to Variables.
-- The local Developer ID certificate is valid for this team.
+- The `.env` file has the Developer ID export, its password, a Base64 copy of the local `.p8` file, and this app's Sparkle key. The two Apple IDs are empty.
+- GitHub has the four required Secret names. It also has the two Apple ID names stored as Secrets. Their values are hidden. Replace the four secret values from `.env` after you confirm that the `.p8` file is a Team key.
+- GitHub has no Variables. Add the two Apple IDs as Variables. Remove their old Secret entries after you copy the IDs from App Store Connect.
+- The Developer ID export came from a valid certificate for this team.
 - The local Sparkle key matches the public key in this app.
 
 You can check names without viewing values:
@@ -101,7 +91,7 @@ If you lose the `.p8` file, create a new Team key. Update the `.p8`, Key ID, and
 
 ## Test the settings
 
-Normal `make check` does not need release credentials. Local `make release-check APP_BUILD_NUMBER=<new-number>` uses your Keychain certificate and the Apple and Sparkle values in `.env`. GitHub uses the `.p12` and its password. The check sends the app to Apple and checks the Sparkle feed. It creates local files only.
+Normal `make check` does not need release credentials. Local `make release-check APP_BUILD_NUMBER=<new-number>` checks a signed distribution. It uses your Keychain certificate and the Apple and Sparkle values in `.env`. The check sends the app to Apple and checks the Sparkle feed. It creates local files only.
 
 After this PR is merged, open **Actions → CI → Run workflow**. Set `signed_distribution` to `true`. Enter a build number higher than the latest published build. The job checks the credentials and stores a short-lived artifact. It does not publish a release.
 
