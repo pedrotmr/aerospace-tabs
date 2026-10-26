@@ -1,7 +1,10 @@
 .build/
 AerospaceTabs.app/
-*.xcodeproj
 .DS_Store
 .swiftpm/
 .env
 .env.*
+!.env.example
+DerivedData/
+*.xcuserstate
+xcuserdata/

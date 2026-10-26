@@ -4,45 +4,116 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      signed_distribution:
+        description: Also build, sign, notarize, staple, and validate local distribution artifacts.
+        required: true
+        type: boolean
+        default: false
+      build_number:
+        description: Explicit increasing numeric CFBundleVersion for the signed check.
+        required: false
+        type: string
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  homebrew-cask:
-    name: Audit Homebrew cask example
-    runs-on: macos-15
-    timeout-minutes: 10
+  checks:
+    name: Build, test, and validate bundle
+    runs-on: macos-26
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Extract and audit documented cask
-        shell: bash
+      - name: Confirm Xcode version
         run: |
           set -euo pipefail
-          brew tap-new --no-git pedrotmr/aerospace-tabs
+          xcodebuild -version
+          xcodebuild -version | grep -E '^Xcode 27\.'
+      - name: Run the documented checks
+        run: make check
 
-          tap_dir="$(brew --repository pedrotmr/aerospace-tabs)"
-          mkdir -p "$tap_dir/Casks"
-          awk '
-            /^## Cask file for the tap$/ { in_section=1; next }
-            in_section && /^```ruby$/ { in_cask=1; next }
-            in_cask && /^```$/ { closed=1; exit }
-            in_cask { print }
-            END { if (!in_cask || !closed) exit 1 }
-          ' docs/launch/homebrew-tap.md > "${tap_dir}/Casks/pedrotmr-aerospace-tabs.rb"
-
-          brew trust --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
-          brew audit --cask --strict --tap pedrotmr/aerospace-tabs
-
-  test:
-    name: Swift build and tests
-    runs-on: macos-15
-    timeout-minutes: 15
+  signed-distribution:
+    name: Signed distribution check
+    if: github.event_name == 'workflow_dispatch' && inputs.signed_distribution
+    needs: checks
+    runs-on: macos-26
+    timeout-minutes: 120
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
-      - name: Build release binary
-        run: swift build -c release
-      - name: Run tests
-        run: swift test
+        with:
+          persist-credentials: false
+
+      - name: Import Developer ID signing identity
+        env:
+          DEVELOPER_ID_CERTIFICATE_P12_BASE64: ${{ secrets.DEVELOPER_ID_CERTIFICATE_P12_BASE64 }}
+          DEVELOPER_ID_CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$DEVELOPER_ID_CERTIFICATE_P12_BASE64" || -z "$DEVELOPER_ID_CERTIFICATE_PASSWORD" ]]; then
+            echo "::error::Configure DEVELOPER_ID_CERTIFICATE_P12_BASE64 and DEVELOPER_ID_CERTIFICATE_PASSWORD as repository secrets."
+            exit 1
+          fi
+          keychain_path="$RUNNER_TEMP/macos-app-signing.keychain-db"
+          keychain_password="$(openssl rand -base64 32)"
+          certificate_path="$RUNNER_TEMP/developer-id.p12"
+          printf '%s' "$DEVELOPER_ID_CERTIFICATE_P12_BASE64" | base64 -D > "$certificate_path"
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$certificate_path" -k "$keychain_path" \
+            -P "$DEVELOPER_ID_CERTIFICATE_PASSWORD" -f pkcs12 -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
+            -k "$keychain_password" "$keychain_path" >/dev/null
+          security list-keychains -d user -s "$keychain_path"
+          signing_identity=$(security find-identity -v -p codesigning "$keychain_path" \
+            | awk '/Developer ID Application:/ { print $2; exit }')
+          if [[ -z "$signing_identity" ]]; then
+            echo "::error::The certificate must include a Developer ID Application identity and private key."
+            exit 1
+          fi
+          echo "CODESIGN_IDENTITY=$signing_identity" >> "$GITHUB_ENV"
+
+      - name: Sign, notarize, staple, and validate artifacts locally
+        env:
+          APP_BUILD_NUMBER: ${{ inputs.build_number }}
+          APPLE_NOTARY_KEY_P8_BASE64: ${{ secrets.APPLE_NOTARY_KEY_P8_BASE64 }}
+          APPLE_NOTARY_KEY_ID: ${{ vars.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ vars.APPLE_NOTARY_ISSUER_ID }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$APP_BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "::error::Enter a positive numeric build_number higher than the latest published build."
+            exit 1
+          fi
+          make release-check APP_BUILD_NUMBER="$APP_BUILD_NUMBER"
+
+      - name: Upload local validation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: aerospace-tabs-signed-check-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .build/release/AerospaceTabs-*.zip
+            .build/release/AerospaceTabs-*.dmg
+            .build/release/appcast/appcast.xml
+          if-no-files-found: error
+          retention-days: 2
+
+      - name: Remove signing material
+        if: always()
+        run: |
+          keychain_path="$RUNNER_TEMP/macos-app-signing.keychain-db"
+          if [[ -e "$keychain_path" ]]; then
+            security delete-keychain "$keychain_path" || true
+          fi
+          rm -f "$RUNNER_TEMP/developer-id.p12" "$RUNNER_TEMP/apple-notary-api-key.p8"

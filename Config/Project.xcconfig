@@ -1,0 +1,6 @@
+// Shared by the app, its policy library, and test target.
+MACOSX_DEPLOYMENT_TARGET = 14.0
+SDKROOT = macosx
+SWIFT_VERSION = 5.0
+ARCHS = arm64 x86_64
+DEVELOPMENT_TEAM = YW25U2BJ23
