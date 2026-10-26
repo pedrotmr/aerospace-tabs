@@ -111,8 +111,8 @@ for component in "$sparkle_version/Autoupdate" "$sparkle_version/Updater.app" "$
   [[ "$signature_details" == *'Timestamp='* ]] || fail "${component##*/} has no secure timestamp."
   [[ "$signature_details" == *"TeamIdentifier=$team_identifier"* ]] || fail "${component##*/} has a different Developer ID team."
 done
-lipo -verify_arch arm64 "$app_path/Contents/MacOS/$APP_NAME"
-lipo -verify_arch x86_64 "$app_path/Contents/MacOS/$APP_NAME"
+lipo "$app_path/Contents/MacOS/$APP_NAME" -verify_arch arm64
+lipo "$app_path/Contents/MacOS/$APP_NAME" -verify_arch x86_64
 
 dmg_path="$release_dir/$APP_NAME-$APP_VERSION.dmg"
 zip_path="$release_dir/$APP_NAME-$APP_VERSION.zip"

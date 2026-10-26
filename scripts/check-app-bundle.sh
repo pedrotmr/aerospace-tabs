@@ -40,13 +40,13 @@ sparkle="$app_path/Contents/Frameworks/Sparkle.framework"
 
 executable="$app_path/Contents/MacOS/$(read_plist CFBundleExecutable)"
 [[ -x "$executable" ]] || fail "The app executable is missing."
-lipo -verify_arch arm64 "$executable" || fail "The app executable is missing arm64."
-lipo -verify_arch x86_64 "$executable" || fail "The app executable is missing x86_64."
+lipo "$executable" -verify_arch arm64 || fail "The app executable is missing arm64."
+lipo "$executable" -verify_arch x86_64 || fail "The app executable is missing x86_64."
 for binary in "$sparkle/Versions/B/Sparkle" \
 	"$sparkle/Versions/B/Autoupdate" \
 	"$sparkle/Versions/B/Updater.app/Contents/MacOS/Updater"; do
-	lipo -verify_arch arm64 "$binary" || fail "Sparkle component is missing arm64: ${binary##*/}"
-	lipo -verify_arch x86_64 "$binary" || fail "Sparkle component is missing x86_64: ${binary##*/}"
+	lipo "$binary" -verify_arch arm64 || fail "Sparkle component is missing arm64: ${binary##*/}"
+	lipo "$binary" -verify_arch x86_64 || fail "Sparkle component is missing x86_64: ${binary##*/}"
 done
 otool -l "$executable" | grep -F '@executable_path/../Frameworks' >/dev/null || fail "The app is missing its Frameworks runtime search path."
 otool -L "$executable" | grep -F 'Sparkle.framework/Versions/B/Sparkle' >/dev/null || fail "The app does not link Sparkle.framework."
