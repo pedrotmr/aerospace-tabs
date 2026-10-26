@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/pedrotmr/aerospace-tabs/compare/v0.1.1...v0.1.2) (2026-10-26)
+
+
+### Bug Fixes
+
+* **build:** verify bundled app icon ([#48](https://github.com/pedrotmr/aerospace-tabs/issues/48)) ([153fa85](https://github.com/pedrotmr/aerospace-tabs/commit/153fa856893e83e5deb9172005143d79b5f311f2))
+
 ## [0.1.1](https://github.com/pedrotmr/aerospace-tabs/compare/v0.1.0...v0.1.1) (2026-10-19)
 
 
