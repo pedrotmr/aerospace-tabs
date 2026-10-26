@@ -32,11 +32,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Confirm Xcode version
-        run: |
-          set -euo pipefail
-          xcodebuild -version
-          xcodebuild -version | grep -E '^Xcode 27\.'
       - name: Run the documented checks
         run: make check
 

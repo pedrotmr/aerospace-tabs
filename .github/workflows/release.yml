@@ -90,12 +90,6 @@ jobs:
           persist-credentials: false
           ref: ${{ needs.prepare-release.outputs.tag_name }}
 
-      - name: Confirm Xcode version
-        run: |
-          set -euo pipefail
-          xcodebuild -version
-          xcodebuild -version | grep -E '^Xcode 27\.'
-
       - name: Run the documented checks
         run: make check APP_BUILD_NUMBER="${GITHUB_RUN_NUMBER}"
 

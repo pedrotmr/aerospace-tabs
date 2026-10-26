@@ -17,7 +17,7 @@ Aerospace Tabs is a companion for AeroSpace. It displays, focuses, and groups wi
 
 ## Build and verification
 
-Use Xcode 27.1 or newer and the Makefile interface. Xcode is the only app build system; Swift Package Manager is used by Xcode only to resolve the pinned Sparkle dependency.
+Use Xcode 26.6 or newer and the Makefile interface. Xcode is the only app build system; Swift Package Manager is used by Xcode only to resolve the pinned Sparkle dependency.
 
 ```sh
 make setup

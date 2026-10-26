@@ -3,7 +3,7 @@
 ## Toolchain
 
 - macOS 14 or later to run Aerospace Tabs.
-- Xcode 27.1 or newer with the macOS platform. The current project uses Xcode's build system and its bundled Swift 6.4 toolchain in Swift 5 language mode.
+- Xcode 26.6 or newer with the macOS platform. The current project uses Xcode's build system and its bundled Swift toolchain in Swift 5 language mode.
 - AeroSpace is required at runtime. Git and Homebrew are optional for the application.
 - Sparkle 2.10.1 is pinned in `AerospaceTabs.xcodeproj`; `make setup` resolves it.
 

@@ -9,7 +9,7 @@ repo_root=$(cd "$(dirname "$0")/.." && pwd)
 "$repo_root/scripts/check-version-config.sh"
 
 if ! command -v "$xcodebuild_cmd" >/dev/null 2>&1; then
-  printf 'error: Xcode 27.1 or newer is required. Install Xcode and select it with xcode-select.\n' >&2
+  printf 'error: Xcode 26.6 or newer is required. Install Xcode and select it with xcode-select.\n' >&2
   exit 1
 fi
 
@@ -17,8 +17,8 @@ xcode_version=$("$xcodebuild_cmd" -version | awk '/^Xcode / { print $2 }')
 major=${xcode_version%%.*}
 minor=${xcode_version#*.}
 minor=${minor%%.*}
-if [[ ! "$major" =~ ^[0-9]+$ || ! "$minor" =~ ^[0-9]+$ ]] || (( major < 27 || (major == 27 && minor < 1) )); then
-  printf 'error: Xcode 27.1 or newer is required; selected version is %s.\n' "${xcode_version:-unknown}" >&2
+if [[ ! "$major" =~ ^[0-9]+$ || ! "$minor" =~ ^[0-9]+$ ]] || (( major < 26 || (major == 26 && minor < 6) )); then
+  printf 'error: Xcode 26.6 or newer is required; selected version is %s.\n' "${xcode_version:-unknown}" >&2
   exit 1
 fi
 
