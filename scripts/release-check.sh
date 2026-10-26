@@ -62,7 +62,6 @@ app_path="$derived_data/Build/Products/Release/$APP_NAME.app"
 framework_bin="$derived_data/SourcePackages/artifacts/sparkle/Sparkle/bin"
 generate_appcast="$framework_bin/generate_appcast"
 sign_update="$framework_bin/sign_update"
-[[ -x "$generate_appcast" && -x "$sign_update" ]] || fail "Sparkle tools are missing. Run make setup first."
 
 rm -rf "$release_dir"
 mkdir -p "$release_dir"
@@ -83,6 +82,10 @@ APP_VERSION="$APP_VERSION" \
 APP_BUILD_NUMBER="$APP_BUILD_NUMBER" \
 APP_MIN_SYSTEM_VERSION="$APP_MIN_SYSTEM_VERSION" \
   "$repo_root/scripts/check-app-bundle.sh" "$app_path"
+
+# Xcode downloads binary package artifacts during the build, not package
+# resolution. Check for Sparkle's release tools only after this build.
+[[ -x "$generate_appcast" && -x "$sign_update" ]] || fail "Sparkle release tools are missing after the build. Check the resolved Sparkle package artifact."
 
 framework="$app_path/Contents/Frameworks/Sparkle.framework"
 sparkle_version="$framework/Versions/B"
