@@ -21,7 +21,7 @@ AeroSpace users (the maintainer included).
 
 ## Support and maintenance
 
-- The repository remains public, and the latest published release is `v0.1.1`.
+- The repository remains public, and the latest published release is `v0.1.2`.
 - Development is paused as of 2026-10-25. Occasional maintenance may happen, but no replies or new releases are promised.
 - Issues and pull requests are welcome on a best-effort basis, with no SLA.
 - **Performance** beats new features.

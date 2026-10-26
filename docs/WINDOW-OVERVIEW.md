@@ -1,6 +1,6 @@
 # Window Overview
 
-**Status:** Implemented. This document describes current behavior and records the design decisions behind it. See the [README](README.md) for setup and the [charter](CHARTER.md) for the project boundary.
+**Status:** Implemented. This document describes current behavior and records the design decisions behind it. See the [README](../README.md) for setup and the [charter](CHARTER.md) for the project boundary.
 
 ## Purpose
 

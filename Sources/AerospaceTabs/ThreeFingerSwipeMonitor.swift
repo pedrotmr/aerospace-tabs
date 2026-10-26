@@ -279,7 +279,7 @@ final class ThreeFingerSwipeMonitor {
 
 /// The MultitouchSupport contact layout used by current Mac trackpads. Its
 /// memory layout follows AeroKit's community-documented MTTouch definition;
-/// see THIRD-PARTY-NOTICES.md. The detector reads identity, state, and position.
+/// see docs/THIRD-PARTY-NOTICES.md. The detector reads identity, state, and position.
 private struct MultitouchContact {
     struct Point { var x: Float; var y: Float }
     struct Readout { var position: Point; var velocity: Point }

@@ -2,13 +2,13 @@
 
 # Aerospace Tabs
 
-A small macOS companion for [AeroSpace](https://github.com/nikitabobko/AeroSpace). AeroSpace tiles windows; Aerospace Tabs adds a tab strip for finding and focusing them, plus a visual overview grouped by AeroSpace workspace.
+A macOS companion for [AeroSpace](https://github.com/nikitabobko/AeroSpace) with a window tab strip and workspace-grouped overview for finding and focusing windows.
 
 > **Maintenance:** Development is paused. Issues and pull requests are welcome on a best-effort basis, but replies and new releases are not promised.
 
-![Placeholder: real multi-workspace screenshot pending](Screenshots/aerospace-tabs-workspaces-placeholder.svg)
+![Placeholder for a real multi-workspace screenshot](Screenshots/aerospace-tabs-workspaces-placeholder.svg)
 
-*This is a labeled placeholder, not a screenshot of the app. See [capture notes](docs/SCREENSHOT.md).*
+*Not a product screenshot. See [capture notes](docs/SCREENSHOT.md).*
 
 ## Quick start
 
@@ -22,16 +22,13 @@ A small macOS companion for [AeroSpace](https://github.com/nikitabobko/AeroSpace
 3. Open **Aerospace Tabs** from Applications. Allow **Accessibility** when macOS asks.
 4. With two or more windows open on that display, right-click the strip and choose **Open Window Overview**. Use the arrow keys and Return to focus a window; Escape closes the overview.
 
-Alternatively, add the tap once with `brew tap pedrotmr/aerospace-tabs`, then run `brew install --cask pedrotmr-aerospace-tabs`.
-
 ## What it does
 
 - Lists AeroSpace windows from occupied workspaces on each display. The strip appears when that display has two or more windows.
 - Click a tab to focus its window; drag to change its local order.
 - Shows a full-screen overview grouped by workspace. Three-finger swipe opens it by default; an optional hot corner is available from the strip menu.
-- Keeps AeroSpace responsible for tiling and layout.
 
-## Requirements and limits
+## Requirements and limitations
 
 - macOS 14 or later, with AeroSpace installed and running.
 - Accessibility enables global shortcuts and Dock notification badges. Screen Recording is optional and enables window previews.
@@ -41,4 +38,6 @@ Alternatively, add the tap once with `brew tap pedrotmr/aerospace-tabs`, then ru
 
 ## Help and development
 
-Report a problem in [GitHub Issues](https://github.com/pedrotmr/aerospace-tabs/issues). See [contribution and build instructions](CONTRIBUTING.md), [project scope](CHARTER.md), and [Window Overview details](WINDOW-OVERVIEW.md). The project is MIT licensed.
+- **Questions and problems:** [GitHub Issues](https://github.com/pedrotmr/aerospace-tabs/issues)
+- **Setup and development:** [Documentation index](docs/README.md), including the [contribution and build guide](docs/CONTRIBUTING.md)
+- **License:** [MIT](LICENSE) · [Third-party notices](docs/THIRD-PARTY-NOTICES.md)

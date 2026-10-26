@@ -27,6 +27,6 @@ Select **Choose Config Editor…** from the AeroSpace submenu once; **Open Confi
 
 ## Previews and privacy
 
-Window previews are captured only while the overview is open and held in a bounded memory cache. Aerospace Tabs does not save screenshots or video to disk or send them off-device. See [Window Overview behavior](../WINDOW-OVERVIEW.md) for capture limits, fallback behavior, and display grouping.
+Window previews are captured only while the overview is open and held in a bounded memory cache. Aerospace Tabs does not save screenshots or video to disk or send them off-device. See [Window Overview behavior](WINDOW-OVERVIEW.md) for capture limits, fallback behavior, and display grouping.
 
 If AeroSpace is unavailable, the app shows a reconnecting status and hides stale tabs. The strip is intentionally absent on a display with fewer than two windows.

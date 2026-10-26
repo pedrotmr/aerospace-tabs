@@ -24,4 +24,4 @@ Before the first release, enable **Allow GitHub Actions to create and approve pu
 
 ## Homebrew
 
-After publishing a release, update `version` and the ZIP's SHA-256 in the tap cask and in [the Homebrew release notes](homebrew-tap.md#after-each-published-release). The install commands stay the same; `brew upgrade` follows the version pinned in the cask.
+After publishing a release, the tap's [sync workflow](homebrew-tap.md#automatic-cask-updates) validates the ZIP, then updates the cask version and SHA-256 automatically. Publishing the draft GitHub Release remains a manual step. The README install command stays the same; `brew upgrade` follows the version pinned in the cask.

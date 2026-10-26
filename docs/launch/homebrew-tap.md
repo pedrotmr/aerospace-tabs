@@ -51,22 +51,13 @@ Once the tap cask is updated, existing users can run `brew update && brew upgrad
 
 ## README install line
 
-Use both methods in the README Install section. They install the same cask.
-
-One option adds the tap and installs the app in a single command:
+Use the single-command install in the README. It adds the tap and installs the cask in one step:
 
 ```sh
 brew install --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
 ```
 
-Or add the tap once, then install with the shorter name:
-
-```sh
-brew tap pedrotmr/aerospace-tabs
-brew install --cask pedrotmr-aerospace-tabs
-```
-
-Once the tap is installed, later installs and upgrades can use `pedrotmr-aerospace-tabs`. Homebrew's tap naming and trust behavior are documented in [Taps](https://docs.brew.sh/Taps) and [Tap Trust](https://docs.brew.sh/Tap-Trust). Cask definitions are Ruby code and can run with the user's privileges, so install a tap you trust.
+Homebrew's tap naming and trust behavior are documented in [Taps](https://docs.brew.sh/Taps) and [Tap Trust](https://docs.brew.sh/Tap-Trust). Cask definitions are Ruby code and can run with the user's privileges, so install a tap you trust.
 
 ## Gatekeeper and notarization
 
