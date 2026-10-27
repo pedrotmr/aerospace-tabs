@@ -30,6 +30,8 @@
 	<true/>
 	<key>NSAccessibilityUsageDescription</key>
 	<string>AeroSpaceTabs needs Accessibility to bind Option-Tab without waiting on the focused app.</string>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>AeroSpaceTabs captures visible windows while Window Overview is open to show live previews. Captures stay on this Mac and are not saved.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>$(APP_COPYRIGHT)</string>
 	<key>SUEnableAutomaticChecks</key>

@@ -27,6 +27,7 @@ final class Hotkeys {
 
     private let initialRepeatDelay: TimeInterval = 0.35
     private let repeatInterval: TimeInterval = 0.09
+    private static let accessibilityPromptedVersionKey = "accessibilityPromptedVersion"
 
     init(
         scheduleFailurePresentation: @escaping (@escaping () -> Void) -> Void = { action in
@@ -272,6 +273,13 @@ final class Hotkeys {
     }
 
     private func promptAccessibilityIfNeeded() {
+        guard !AXIsProcessTrusted() else { return }
+
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+        let defaults = UserDefaults.standard
+        guard defaults.string(forKey: Self.accessibilityPromptedVersionKey) != version else { return }
+        defaults.set(version, forKey: Self.accessibilityPromptedVersionKey)
+
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)
     }
