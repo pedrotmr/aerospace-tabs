@@ -21,9 +21,8 @@ AeroSpace users (the maintainer included).
 
 ## Support and maintenance
 
-- The repository remains public, and the latest published release is `v0.1.2`.
-- Development is paused as of 2026-10-25. Occasional maintenance may happen, but no replies or new releases are promised.
-- Issues and pull requests are welcome on a best-effort basis, with no SLA.
+- The repository is public. The [GitHub Releases page](https://github.com/pedrotmr/aerospace-tabs/releases/latest) lists the latest stable release.
+- Maintenance is limited. Issues and pull requests are welcome on a best-effort basis. Replies and release dates are not promised.
 - **Performance** beats new features.
 
 New ideas must pass the feature fence:

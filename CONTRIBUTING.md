@@ -1,6 +1,6 @@
 # Contributing
 
-Development is paused. Issues and pull requests are welcome on a best-effort basis; there is no response time or release promise.
+Maintenance is limited. Issues and pull requests are welcome on a best-effort basis. Replies and release dates are not promised.
 
 ## Report a problem
 
