@@ -22,6 +22,7 @@ enum AerospaceTabsMain {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private let updater = UpdaterService()
     private let session = Session()
     private let hotkeys = Hotkeys()
     private let missionControl = MissionControlWatcher()
@@ -35,6 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var nativeSettingsRestart: DispatchWorkItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        installApplicationMenu()
         // Clear a leftover boost from a previous crash; live boost follows strip visibility in render().
         GapBoost.shared.prepareAtLaunch()
         GapsConfig.shared.start()
@@ -101,6 +103,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         syncActivationSettings()
     }
 
+    private func installApplicationMenu() {
+        let appMenu = NSMenu()
+        let checkForUpdates = NSMenuItem(
+            title: "Check for Updates…",
+            action: #selector(UpdaterService.checkForUpdates(_:)),
+            keyEquivalent: ""
+        )
+        checkForUpdates.target = updater
+        appMenu.addItem(checkForUpdates)
+        appMenu.addItem(.separator())
+
+        let quit = NSMenuItem(title: "Quit Aerospace Tabs", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        quit.target = NSApp
+        appMenu.addItem(quit)
+
+        let appMenuItem = NSMenuItem()
+        appMenuItem.title = "Aerospace Tabs"
+        appMenuItem.submenu = appMenu
+
+        let mainMenu = NSMenu()
+        mainMenu.addItem(appMenuItem)
+        NSApp.mainMenu = mainMenu
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         overview.dismiss(restorePrevious: false)
         hotCorner.stop()
@@ -153,6 +179,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     },
                     onOpenOverview: { [weak self] in
                         self?.overview.toggle()
+                    },
+                    onCheckForUpdates: { [weak self] in
+                        self?.updater.checkForUpdates(nil)
                     },
                     onToggleSwipe: {
                         let settings = OverviewSettings.shared

@@ -1,55 +1,84 @@
-APP := AerospaceTabs.app
-BIN := .build/release/AerospaceTabs
-ARM64_BUILD_PATH := .build/release-arm64
-INTEL_BUILD_PATH := .build/release-x86_64
-UNIVERSAL_BIN := .build/release-universal/AerospaceTabs
-APP_BINARY ?= $(BIN)
-CODESIGN_FLAGS ?=
-SIGNING_IDENTITY ?= $(shell security find-identity -v -p codesigning 2>/dev/null | awk '/^[[:space:]]*[0-9]+[^0-9]/ && $$2 ~ /^[[:xdigit:]]+$$/ { print $$2; exit }')
-ifeq ($(strip $(SIGNING_IDENTITY)),)
-SIGNING_IDENTITY := -
-endif
+PROJECT := AerospaceTabs.xcodeproj
+SCHEME := AerospaceTabs
+APP_NAME := $(shell sed -n 's/^PRODUCT_NAME = //p' Config/App.xcconfig)
+APP_BUNDLE_ID := $(shell sed -n 's/^PRODUCT_BUNDLE_IDENTIFIER = //p' Config/App.xcconfig)
+APP_MIN_SYSTEM_VERSION := $(shell sed -n 's/^MACOSX_DEPLOYMENT_TARGET = //p' Config/Project.xcconfig)
+SPARKLE_PUBLIC_ED_KEY := $(shell sed -n 's/^SPARKLE_PUBLIC_ED_KEY = //p' Config/App.xcconfig)
+SPARKLE_ENABLED := $(shell sed -n 's/^SPARKLE_ENABLED = //p' Config/App.xcconfig)
+RELEASE_OWNER := $(shell sed -n 's/^RELEASE_OWNER = //p' Config/App.xcconfig)
+RELEASE_SLUG := $(shell sed -n 's/^RELEASE_SLUG = //p' Config/App.xcconfig)
+SPARKLE_FEED_URL := https://github.com/$(RELEASE_OWNER)/$(RELEASE_SLUG)/releases/latest/download/appcast.xml
+SPARKLE_KEYCHAIN_ACCOUNT := $(RELEASE_SLUG)
+APP_VERSION := $(shell sed -n 's/^APP_MARKETING_VERSION = //p' Config/App.xcconfig)
+APP_BUILD_NUMBER ?= $(shell sed -n 's/^APP_BUILD_NUMBER = //p' Config/App.xcconfig)
+DERIVED_DATA := .build/DerivedData
+DEBUG_APP := $(DERIVED_DATA)/Build/Products/Debug/$(APP_NAME).app
+RELEASE_APP := $(DERIVED_DATA)/Build/Products/Release/$(APP_NAME).app
+XCODEBUILD ?= xcodebuild
+PYTHON ?= python3
 
-.PHONY: build build-universal assemble-app run kill restore-gaps
+.PHONY: setup build run test bundle check release-check restore-gaps clean
+
+setup:
+	@XCODEBUILD='$(XCODEBUILD)' scripts/setup.sh '$(PROJECT)' '$(SCHEME)'
 
 build:
-	swift build -c release
-	$(MAKE) assemble-app APP_BINARY="$(BIN)"
+	@$(XCODEBUILD) -project $(PROJECT) -scheme $(SCHEME) -configuration Debug \
+		-derivedDataPath $(DERIVED_DATA) APP_MARKETING_VERSION=$(APP_VERSION) \
+		APP_BUILD_NUMBER=$(APP_BUILD_NUMBER) CODE_SIGNING_ALLOWED=NO build
 
-build-universal:
-	swift build -c release --triple arm64-apple-macosx14.0 --scratch-path $(ARM64_BUILD_PATH)
-	swift build -c release --triple x86_64-apple-macosx14.0 --scratch-path $(INTEL_BUILD_PATH)
-	mkdir -p .build/release-universal
-	lipo -create \
-		"$$(swift build -c release --triple arm64-apple-macosx14.0 --scratch-path $(ARM64_BUILD_PATH) --show-bin-path)/AerospaceTabs" \
-		"$$(swift build -c release --triple x86_64-apple-macosx14.0 --scratch-path $(INTEL_BUILD_PATH) --show-bin-path)/AerospaceTabs" \
-		-output "$(UNIVERSAL_BIN)"
-	lipo "$(UNIVERSAL_BIN)" -verify_arch arm64 x86_64
-	$(MAKE) assemble-app APP_BINARY="$(UNIVERSAL_BIN)"
+run: build
+	@if /usr/bin/pgrep -x '$(APP_NAME)' >/dev/null 2>&1; then \
+		/usr/bin/osascript -e 'tell application id "$(APP_BUNDLE_ID)" to quit' >/dev/null 2>&1 || true; \
+		attempt=0; \
+		while /usr/bin/pgrep -x '$(APP_NAME)' >/dev/null 2>&1 && [ $$attempt -lt 50 ]; do \
+			sleep 0.2; attempt=$$((attempt + 1)); \
+		done; \
+		if /usr/bin/pgrep -x '$(APP_NAME)' >/dev/null 2>&1; then \
+			echo 'Aerospace Tabs did not quit. Close it before running the new build.' >&2; exit 1; \
+		fi; \
+	fi
+	@open -n "$(DEBUG_APP)"
 
-assemble-app:
-	rm -rf $(APP)
-	mkdir -p $(APP)/Contents/MacOS $(APP)/Contents/Resources
-	cp "$(APP_BINARY)" $(APP)/Contents/MacOS/AerospaceTabs
-	cp Resources/Info.plist $(APP)/Contents/Info.plist
-	cp Resources/AerospaceTabs.icns $(APP)/Contents/Resources/AerospaceTabs.icns
-	test "$$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$(APP)/Contents/Info.plist")" = "AerospaceTabs.icns"
-	test -s "$(APP)/Contents/Resources/AerospaceTabs.icns"
-ifdef APP_VERSION
-	/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $(APP_VERSION)" $(APP)/Contents/Info.plist
-endif
-ifdef BUILD_NUMBER
-	/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(BUILD_NUMBER)" $(APP)/Contents/Info.plist
-endif
-	codesign --force $(CODESIGN_FLAGS) --sign "$(SIGNING_IDENTITY)" --identifier com.pedrotmr.AerospaceTabs $(APP)
+test:
+	@$(XCODEBUILD) test -project $(PROJECT) -scheme $(SCHEME) -configuration Debug \
+		-derivedDataPath $(DERIVED_DATA) APP_MARKETING_VERSION=$(APP_VERSION) \
+		APP_BUILD_NUMBER=$(APP_BUILD_NUMBER) CODE_SIGNING_ALLOWED=NO
+	@$(PYTHON) -m unittest discover -s scripts/tests -p 'test_*.py'
 
-kill:
-	-$(BIN) --restore-gaps 2>/dev/null || true
-	-killall AerospaceTabs 2>/dev/null || true
+bundle:
+	@$(XCODEBUILD) build -project $(PROJECT) -scheme $(SCHEME) -configuration Release \
+		-destination 'generic/platform=macOS' -derivedDataPath $(DERIVED_DATA) \
+		APP_MARKETING_VERSION=$(APP_VERSION) APP_BUILD_NUMBER=$(APP_BUILD_NUMBER) \
+		ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO
+	@APP_BUNDLE_ID='$(APP_BUNDLE_ID)' APP_VERSION='$(APP_VERSION)' \
+		APP_BUILD_NUMBER='$(APP_BUILD_NUMBER)' APP_MIN_SYSTEM_VERSION='$(APP_MIN_SYSTEM_VERSION)' \
+		SPARKLE_ENABLED='$(SPARKLE_ENABLED)' SPARKLE_FEED_URL='$(SPARKLE_FEED_URL)' \
+		SPARKLE_PUBLIC_ED_KEY='$(SPARKLE_PUBLIC_ED_KEY)' \
+		scripts/check-app-bundle.sh '$(RELEASE_APP)'
 
-restore-gaps:
-	swift build -c release
-	$(BIN) --restore-gaps
+check:
+	@$(MAKE) setup
+	@$(MAKE) test
+	@$(MAKE) bundle
 
-run: kill build
-	open $(APP)
+release-check:
+	@env -u APPLE_NOTARY_KEY_P8_BASE64 -u APPLE_NOTARY_KEY_ID \
+		-u APPLE_NOTARY_ISSUER_ID -u SPARKLE_PRIVATE_KEY $(MAKE) setup
+	@if [ '$(origin APP_BUILD_NUMBER)' = file ]; then \
+		echo 'Set APP_BUILD_NUMBER to a new, increasing numeric value for a signed release check.' >&2; exit 2; \
+	fi
+	@APP_PROJECT='$(PROJECT)' APP_SCHEME='$(SCHEME)' APP_NAME='$(APP_NAME)' \
+		APP_BUNDLE_ID='$(APP_BUNDLE_ID)' APP_MIN_SYSTEM_VERSION='$(APP_MIN_SYSTEM_VERSION)' \
+		APP_VERSION='$(APP_VERSION)' APP_BUILD_NUMBER='$(APP_BUILD_NUMBER)' \
+		RELEASE_OWNER='$(RELEASE_OWNER)' RELEASE_SLUG='$(RELEASE_SLUG)' \
+		SPARKLE_KEYCHAIN_ACCOUNT='$(SPARKLE_KEYCHAIN_ACCOUNT)' \
+		SPARKLE_ENABLED='$(SPARKLE_ENABLED)' SPARKLE_FEED_URL='$(SPARKLE_FEED_URL)' \
+		SPARKLE_PUBLIC_ED_KEY='$(SPARKLE_PUBLIC_ED_KEY)' \
+		scripts/release-check.sh
+
+restore-gaps: build
+	@'$(DEBUG_APP)/Contents/MacOS/$(APP_NAME)' --restore-gaps
+
+clean:
+	@rm -rf '$(DERIVED_DATA)' .build/release

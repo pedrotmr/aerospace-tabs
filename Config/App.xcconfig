@@ -1,0 +1,28 @@
+// `make` supplies the Release Please version and release run number.
+// These defaults keep the Xcode project runnable during local debugging.
+#include "Project.xcconfig"
+// x-release-please-start-version
+APP_MARKETING_VERSION = 0.1.2
+// x-release-please-end
+APP_BUILD_NUMBER = 1
+
+PRODUCT_NAME = AerospaceTabs
+PRODUCT_BUNDLE_IDENTIFIER = com.pedrotmr.AerospaceTabs
+MARKETING_VERSION = $(APP_MARKETING_VERSION)
+CURRENT_PROJECT_VERSION = $(APP_BUILD_NUMBER)
+INFOPLIST_FILE = Config/Info.plist
+GENERATE_INFOPLIST_FILE = NO
+
+APP_COPYRIGHT = Copyright © 2026 pedrotmr
+RELEASE_OWNER = pedrotmr
+RELEASE_SLUG = aerospace-tabs
+SPARKLE_ENABLED = YES
+SPARKLE_FEED_URL = https:/$()/github.com/$(RELEASE_OWNER)/$(RELEASE_SLUG)/releases/latest/download/appcast.xml
+SPARKLE_PUBLIC_ED_KEY = XwofBdNg9v/sbXo3mTnl7hr4a3dKPJr8dZ+CQIPq4Cg=
+
+CODE_SIGN_STYLE = Automatic
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/../Frameworks
+ENABLE_APP_SANDBOX = NO
+ENABLE_HARDENED_RUNTIME = YES
+SWIFT_EMIT_LOC_STRINGS = YES
+SWIFT_STRICT_CONCURRENCY = minimal

@@ -25,3 +25,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Sparkle
+
+The app embeds Sparkle 2.10.1, licensed under MIT with additional external licenses. The full notices are bundled as `Resources/Sparkle-LICENSE.txt`; source and license are available at [sparkle-project/Sparkle](https://github.com/sparkle-project/Sparkle).
