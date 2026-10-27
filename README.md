@@ -1,58 +1,81 @@
-<img src="Resources/aerospace-tabs-icon.png" alt="AeroSpaceTabs app icon" width="160">
+<div align="center">
+  <img src="Resources/aerospace-tabs-icon.png" alt="AeroSpaceTabs app icon" width="128">
+  <h1>AeroSpaceTabs</h1>
+  <p>A macOS companion for AeroSpace with a window tab strip and workspace-grouped overview</p>
+  <p>
+    <a href="https://github.com/pedrotmr/aerospace-tabs/releases/latest"><img src="https://img.shields.io/github/v/release/pedrotmr/aerospace-tabs?label=latest%20release" alt="Latest release"></a>
+    <a href="https://github.com/pedrotmr/aerospace-tabs/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/pedrotmr/aerospace-tabs/ci.yml?label=checks" alt="Build and test status"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/github/license/pedrotmr/aerospace-tabs" alt="MIT license"></a>
+  </p>
+</div>
 
-# AeroSpaceTabs
+![Screenshot placeholder for the AeroSpaceTabs workspace overview](Screenshots/aerospace-tabs-workspaces-placeholder.svg)
 
-A macOS companion for [AeroSpace](https://github.com/nikitabobko/AeroSpace). It adds window tabs and a workspace overview so you can find and focus windows.
+_This is a placeholder, not an app screenshot. See the [capture notes](docs/SCREENSHOT.md)._
 
-> **Maintenance:** Maintenance is limited. Issues and pull requests are welcome on a best-effort basis. Replies and release dates are not promised.
+## ✨ Features
 
-![Screenshot placeholder: capture AeroSpaceTabs with a local demo setup](Screenshots/aerospace-tabs-workspaces-placeholder.svg)
+AeroSpaceTabs adds a tab strip and a workspace overview to [AeroSpace](https://github.com/nikitabobko/AeroSpace). AeroSpace remains in control of window tiling.
 
-*Not a product screenshot. See [capture notes](docs/SCREENSHOT.md).*
+- 🪟 **Window tabs.** A strip appears when a display has two or more windows. Click to focus or drag to reorder.
+- 🧭 **Workspace overview.** Browse windows grouped by AeroSpace workspace.
+- ⌨️ **Quick focus.** Use the keyboard, the default three-finger swipe, or a hot corner.
 
-## Install
+## 📦 Install
 
-### Homebrew
+Choose one installation method:
+
+### Option 1: Homebrew
 
 ```sh
 brew install --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
 ```
 
-Homebrew manages updates for this copy. To update only AeroSpaceTabs, run:
+Homebrew manages updates for this copy. To update only AeroSpaceTabs:
 
 ```sh
 brew update
 brew upgrade --cask --greedy-auto-updates pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
 ```
 
-### Direct download
+### Option 2: Direct download
 
-Download the latest stable `AerospaceTabs-<version>.dmg` or `.zip` from [GitHub Releases](https://github.com/pedrotmr/aerospace-tabs/releases/latest). Open the disk image and drag `AerospaceTabs.app` to Applications, or expand the ZIP and move the app to Applications.
+1. Download the latest stable [DMG or ZIP from GitHub Releases](https://github.com/pedrotmr/aerospace-tabs/releases/latest).
+2. If you downloaded the DMG, open it. If you downloaded the ZIP, extract it.
+3. Drag `AerospaceTabs.app` to your Applications folder.
 
-Direct installs can use **Check for Updates…** in the app. Releases before v0.2.0 do not include Sparkle. If you use one of those versions, install the latest release manually once.
+To update a direct download, choose **Check for Updates…** in the app. Versions before v0.2.0 need one manual update first.
 
-## First launch
+## 🚀 First launch
 
-1. Install and start [AeroSpace](https://github.com/nikitabobko/AeroSpace).
-2. Open **AeroSpaceTabs** from Applications and allow **Accessibility** access when macOS asks.
-3. With two or more windows open on a display, right-click the strip and choose **Open Window Overview**. Use the arrow keys and Return to focus a window. Press Escape to close the overview.
+1. Install and start AeroSpace.
+2. Open AeroSpaceTabs from Applications and allow **Accessibility** access when macOS asks.
+3. Use the default three-finger swipe to open the overview. Move with the arrow keys, press Return to focus a window, or press Escape to close the overview.
 
-## What it does
+## ⚙️ Requirements and limitations
 
-- Shows windows from occupied AeroSpace workspaces on each display. A strip appears when a display has two or more windows.
-- Click a tab to focus its window. Drag tabs to change their order on that display.
-- Shows a full-screen overview grouped by workspace. A three-finger swipe opens it by default. You can also set a hot corner in the strip menu.
+- Requires macOS 14 or later, AeroSpace running, and Accessibility access. Screen Recording is optional for window previews.
+- Temporarily changes AeroSpace's `gaps.outer.top` and normally restores the previous value on quit. See the [recovery guide](docs/usage.md) if needed.
+- Trackpad swipe uses Apple's private `MultitouchSupport` framework and may change after macOS updates.
+- Window previews stay in memory. The app does not save or send them, and it does not manage native macOS Spaces.
 
-## Requirements and limitations
+## 🛠 Development
 
-- macOS 14 or later, with AeroSpace installed and running.
-- Accessibility access is required. Screen Recording is optional and enables window previews.
-- The app temporarily increases AeroSpace's `gaps.outer.top` while it runs, then restores it when you quit. See [usage notes](docs/usage.md) if recovery is needed.
-- Trackpad swipe detection uses Apple's private `MultitouchSupport` framework and may break after a macOS update. Window previews stay in memory. The app does not save or send them.
-- AeroSpaceTabs is not a window manager and does not manage native macOS Spaces.
+Use Xcode 26.6 or later. These commands do not need signing or release credentials:
 
-## Help and development
+```sh
+make setup
+make run
+make check
+```
 
-- **Questions and problems:** [GitHub Issues](https://github.com/pedrotmr/aerospace-tabs/issues)
-- **Setup and development:** [Documentation index](docs/README.md), [contribution guide](CONTRIBUTING.md), and [build and release guide](docs/BUILD-AND-RELEASE.md)
-- **License:** [MIT](LICENSE) · [Third-party notices](docs/THIRD-PARTY-NOTICES.md)
+See the [build and release guide](docs/BUILD-AND-RELEASE.md) for tool and release details.
+
+> Maintenance is best-effort. Issues and pull requests are welcome, but replies and release dates are not promised.
+
+## Links
+
+- 🐛 **Support:** [Report a problem](https://github.com/pedrotmr/aerospace-tabs/issues)
+- 📚 **Documentation:** [Read the guides](docs/README.md)
+- 🤝 **Contribute:** [Contribution guide](CONTRIBUTING.md)
+- ⚖️ **License:** [MIT](LICENSE) · [Third-party notices](docs/THIRD-PARTY-NOTICES.md)
