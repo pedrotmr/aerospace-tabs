@@ -52,6 +52,8 @@ class UpdateCaskTests(unittest.TestCase):
 
         self.assertIn('"managedByHomebrewVersion", "-string", "1.2.3"', cask)
         self.assertIn('"delete", "com.example.Demo.homebrew", "managedByHomebrewVersion"', cask)
+        self.assertIn('"managedByHomebrewBundlePath", "-string", "#{appdir}/Demo.app"', cask)
+        self.assertIn('"delete", "com.example.Demo.homebrew", "managedByHomebrewBundlePath"', cask)
 
 
 if __name__ == "__main__":

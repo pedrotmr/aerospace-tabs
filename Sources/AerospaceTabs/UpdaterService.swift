@@ -15,7 +15,8 @@ final class UpdaterService {
         let installedVersion = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
         managedByHomebrew = HomebrewInstallDetector.isManagedByHomebrew(
             bundleIdentifier: bundleIdentifier,
-            installedVersion: installedVersion
+            installedVersion: installedVersion,
+            bundleURL: bundle.bundleURL
         )
         controller = SPUStandardUpdaterController(
             startingUpdater: !managedByHomebrew,

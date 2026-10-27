@@ -52,7 +52,9 @@ The direct ZIP contains the stapled app bundle; the ZIP itself is not stapled. T
 
 ## Update paths
 
-Homebrew users should use `brew update && brew upgrade`. The public v0.1.2 cask points to a build without Sparkle, so that cask does not declare `auto_updates` yet. The tap adds that stanza when it syncs a Sparkle-enabled published build. The cask writes and removes its install marker in a separate UserDefaults domain. The app reads the marker before starting Sparkle and checks that its version matches the running app.
+Homebrew users should use `brew update && brew upgrade`. The public v0.1.2 cask points to a build without Sparkle, so that cask does not declare `auto_updates` yet. The tap adds that stanza when it syncs a Sparkle-enabled published build. The cask writes and removes its install marker in a separate UserDefaults domain. The app checks the marker's version and app path before it starts Sparkle. This lets a separate direct copy use Sparkle even when a Homebrew copy is also installed.
+
+To switch the same app copy from Homebrew to a direct download, run `brew uninstall --cask aerospace-tabs` first, then install the downloaded app. Homebrew owns the app path while its cask is installed.
 
 Homebrew's current FAQ says ordinary `brew upgrade` skips a readable self-updating app when it is the same version as or newer than the cask. Naming the cask or using greedy upgrade options can include it and reinstall an older version. Use plain `brew upgrade`. See [Homebrew's updater guidance](https://docs.brew.sh/FAQ#how-does-brew-upgrade-handle-apps-that-update-themselves).
 
