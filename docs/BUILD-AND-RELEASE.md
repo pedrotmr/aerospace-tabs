@@ -28,7 +28,7 @@ make bundle
 make check
 ```
 
-These commands work without signing credentials. `make setup` resolves Sparkle. `make run` opens the Debug app. `make bundle` builds and checks an unsigned universal Release app in `.build/DerivedData`. `make check` is the CI command; it runs tests and verifies the app's metadata, icon, Sparkle framework, runtime path, and architecture slices.
+These commands work without distribution credentials. `make setup` resolves Sparkle. `make run` signs the Debug app with the first available Apple Development identity before opening it, so macOS can keep its permissions across rebuilds. This development identity is separate from the Developer ID signature used by Homebrew, so the Debug app may need its own one-time permission grant. If no Apple Development identity is installed, `make run` opens the unsigned Debug app and warns that macOS may re-prompt after each build. `make bundle` builds and checks an unsigned universal Release app in `.build/DerivedData`. `make check` is the CI command; it runs tests and verifies the app's metadata, icon, Sparkle framework, runtime path, and architecture slices.
 
 To validate local Developer ID distribution without publishing, provide a new increasing build number:
 

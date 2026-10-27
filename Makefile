@@ -16,6 +16,7 @@ DEBUG_APP := $(DERIVED_DATA)/Build/Products/Debug/$(APP_NAME).app
 RELEASE_APP := $(DERIVED_DATA)/Build/Products/Release/$(APP_NAME).app
 XCODEBUILD ?= xcodebuild
 PYTHON ?= python3
+LOCAL_DEVELOPMENT_IDENTITY ?= $(shell /usr/bin/security find-identity -v -p codesigning 2>/dev/null | /usr/bin/awk -F '"' '/Apple Development:/ { print $$2; exit }')
 
 .PHONY: setup build run test bundle check release-check restore-gaps clean
 
@@ -28,6 +29,11 @@ build:
 		APP_BUILD_NUMBER=$(APP_BUILD_NUMBER) CODE_SIGNING_ALLOWED=NO build
 
 run: build
+	@if [ -n "$(LOCAL_DEVELOPMENT_IDENTITY)" ]; then \
+		scripts/sign-debug-app.sh "$(DEBUG_APP)" "$(LOCAL_DEVELOPMENT_IDENTITY)"; \
+	else \
+		echo 'warning: no Apple Development identity found; macOS may re-prompt for permissions after each Debug build.' >&2; \
+	fi
 	@if /usr/bin/pgrep -x '$(APP_NAME)' >/dev/null 2>&1; then \
 		/usr/bin/osascript -e 'tell application id "$(APP_BUNDLE_ID)" to quit' >/dev/null 2>&1 || true; \
 		attempt=0; \
