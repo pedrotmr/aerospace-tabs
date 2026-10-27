@@ -29,7 +29,7 @@ final class UpdaterService {
         if managedByHomebrew {
             let alert = NSAlert()
             alert.messageText = "Updates are managed by Homebrew"
-            alert.informativeText = "Run `brew update && brew upgrade` to update Aerospace Tabs."
+            alert.informativeText = "Run `brew update`, then `brew upgrade --cask --greedy-auto-updates pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs` to update Aerospace Tabs."
             alert.addButton(withTitle: "OK")
             alert.runModal()
             return
