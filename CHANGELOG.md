@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/pedrotmr/aerospace-tabs/compare/v0.1.2...v0.2.0) (2026-10-27)
+
+
+### Features
+
+* standardize Xcode and Sparkle distribution ([d2a6176](https://github.com/pedrotmr/aerospace-tabs/commit/d2a6176a94dc8356f1ad9778f854373047fa67be))
+
 ## [0.1.2](https://github.com/pedrotmr/aerospace-tabs/compare/v0.1.1...v0.1.2) (2026-10-26)
 
 
