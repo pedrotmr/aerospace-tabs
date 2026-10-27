@@ -23,9 +23,10 @@ read_plist() {
 [[ -n "$(read_plist NSHumanReadableCopyright)" ]] || fail "Copyright metadata is empty."
 
 feed_url=$(read_plist SUFeedURL)
-[[ "$feed_url" == https://github.com/*/releases/latest/download/appcast.xml ]] || fail "Sparkle feed URL must target the stable appcast.xml."
+[[ "${SPARKLE_ENABLED:-}" == YES ]] || fail "Sparkle must be enabled in Config/App.xcconfig."
+[[ "$feed_url" == "$SPARKLE_FEED_URL" ]] || fail "Sparkle feed URL does not match Config/App.xcconfig."
 public_key=$(read_plist SUPublicEDKey)
-[[ -n "$public_key" && "$public_key" != PENDING_* ]] || fail "Sparkle public key is missing or still a placeholder."
+[[ -n "$public_key" && "$public_key" == "$SPARKLE_PUBLIC_ED_KEY" ]] || fail "Sparkle public key does not match Config/App.xcconfig."
 
 resources="$app_path/Contents/Resources"
 icon_name=$(read_plist CFBundleIconFile)

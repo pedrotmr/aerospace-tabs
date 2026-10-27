@@ -14,11 +14,13 @@ chmod 600 "$repo_root/.env"
 "$repo_root/scripts/check-version-config.sh"
 
 if ! command -v "$xcodebuild_cmd" >/dev/null 2>&1; then
-  printf 'error: Xcode 26.6 or newer is required. Install Xcode and select it with xcode-select.\n' >&2
+  minimum_xcode=$(sed -n 's/^MINIMUM_XCODE_VERSION = //p' "$repo_root/Config/Project.xcconfig")
+  printf 'error: Xcode %s or newer is required. Install Xcode and select it with xcode-select.\n' "${minimum_xcode:-the configured minimum}" >&2
   exit 1
 fi
 
-xcode_version=$("$xcodebuild_cmd" -version | awk '/^Xcode / { print $2 }')
+version_output=$("$xcodebuild_cmd" -version 2>/dev/null || true)
+xcode_version=$(awk '/^Xcode / { print $2 }' <<< "$version_output")
 minimum_xcode=$(sed -n 's/^MINIMUM_XCODE_VERSION = //p' "$repo_root/Config/Project.xcconfig")
 major=${xcode_version%%.*}
 minor=${xcode_version#*.}
@@ -31,4 +33,5 @@ if [[ ! "$minimum_xcode" =~ ^[0-9]+\.[0-9]+$ || ! "$major" =~ ^[0-9]+$ || ! "$mi
   exit 1
 fi
 
-"$xcodebuild_cmd" -resolvePackageDependencies -project "$project" -scheme "$scheme"
+"$xcodebuild_cmd" -resolvePackageDependencies -project "$project" -scheme "$scheme" \
+  -derivedDataPath "$repo_root/.build/DerivedData"

@@ -5,12 +5,18 @@ import Sparkle
 final class UpdaterService {
     private let userDriverDelegate: UpdaterUserDriverDelegate
     private let controller: SPUStandardUpdaterController
+    private let managedByHomebrew: Bool
 
     init() {
         let userDriverDelegate = UpdaterUserDriverDelegate()
         self.userDriverDelegate = userDriverDelegate
-        let bundleIdentifier = Bundle.main.bundleIdentifier ?? "com.pedrotmr.AerospaceTabs"
-        let managedByHomebrew = HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier)
+        let bundle = Bundle.main
+        let bundleIdentifier = bundle.bundleIdentifier ?? "com.pedrotmr.AerospaceTabs"
+        let installedVersion = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+        managedByHomebrew = HomebrewInstallDetector.isManagedByHomebrew(
+            bundleIdentifier: bundleIdentifier,
+            installedVersion: installedVersion
+        )
         controller = SPUStandardUpdaterController(
             startingUpdater: !managedByHomebrew,
             updaterDelegate: nil,
@@ -19,8 +25,7 @@ final class UpdaterService {
     }
 
     @objc func checkForUpdates(_ sender: Any?) {
-        let bundleIdentifier = Bundle.main.bundleIdentifier ?? "com.pedrotmr.AerospaceTabs"
-        if HomebrewInstallDetector.isManagedByHomebrew(bundleIdentifier: bundleIdentifier) {
+        if managedByHomebrew {
             let alert = NSAlert()
             alert.messageText = "Updates are managed by Homebrew"
             alert.informativeText = "Run `brew update && brew upgrade` to update Aerospace Tabs."

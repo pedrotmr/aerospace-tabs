@@ -29,7 +29,7 @@ make check
 make release-check APP_BUILD_NUMBER=<new-increasing-number>
 ```
 
-The first six commands require no distribution credentials. `make release-check` requires a Developer ID Application identity, Apple notarization credentials, and this app's Sparkle EdDSA key. It only creates files under `.build/release`; it does not publish.
+The first six commands require no distribution credentials. `make release-check` requires a Developer ID Application identity, Apple notarization credentials, and this app's Sparkle EdDSA key. It creates `.env` from the example if needed, writes build files under `.build/DerivedData`, and writes distribution files under `.build/release`. It does not publish to GitHub.
 
 ## Compatibility and scope
 

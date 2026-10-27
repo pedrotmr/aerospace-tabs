@@ -180,6 +180,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     onOpenOverview: { [weak self] in
                         self?.overview.toggle()
                     },
+                    onCheckForUpdates: { [weak self] in
+                        self?.updater.checkForUpdates(nil)
+                    },
                     onToggleSwipe: {
                         let settings = OverviewSettings.shared
                         settings.setSwipeEnabled(!settings.swipeEnabled)

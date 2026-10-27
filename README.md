@@ -18,7 +18,7 @@ The latest published version is v0.1.2. Install it with Homebrew:
 brew install --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
 ```
 
-For a direct install, download `AerospaceTabs.zip` from [GitHub Releases](https://github.com/pedrotmr/aerospace-tabs/releases/latest), unzip it, and move `AerospaceTabs.app` to Applications. The published app is signed and notarized.
+For a direct install, download the versioned `AerospaceTabs-<version>.zip` asset from [GitHub Releases](https://github.com/pedrotmr/aerospace-tabs/releases/latest), unzip it, and move `AerospaceTabs.app` to Applications. The published app is signed and notarized.
 
 ## First launch
 

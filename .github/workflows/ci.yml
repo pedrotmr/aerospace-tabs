@@ -20,8 +20,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.ref }}-${{ inputs.signed_distribution && 'signed' || 'checks' }}
+  cancel-in-progress: ${{ !inputs.signed_distribution }}
 
 jobs:
   checks:
@@ -37,7 +37,8 @@ jobs:
 
   signed-distribution:
     name: Signed distribution check
-    if: github.event_name == 'workflow_dispatch' && inputs.signed_distribution
+    if: github.event_name == 'workflow_dispatch' && inputs.signed_distribution && github.ref == 'refs/heads/main'
+    environment: signed-distribution
     needs: checks
     runs-on: macos-26
     timeout-minutes: 120
@@ -111,4 +112,4 @@ jobs:
           if [[ -e "$keychain_path" ]]; then
             security delete-keychain "$keychain_path" || true
           fi
-          rm -f "$RUNNER_TEMP/developer-id.p12" "$RUNNER_TEMP/apple-notary-api-key.p8"
+          rm -f "$RUNNER_TEMP/developer-id.p12"

@@ -20,10 +20,18 @@ bundle_id=$(setting Config/App.xcconfig PRODUCT_BUNDLE_IDENTIFIER)
 owner=$(setting Config/App.xcconfig RELEASE_OWNER)
 slug=$(setting Config/App.xcconfig RELEASE_SLUG)
 min_macos=$(setting Config/Project.xcconfig MACOSX_DEPLOYMENT_TARGET)
+expected_team=$(setting Config/Project.xcconfig DEVELOPMENT_TEAM)
 sparkle_enabled=$(setting Config/App.xcconfig SPARKLE_ENABLED)
+expected_feed=$(setting Config/App.xcconfig SPARKLE_FEED_URL)
+expected_public_key=$(setting Config/App.xcconfig SPARKLE_PUBLIC_ED_KEY)
+sparkle_keychain_account=$(setting Config/App.xcconfig RELEASE_SLUG)
 expected_version=${tag#v}
-[[ -n "$app_name" && -n "$bundle_id" && -n "$owner" && -n "$slug" && -n "$min_macos" ]] || {
+[[ -n "$app_name" && -n "$bundle_id" && -n "$owner" && -n "$slug" && -n "$min_macos" && -n "$expected_team" ]] || {
   echo "error: app release settings are incomplete." >&2
+  exit 1
+}
+[[ "$sparkle_enabled" == YES && -n "$expected_feed" && -n "$expected_public_key" ]] || {
+  echo "error: Sparkle must be enabled with a feed and public key in Config/App.xcconfig." >&2
   exit 1
 }
 
@@ -57,6 +65,7 @@ signature=$(codesign --display --verbose=4 "$app" 2>&1)
 [[ "$signature" == *'(runtime)'* ]] || { echo "error: app signature does not enable hardened runtime." >&2; exit 1; }
 [[ "$signature" == *'TeamIdentifier='* ]] || { echo "error: app signature has no team identifier." >&2; exit 1; }
 team_id=$(sed -n 's/^TeamIdentifier=//p' <<< "$signature" | head -n 1)
+[[ "$team_id" == "$expected_team" ]] || { echo "error: app signature team does not match Config/Project.xcconfig." >&2; exit 1; }
 for architecture in arm64 x86_64; do lipo "$app/Contents/MacOS/$executable" -verify_arch "$architecture"; done
 
 if [[ "$sparkle_enabled" == "YES" ]]; then
@@ -64,8 +73,7 @@ if [[ "$sparkle_enabled" == "YES" ]]; then
   binary="$framework/Versions/B"
   feed_url=$(/usr/libexec/PlistBuddy -c 'Print :SUFeedURL' "$plist")
   public_key=$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$plist")
-  expected_feed="https://github.com/$owner/$slug/releases/latest/download/appcast.xml"
-  [[ -x "$binary/Sparkle" && "$feed_url" == "$expected_feed" && -n "$public_key" && "$public_key" != REPLACE_* ]] || {
+  [[ -x "$binary/Sparkle" && "$feed_url" == "$expected_feed" && "$public_key" == "$expected_public_key" ]] || {
     echo "error: Sparkle framework, feed, or public key is missing from the app bundle." >&2
     exit 1
   }
@@ -113,6 +121,15 @@ signature = next((value for key, value in enclosure.attrib.items() if key.split(
 if not signature:
     raise SystemExit("error: Sparkle feed enclosure has no EdDSA signature")
 PY
+  feed_signature=$(/usr/bin/xmllint --xpath 'string((//*[local-name()="item"])[1]/*[local-name()="enclosure"]/@*[local-name()="edSignature"])' "$appcast")
+  [[ -n "$feed_signature" ]] || { echo "error: Sparkle feed has no EdDSA signature." >&2; exit 1; }
+  sign_update=".build/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update"
+  [[ -x "$sign_update" ]] || { echo "error: Sparkle's sign_update tool is missing; run make bundle." >&2; exit 1; }
+  if [[ -n "${SPARKLE_PRIVATE_KEY:-}" ]]; then
+    printf '%s' "$SPARKLE_PRIVATE_KEY" | "$sign_update" --verify --ed-key-file - "$archive" "$feed_signature"
+  else
+    "$sign_update" --account "$sparkle_keychain_account" --verify "$archive" "$feed_signature"
+  fi
 fi
 
 xcrun stapler validate "$app"

@@ -8,7 +8,7 @@ Open a [GitHub issue](https://github.com/pedrotmr/aerospace-tabs/issues) with ma
 
 ## Prepare and verify
 
-Install Xcode 26.6 or newer with the macOS platform. Git is required for source work. Homebrew is optional. Run the same commands used by CI:
+Install Xcode 26.6 or newer with the macOS platform. Git is required for source work. Homebrew is optional. These are the standard local commands. CI runs `make check`:
 
 ```sh
 make setup

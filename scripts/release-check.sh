@@ -35,7 +35,7 @@ require_value() {
   [[ -n "${!name:-}" ]] || fail "Required release configuration is missing: $name"
 }
 
-for name in APP_PROJECT APP_SCHEME APP_NAME APP_BUNDLE_ID APP_MIN_SYSTEM_VERSION APP_VERSION APP_BUILD_NUMBER RELEASE_OWNER RELEASE_SLUG SPARKLE_KEYCHAIN_ACCOUNT; do
+for name in APP_PROJECT APP_SCHEME APP_NAME APP_BUNDLE_ID APP_MIN_SYSTEM_VERSION APP_VERSION APP_BUILD_NUMBER RELEASE_OWNER RELEASE_SLUG SPARKLE_KEYCHAIN_ACCOUNT SPARKLE_ENABLED SPARKLE_FEED_URL SPARKLE_PUBLIC_ED_KEY; do
   require_value "$name"
 done
 for name in APPLE_NOTARY_KEY_P8_BASE64 APPLE_NOTARY_KEY_ID APPLE_NOTARY_ISSUER_ID; do
@@ -46,7 +46,8 @@ if [[ "${CI:-}" == true ]]; then
 fi
 
 [[ "$APP_BUILD_NUMBER" =~ ^[0-9]+$ ]] || fail "APP_BUILD_NUMBER must be a positive integer."
-(( APP_BUILD_NUMBER > 0 )) || fail "APP_BUILD_NUMBER must be a positive integer."
+build_number_decimal=$((10#$APP_BUILD_NUMBER))
+(( build_number_decimal > 0 )) || fail "APP_BUILD_NUMBER must be a positive integer."
 command -v jq >/dev/null || fail "Install jq to run release-check."
 
 identity=${CODESIGN_IDENTITY:-}
@@ -81,6 +82,9 @@ APP_BUNDLE_ID="$APP_BUNDLE_ID" \
 APP_VERSION="$APP_VERSION" \
 APP_BUILD_NUMBER="$APP_BUILD_NUMBER" \
 APP_MIN_SYSTEM_VERSION="$APP_MIN_SYSTEM_VERSION" \
+SPARKLE_ENABLED="$SPARKLE_ENABLED" \
+SPARKLE_FEED_URL="$SPARKLE_FEED_URL" \
+SPARKLE_PUBLIC_ED_KEY="$SPARKLE_PUBLIC_ED_KEY" \
   "$repo_root/scripts/check-app-bundle.sh" "$app_path"
 
 # Xcode downloads binary package artifacts during the build, not package
@@ -91,7 +95,7 @@ framework="$app_path/Contents/Frameworks/Sparkle.framework"
 sparkle_version="$framework/Versions/B"
 # Sparkle XPC services are only for sandboxed apps. Both apps are intentionally
 # unsandboxed, so remove them before signing the framework.
-rm -rf "$sparkle_version/XPCServices"
+rm -rf "$framework/XPCServices" "$sparkle_version/XPCServices"
 
 sign_component() {
   codesign --force --options runtime --timestamp --sign "$identity" "$1"
@@ -202,10 +206,10 @@ rm -rf "$verify_zip_dir"
 download_prefix="https://github.com/$RELEASE_OWNER/$RELEASE_SLUG/releases/download/v$APP_VERSION/"
 if [[ -n "${SPARKLE_PRIVATE_KEY:-}" ]]; then
   printf '%s' "$SPARKLE_PRIVATE_KEY" | "$generate_appcast" \
-    --ed-key-file - --download-url-prefix "$download_prefix" "$appcast_dir"
+    --ed-key-file - --embed-release-notes --download-url-prefix "$download_prefix" "$appcast_dir"
 else
   "$generate_appcast" --account "$SPARKLE_KEYCHAIN_ACCOUNT" \
-    --download-url-prefix "$download_prefix" "$appcast_dir"
+    --embed-release-notes --download-url-prefix "$download_prefix" "$appcast_dir"
 fi
 
 appcast="$appcast_dir/appcast.xml"

@@ -20,6 +20,7 @@ concurrency:
 jobs:
   prepare-release:
     name: Prepare version PR or validate draft
+    if: github.event_name == 'push' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       actions: write
@@ -51,8 +52,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          release_branch=$(gh pr list --base main --state open --json title,headRefName \
-            --jq '.[] | select(.title | test("release"; "i")) | .headRefName' | head -n 1)
+          release_branch=$(gh pr list --base main --state open --json headRefName \
+            --jq '.[] | select(.headRefName | startswith("release-please--branches--main")) | .headRefName' | head -n 1)
           if [[ -n "$release_branch" ]]; then
             gh workflow run ci.yml --ref "$release_branch"
           fi
@@ -74,11 +75,17 @@ jobs:
             echo "::error::The selected release must still be a draft."
             exit 1
           fi
+          comparison=$(gh api "repos/$GH_REPO/compare/main...$RELEASE_TAG" --jq '.status')
+          if [[ "$comparison" != "behind" && "$comparison" != "identical" ]]; then
+            echo "::error::The selected draft tag must point to a commit already on main."
+            exit 1
+          fi
 
   build-release:
     name: Build, sign, notarize, and stage update feed
-    if: needs.prepare-release.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch'
+    if: (needs.prepare-release.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     needs: prepare-release
+    environment: signed-distribution
     runs-on: macos-26
     timeout-minutes: 120
     permissions:
@@ -181,7 +188,7 @@ jobs:
           gh release upload "$RELEASE_TAG" \
             .build/release/AerospaceTabs-*.zip \
             .build/release/AerospaceTabs-*.dmg \
-            .build/release/appcast.xml --clobber
+            .build/release/appcast/appcast.xml --clobber
 
       - name: Confirm draft assets are present
         env:

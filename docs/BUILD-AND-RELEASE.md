@@ -36,7 +36,7 @@ To validate local Developer ID distribution without publishing, provide a new in
 make release-check APP_BUILD_NUMBER=18
 ```
 
-This requires a Developer ID Application identity in Keychain, Apple notary credentials, and Aerospace Tabs' EdDSA private key in Keychain or ignored `.env`. It creates a ZIP, DMG, appcast, and validation logs under `.build/release`. It never uploads or publishes. See [Credentials](CREDENTIALS.md). Base64 is encoding, not encryption.
+This requires a Developer ID Application identity in Keychain, Apple notary credentials, and Aerospace Tabs' EdDSA private key in Keychain or ignored `.env`. It creates a ZIP, DMG, appcast, and validation logs under `.build/release`. It sends the DMG to Apple for notarization, but does not upload files to GitHub or publish a release. See [Credentials](CREDENTIALS.md). Base64 is encoding, not encryption.
 
 ## Version and release flow
 
@@ -44,14 +44,16 @@ Release Please reads `.release-please-manifest.json` and `CHANGELOG.md`; Convent
 
 On `main`, Release Please opens or updates a draft version PR. Merging it creates a draft GitHub release and tag in that workflow. The workflow checks out the tag, runs `make check`, signs Sparkle's nested updater and framework from the inside out, signs the app, notarizes the DMG, validates Apple's result and log, staples the app and DMG, and tests the app extracted from the final ZIP. It attaches the versioned ZIP, DMG, and `appcast.xml` to the draft. It does not publish. A manual workflow run may rebuild only an existing draft.
 
+GitHub gates signing jobs with the `signed-distribution` environment. Its deployment branch policy allows `main`; signing credentials stay in repository secrets.
+
 Review the draft and publish it manually in GitHub when it is ready. The app uses the stable feed URL `https://github.com/pedrotmr/aerospace-tabs/releases/latest/download/appcast.xml`. Drafts are not returned as the latest public release, so a draft appcast cannot move the public feed. When you publish a stable release, the Homebrew workflow checks that release's ZIP, calculates its SHA-256, audits the cask, and pushes it to the tap. It needs `HOMEBREW_TAP_TOKEN` with write access to that tap.
 
 The direct ZIP contains the stapled app bundle; the ZIP itself is not stapled. The cask downloads that same ZIP and uses its real SHA-256. Do not replace assets after a release is published; make a new version. The app release workflow avoids running from both tag push and release-published events.
 
 ## Update paths
 
-Homebrew users should use `brew update && brew upgrade`. The public v0.1.2 cask points to a build without Sparkle, so that cask does not declare `auto_updates` yet. The tap adds that stanza when it syncs a Sparkle-enabled published build. The cask marks its install in a separate UserDefaults domain; the app reads this marker before starting Sparkle and removes it when Homebrew uninstalls the app.
+Homebrew users should use `brew update && brew upgrade`. The public v0.1.2 cask points to a build without Sparkle, so that cask does not declare `auto_updates` yet. The tap adds that stanza when it syncs a Sparkle-enabled published build. The cask writes and removes its install marker in a separate UserDefaults domain. The app reads the marker before starting Sparkle and checks that its version matches the running app.
 
-Homebrew 7.0.11 documentation and code confirm that ordinary `brew upgrade` avoids downgrading a readable self-updating app when Sparkle has made it newer than the cask. `brew upgrade --cask pedrotmr-aerospace-tabs`, `--greedy`, and `--greedy-auto-updates` can reinstall an older cask version. Use plain `brew upgrade`.
+Homebrew's current FAQ says ordinary `brew upgrade` skips a readable self-updating app when it is the same version as or newer than the cask. Naming the cask or using greedy upgrade options can include it and reinstall an older version. Use plain `brew upgrade`. See [Homebrew's updater guidance](https://docs.brew.sh/FAQ#how-does-brew-upgrade-handle-apps-that-update-themselves).
 
 The published v0.1.2 app has no Sparkle framework, so it cannot self-update. Direct users must download and install a later version manually; a Sparkle-enabled build can update direct installs after it is published.

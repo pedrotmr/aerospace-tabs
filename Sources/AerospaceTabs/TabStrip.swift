@@ -238,6 +238,7 @@ final class TabStrip {
         onPick: @escaping (Int) -> Void,
         onReorder: @escaping ([Int], String) -> Void,
         onOpenOverview: @escaping () -> Void,
+        onCheckForUpdates: @escaping () -> Void,
         onToggleSwipe: @escaping () -> Void,
         isSwipeAvailable: @escaping () -> Bool,
         onQuit: @escaping () -> Void
@@ -246,6 +247,7 @@ final class TabStrip {
         view.onPick = onPick
         view.onReorder = onReorder
         view.onOpenOverview = onOpenOverview
+        view.onCheckForUpdates = onCheckForUpdates
         view.onToggleSwipe = onToggleSwipe
         view.isSwipeAvailable = isSwipeAvailable
         view.onQuit = onQuit
@@ -412,6 +414,7 @@ final class TabStrip {
 
 final class TabStripView: NSView {
     var onOpenOverview: (() -> Void)?
+    var onCheckForUpdates: (() -> Void)?
     var onToggleSwipe: (() -> Void)?
     var isSwipeAvailable: (() -> Bool)?
 
@@ -794,9 +797,20 @@ final class TabStripView: NSView {
         menu.setSubmenu(aerospace, for: aerospaceItem)
 
         menu.addItem(.separator())
+        let checkForUpdates = menu.addItem(
+            withTitle: "Check for Updates…",
+            action: #selector(checkForUpdates),
+            keyEquivalent: ""
+        )
+        checkForUpdates.target = self
+        menu.addItem(.separator())
         let quit = menu.addItem(withTitle: "Quit Aerospace Tabs", action: #selector(quit), keyEquivalent: "")
         quit.target = self
         NSMenu.popUpContextMenu(menu, with: event, for: self)
+    }
+
+    @objc private func checkForUpdates() {
+        onCheckForUpdates?()
     }
 
     @objc private func selectTheme(_ sender: NSMenuItem) {

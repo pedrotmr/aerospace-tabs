@@ -14,7 +14,7 @@ Normal local work needs no credentials. Signed release checks use Apple keys. Sp
 | `SPARKLE_PRIVATE_KEY` | Secret | This app | Signs this app's update feed | Sparkle `generate_keys` tool |
 | `HOMEBREW_TAP_TOKEN` | Secret | This tap | Lets this app update one cask | Fine-grained GitHub token for the tap |
 
-An app with Sparkle and Homebrew uses five secrets and two variables. The three Apple secrets and two Apple IDs can be shared by apps on the same Apple team. Each app needs its own Sparkle key. Each tap needs its own Homebrew token.
+An app with Sparkle uses four secrets and two public variables. Add `HOMEBREW_TAP_TOKEN` as a fifth secret when automatic tap updates are enabled. The five Apple values can be shared by apps on the same Apple team. Each app needs its own Sparkle key. Each tap needs its own Homebrew token.
 
 GitHub creates `GITHUB_TOKEN` for Actions. Do not add that token.
 
@@ -95,7 +95,7 @@ Open this app repository. Go to **Settings → Secrets and variables → Actions
 
 1. Add secret values under **Secrets**.
 2. Add `APPLE_NOTARY_KEY_ID` and `APPLE_NOTARY_ISSUER_ID` under **Variables**.
-3. Add `SPARKLE_PRIVATE_KEY` and `HOMEBREW_TAP_TOKEN` only when those modules are enabled.
+3. Add `SPARKLE_PRIVATE_KEY` and, when automatic tap updates are enabled, `HOMEBREW_TAP_TOKEN` under **Secrets**.
 
 GitHub hides secret values after you save them. Keep the local `.env` as your copy. Check names without showing values:
 
