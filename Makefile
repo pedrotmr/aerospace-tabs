@@ -16,7 +16,7 @@ DEBUG_APP := $(DERIVED_DATA)/Build/Products/Debug/$(APP_NAME).app
 RELEASE_APP := $(DERIVED_DATA)/Build/Products/Release/$(APP_NAME).app
 XCODEBUILD ?= xcodebuild
 PYTHON ?= python3
-LOCAL_DEVELOPMENT_IDENTITY ?= $(shell /usr/bin/security find-identity -v -p codesigning 2>/dev/null | /usr/bin/awk -F '"' '/Apple Development:/ { print $$2; exit }')
+LOCAL_DEVELOPMENT_IDENTITY ?= $(shell /usr/bin/security find-identity -v -p codesigning 2>/dev/null | /usr/bin/awk '/Apple Development:/ { print $$2; exit }')
 
 .PHONY: setup build run test bundle check release-check restore-gaps clean
 

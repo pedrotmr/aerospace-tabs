@@ -52,7 +52,7 @@ final class WindowPreviewStore: ObservableObject {
             }
             captureLogger.debug("Backing-store capture unavailable for window \(id, privacy: .public); trying ScreenCaptureKit")
             guard let window = await discovery.window(id: id) else {
-                captureLogger.error("ScreenCaptureKit did not find window \(id, privacy: .public)")
+                captureLogger.error("OverviewWindowDiscovery.window(id:) returned no window for \(id, privacy: .public)")
                 return nil
             }
             return await OverviewWindowCapture.capture(window)
