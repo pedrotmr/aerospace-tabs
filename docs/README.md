@@ -18,4 +18,4 @@ Start with the [main README](../README.md) for the project summary, requirements
 
 ## Release maintenance
 
-The [Homebrew guide](HOMEBREW.md) and [build and release guide](BUILD-AND-RELEASE.md) describe the current workflow. Development is paused.
+The [Homebrew guide](HOMEBREW.md) and [build and release guide](BUILD-AND-RELEASE.md) describe the current workflow. Maintenance is limited; replies and release dates are not promised.

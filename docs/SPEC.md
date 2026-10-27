@@ -14,4 +14,4 @@ Aerospace Tabs is a macOS companion for people who use AeroSpace.
 
 The app requires AeroSpace to be installed and running. It does not tile windows, replace AeroSpace, or manage native macOS Spaces. It temporarily changes AeroSpace's top outer gap while running and normally restores the previous value on quit. Recovery instructions are in the [usage guide](usage.md).
 
-Trackpad gesture support relies on macOS's private `MultitouchSupport` framework and can break after system updates. Window previews stay on the Mac and are not saved. The published v0.1.2 build predates Sparkle, so existing direct installs cannot update themselves; use Homebrew or download a later version manually.
+Trackpad gesture support relies on macOS's private `MultitouchSupport` framework and can break after system updates. Window previews stay on the Mac and are not saved. The v0.1.2 direct build has no Sparkle updater, so users on that version must install a newer release manually once. Later direct releases can update with Sparkle.
