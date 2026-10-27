@@ -27,11 +27,16 @@ final class UpdaterService {
 
     @objc func checkForUpdates(_ sender: Any?) {
         if managedByHomebrew {
+            let updateCommand = "brew update && brew upgrade --cask --greedy-auto-updates pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs"
             let alert = NSAlert()
             alert.messageText = "Updates are managed by Homebrew"
-            alert.informativeText = "Run `brew update`, then `brew upgrade --cask --greedy-auto-updates pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs` to update Aerospace Tabs."
+            alert.informativeText = "To update Aerospace Tabs, copy and run this command in Terminal:\n\n\(updateCommand)"
+            alert.addButton(withTitle: "Copy Command")
             alert.addButton(withTitle: "OK")
-            alert.runModal()
+            if alert.runModal() == .alertFirstButtonReturn {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(updateCommand, forType: .string)
+            }
             return
         }
         controller.checkForUpdates(sender)
