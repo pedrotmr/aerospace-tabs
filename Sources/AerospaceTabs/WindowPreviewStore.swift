@@ -42,11 +42,19 @@ final class WindowPreviewStore: ObservableObject {
         self.screenRecordingAccess = screenRecordingAccess
         needsScreenRecording = !screenRecordingAccess()
         let discovery = discovery
+        let captureLogger = Logger(subsystem: "com.pedrotmr.AerospaceTabs", category: "OverviewCapture")
         self.captureSnapshot = captureSnapshot ?? { id in
+            captureLogger.debug("Starting snapshot capture for window \(id, privacy: .public)")
+            captureLogger.debug("Trying backing-store capture for window \(id, privacy: .public)")
             if let image = OverviewWindowCapture.captureBackingStore(windowID: CGWindowID(id)) {
+                captureLogger.debug("Backing-store capture succeeded for window \(id, privacy: .public)")
                 return image
             }
-            guard let window = await discovery.window(id: id) else { return nil }
+            captureLogger.debug("Backing-store capture unavailable for window \(id, privacy: .public); trying ScreenCaptureKit")
+            guard let window = await discovery.window(id: id) else {
+                captureLogger.error("OverviewWindowDiscovery.window(id:) returned no window for \(id, privacy: .public)")
+                return nil
+            }
             return await OverviewWindowCapture.capture(window)
         }
     }
@@ -87,6 +95,8 @@ final class WindowPreviewStore: ObservableObject {
         liveEnabled = false
         liveRetryDates.removeAll()
         refreshScreenRecordingAccess()
+        let access = needsScreenRecording ? "unavailable" : "available"
+        logger.debug("Screen Recording access during overview: \(access, privacy: .public)")
         updateAspectRatios()
         timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -221,6 +231,7 @@ final class WindowPreviewStore: ObservableObject {
             guard let window = windows[id] else { continue }
             inFlight.insert(id)
             attemptDates[id] = Date()
+            logger.debug("Starting preview request for window \(id, privacy: .public)")
             let started = Date()
             let token = generation
             let captureSnapshot = captureSnapshot
@@ -338,16 +349,24 @@ private actor OverviewWindowDiscovery {
     private var lookup: Task<[Int: SCWindow]?, Never>?
     private var expires = Date.distantPast
     private var generation = 0
+    private let logger = Logger(subsystem: "com.pedrotmr.AerospaceTabs", category: "OverviewCapture")
 
     func window(id: Int) async -> SCWindow? {
         if lookup == nil || Date() >= expires {
             generation += 1
             let generation = generation
             expires = Date().addingTimeInterval(10)
-            lookup = Task {
-                guard let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
-                else { return nil }
-                return Dictionary(content.windows.map { (Int($0.windowID), $0) }) { first, _ in first }
+            logger.debug("Requesting ScreenCaptureKit shareable content")
+            lookup = Task { [logger] in
+                do {
+                    let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
+                    logger.debug("ScreenCaptureKit discovery returned \(content.windows.count, privacy: .public) windows")
+                    return Dictionary(content.windows.map { (Int($0.windowID), $0) }) { first, _ in first }
+                } catch {
+                    let nsError = error as NSError
+                    logger.error("ScreenCaptureKit discovery failed: \(nsError.domain, privacy: .public) code \(nsError.code, privacy: .public): \(nsError.localizedDescription, privacy: .public)")
+                    return nil
+                }
             }
             return await result(id: id, generation: generation)
         }
@@ -356,7 +375,9 @@ private actor OverviewWindowDiscovery {
 
     private func result(id: Int, generation: Int) async -> SCWindow? {
         guard let lookup else { return nil }
+        logger.debug("Waiting for ScreenCaptureKit discovery for window \(id, privacy: .public)")
         let windows = await lookup.value
+        logger.debug("ScreenCaptureKit discovery completed for window \(id, privacy: .public): \(windows?[id] != nil, privacy: .public)")
         guard generation == self.generation else { return windows?[id] }
         if windows?[id] == nil {
             // Keep one shared retry window for concurrent preview requests.
@@ -381,6 +402,7 @@ private enum OverviewWindowCapture {
         }
         return unsafeBitCast(symbol, to: CreateWindowImage.self)
     }()
+    private static let logger = Logger(subsystem: "com.pedrotmr.AerospaceTabs", category: "OverviewCapture")
 
     static func capture(_ window: SCWindow) async -> CGImage? {
         let size = window.frame.size
@@ -395,12 +417,16 @@ private enum OverviewWindowCapture {
 
         do {
             let filter = SCContentFilter(desktopIndependentWindow: window)
+            logger.debug("Requesting ScreenCaptureKit screenshot for window \(window.windowID, privacy: .public)")
             let image = try await SCScreenshotManager.captureImage(
                 contentFilter: filter,
                 configuration: configuration
             )
+            logger.debug("ScreenCaptureKit screenshot succeeded for window \(window.windowID, privacy: .public)")
             return downscaled(image, maxDimension: maxDimension)
         } catch {
+            let nsError = error as NSError
+            logger.error("ScreenCaptureKit screenshot failed for window \(window.windowID, privacy: .public): \(nsError.domain, privacy: .public) code \(nsError.code, privacy: .public): \(nsError.localizedDescription, privacy: .public)")
             return nil
         }
     }
