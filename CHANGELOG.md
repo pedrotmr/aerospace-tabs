@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.3](https://github.com/pedrotmr/aerospace-tabs/compare/v0.2.2...v0.2.3) (2026-10-27)
+
+
+### Bug Fixes
+
+* address debug permission review findings ([f54dcb9](https://github.com/pedrotmr/aerospace-tabs/commit/f54dcb9e0d918d305c3bb31fb4b08c30c8f75a3c))
+* stabilize local debug permissions ([6718de2](https://github.com/pedrotmr/aerospace-tabs/commit/6718de269bc3a74b59468881745612d726486f34))
+* stabilize local debug permissions ([#59](https://github.com/pedrotmr/aerospace-tabs/issues/59)) ([5e3b8d5](https://github.com/pedrotmr/aerospace-tabs/commit/5e3b8d5bb3887f0caa28d3fae3b73b7a384f3c6d))
+
 ## [0.2.2](https://github.com/pedrotmr/aerospace-tabs/compare/v0.2.1...v0.2.2) (2026-10-27)
 
 
