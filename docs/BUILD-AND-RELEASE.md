@@ -2,7 +2,7 @@
 
 ## Toolchain
 
-- macOS 14 or later to run Aerospace Tabs.
+- macOS 14 or later to run AeroSpaceTabs.
 - Xcode 26.6 or newer with the macOS platform. The current project uses Xcode's build system and its bundled Swift toolchain in Swift 5 language mode.
 - AeroSpace is required at runtime. Git and Homebrew are optional for the application.
 - Sparkle 2.10.1 is pinned in `AerospaceTabs.xcodeproj`; `make setup` resolves it.
@@ -36,7 +36,7 @@ To validate local Developer ID distribution without publishing, provide a new in
 make release-check APP_BUILD_NUMBER=18
 ```
 
-This requires a Developer ID Application identity in Keychain, Apple notary credentials, and Aerospace Tabs' EdDSA private key in Keychain or ignored `.env`. It creates a ZIP, DMG, appcast, and validation logs under `.build/release`. It sends the DMG to Apple for notarization, but does not upload files to GitHub or publish a release. See [Credentials](CREDENTIALS.md). Base64 is encoding, not encryption.
+This requires a Developer ID Application identity in Keychain, Apple notary credentials, and AeroSpaceTabs' EdDSA private key in Keychain or ignored `.env`. It creates a ZIP, DMG, appcast, and validation logs under `.build/release`. It sends the DMG to Apple for notarization, but does not upload files to GitHub or publish a release. See [Credentials](CREDENTIALS.md). Base64 is encoding, not encryption.
 
 ## Version and release flow
 
@@ -60,7 +60,7 @@ brew update
 brew upgrade --cask --greedy-auto-updates pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
 ```
 
-The cask sets `auto_updates true`. Homebrew's [`--greedy-auto-updates` option](https://docs.brew.sh/Manpage#upgrade-options-installed_formulainstalled_cask-) includes this cask while the command targets only Aerospace Tabs. The cask writes a Homebrew marker, and the app does not start Sparkle for that copy.
+The cask sets `auto_updates true`. Homebrew's [`--greedy-auto-updates` option](https://docs.brew.sh/Manpage#upgrade-options-installed_formulainstalled_cask-) includes this cask while the command targets only AeroSpaceTabs. The cask writes a Homebrew marker, and the app does not start Sparkle for that copy.
 
 Direct downloads can check for updates from **Check for Updates…** in the app. The v0.1.2 direct build has no Sparkle updater, so users on that version must install v0.2.0 or later manually once. Later direct releases can update with Sparkle.
 

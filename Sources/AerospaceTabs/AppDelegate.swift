@@ -114,12 +114,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appMenu.addItem(checkForUpdates)
         appMenu.addItem(.separator())
 
-        let quit = NSMenuItem(title: "Quit Aerospace Tabs", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        let quit = NSMenuItem(title: "Quit AeroSpaceTabs", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         quit.target = NSApp
         appMenu.addItem(quit)
 
         let appMenuItem = NSMenuItem()
-        appMenuItem.title = "Aerospace Tabs"
+        appMenuItem.title = "AeroSpaceTabs"
         appMenuItem.submenu = appMenu
 
         let mainMenu = NSMenu()

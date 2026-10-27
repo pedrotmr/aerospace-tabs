@@ -711,7 +711,7 @@ final class TabStripView: NSView {
             item.state = corner == selectedCorner ? .on : .off
         }
         let cornerItem = activation.addItem(withTitle: "Hot Corner", action: nil, keyEquivalent: "")
-        cornerItem.toolTip = "Aerospace Tabs restores the selected macOS corner when the app quits."
+        cornerItem.toolTip = "AeroSpaceTabs restores the selected macOS corner when the app quits."
         activation.setSubmenu(cornerMenu, for: cornerItem)
         let activationItem = menu.addItem(withTitle: "Activation", action: nil, keyEquivalent: "")
         menu.setSubmenu(activation, for: activationItem)
@@ -769,7 +769,7 @@ final class TabStripView: NSView {
         )
         openConfig.target = self
         openConfig.isEnabled = FileManager.default.isReadableFile(atPath: configURL.path)
-        openConfig.toolTip = "Opens the config while keeping Aerospace Tabs and its current gaps active."
+        openConfig.toolTip = "Opens the config while keeping AeroSpaceTabs and its current gaps active."
 
         let chooseEditor = aerospace.addItem(
             withTitle: "Choose Config Editor…",
@@ -791,7 +791,7 @@ final class TabStripView: NSView {
         quitAerospace.isEnabled = !NSRunningApplication.runningApplications(
             withBundleIdentifier: AerospaceMenuActions.aerospaceBundleIdentifier
         ).isEmpty
-        quitAerospace.toolTip = "Also quits Aerospace Tabs, which requires AeroSpace to run."
+        quitAerospace.toolTip = "Also quits AeroSpaceTabs, which requires AeroSpace to run."
 
         let aerospaceItem = menu.addItem(withTitle: "AeroSpace", action: nil, keyEquivalent: "")
         menu.setSubmenu(aerospace, for: aerospaceItem)
@@ -804,7 +804,7 @@ final class TabStripView: NSView {
         )
         checkForUpdates.target = self
         menu.addItem(.separator())
-        let quit = menu.addItem(withTitle: "Quit Aerospace Tabs", action: #selector(quit), keyEquivalent: "")
+        let quit = menu.addItem(withTitle: "Quit AeroSpaceTabs", action: #selector(quit), keyEquivalent: "")
         quit.target = self
         NSMenu.popUpContextMenu(menu, with: event, for: self)
     }

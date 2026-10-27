@@ -6,7 +6,7 @@ enum ConfigEditingPreparation: Equatable {
     case failedToRestore
 }
 
-/// While Aerospace Tabs is running, temporarily adds the strip height plus a small clearance to AeroSpace `gaps.outer.top` so windows clear the bar — then restores on quit.
+/// While AeroSpaceTabs is running, temporarily adds the strip height plus a small clearance to AeroSpace `gaps.outer.top` so windows clear the bar — then restores on quit.
 ///
 /// Backup lives on disk next to the AeroSpace config so a force-quit still leaves a recoverable original.
 /// All file access is serialized.

@@ -78,7 +78,7 @@ jobs:
             --cask-token "pedrotmr-aerospace-tabs" \
             --bundle-id "com.pedrotmr.AerospaceTabs" \
             --app-name "AerospaceTabs" \
-            --app-display-name "AeroSpace Tabs" \
+            --app-display-name "AeroSpaceTabs" \
             --description "Window tabs and overview for AeroSpace" \
             --min-macos "14.0" \
             --sparkle "yes"
@@ -95,7 +95,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "Casks/pedrotmr-aerospace-tabs.rb"
           if ! git diff --cached --quiet; then
-            git commit -m "Update AeroSpace Tabs to $VERSION"
+            git commit -m "Update AeroSpaceTabs to $VERSION"
             echo "updated=true" >> "$GITHUB_OUTPUT"
           fi
 

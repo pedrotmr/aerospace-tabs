@@ -1,6 +1,6 @@
 # Specification
 
-Aerospace Tabs is a macOS companion for people who use AeroSpace.
+AeroSpaceTabs is a macOS companion for people who use AeroSpace.
 
 ## Behavior
 

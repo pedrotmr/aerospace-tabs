@@ -2,7 +2,7 @@
 
 ## Project
 
-Aerospace Tabs is a companion for AeroSpace. It displays, focuses, and groups windows managed by AeroSpace; it does not own tiling or native macOS Spaces.
+AeroSpaceTabs is a companion for AeroSpace. It displays, focuses, and groups windows managed by AeroSpace; it does not own tiling or native macOS Spaces.
 
 ## Structure
 

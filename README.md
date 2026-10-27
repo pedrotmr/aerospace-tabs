@@ -1,12 +1,12 @@
-<img src="Resources/aerospace-tabs-icon.png" alt="Aerospace Tabs app icon" width="160">
+<img src="Resources/aerospace-tabs-icon.png" alt="AeroSpaceTabs app icon" width="160">
 
-# Aerospace Tabs
+# AeroSpaceTabs
 
 A macOS companion for [AeroSpace](https://github.com/nikitabobko/AeroSpace). It adds window tabs and a workspace overview so you can find and focus windows.
 
 > **Maintenance:** Maintenance is limited. Issues and pull requests are welcome on a best-effort basis. Replies and release dates are not promised.
 
-![Screenshot placeholder: capture Aerospace Tabs with a local demo setup](Screenshots/aerospace-tabs-workspaces-placeholder.svg)
+![Screenshot placeholder: capture AeroSpaceTabs with a local demo setup](Screenshots/aerospace-tabs-workspaces-placeholder.svg)
 
 *Not a product screenshot. See [capture notes](docs/SCREENSHOT.md).*
 
@@ -18,7 +18,7 @@ A macOS companion for [AeroSpace](https://github.com/nikitabobko/AeroSpace). It 
 brew install --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
 ```
 
-Homebrew manages updates for this copy. To update only Aerospace Tabs, run:
+Homebrew manages updates for this copy. To update only AeroSpaceTabs, run:
 
 ```sh
 brew update
@@ -34,7 +34,7 @@ Direct installs can use **Check for Updates…** in the app. Releases before v0.
 ## First launch
 
 1. Install and start [AeroSpace](https://github.com/nikitabobko/AeroSpace).
-2. Open **Aerospace Tabs** from Applications and allow **Accessibility** access when macOS asks.
+2. Open **AeroSpaceTabs** from Applications and allow **Accessibility** access when macOS asks.
 3. With two or more windows open on a display, right-click the strip and choose **Open Window Overview**. Use the arrow keys and Return to focus a window. Press Escape to close the overview.
 
 ## What it does
@@ -49,7 +49,7 @@ Direct installs can use **Check for Updates…** in the app. Releases before v0.
 - Accessibility access is required. Screen Recording is optional and enables window previews.
 - The app temporarily increases AeroSpace's `gaps.outer.top` while it runs, then restores it when you quit. See [usage notes](docs/usage.md) if recovery is needed.
 - Trackpad swipe detection uses Apple's private `MultitouchSupport` framework and may break after a macOS update. Window previews stay in memory. The app does not save or send them.
-- Aerospace Tabs is not a window manager and does not manage native macOS Spaces.
+- AeroSpaceTabs is not a window manager and does not manage native macOS Spaces.
 
 ## Help and development
 
