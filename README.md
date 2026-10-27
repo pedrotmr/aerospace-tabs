@@ -22,12 +22,12 @@ Homebrew manages updates for this copy. To update only Aerospace Tabs, run:
 
 ```sh
 brew update
-brew upgrade --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
+brew upgrade --cask --greedy-auto-updates pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
 ```
 
 ### Direct download
 
-Download the latest stable `AerospaceTabs-<version>.dmg` from [GitHub Releases](https://github.com/pedrotmr/aerospace-tabs/releases/latest). Open the disk image and drag `AerospaceTabs.app` to Applications.
+Download the latest stable `AerospaceTabs-<version>.dmg` or `.zip` from [GitHub Releases](https://github.com/pedrotmr/aerospace-tabs/releases/latest). Open the disk image and drag `AerospaceTabs.app` to Applications, or expand the ZIP and move the app to Applications.
 
 Direct installs can use **Check for Updates…** in the app. Releases before v0.2.0 do not include Sparkle. If you use one of those versions, install the latest release manually once.
 

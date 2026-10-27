@@ -19,7 +19,7 @@ Homebrew manages updates for this copy. To update only this cask, run:
 
 ```sh
 brew update
-brew upgrade --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
+brew upgrade --cask --greedy-auto-updates pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
 ```
 
 Direct downloads use Sparkle. Do not use the Homebrew command to update a direct download.
