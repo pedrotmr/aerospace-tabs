@@ -18,7 +18,12 @@ A macOS companion for [AeroSpace](https://github.com/nikitabobko/AeroSpace). It 
 brew install --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
 ```
 
-Homebrew installs and updates this copy. Update it with `brew update && brew upgrade`.
+Homebrew manages updates for this copy. To update only Aerospace Tabs, run:
+
+```sh
+brew update
+brew upgrade --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
+```
 
 ### Direct download
 
@@ -38,7 +43,7 @@ Direct installs can use **Check for Updates…** in the app. Releases before v0.
 - Click a tab to focus its window. Drag tabs to change their order on that display.
 - Shows a full-screen overview grouped by workspace. A three-finger swipe opens it by default. You can also set a hot corner in the strip menu.
 
-## Requirements and limits
+## Requirements and limitations
 
 - macOS 14 or later, with AeroSpace installed and running.
 - Accessibility access is required. Screen Recording is optional and enables window previews.
