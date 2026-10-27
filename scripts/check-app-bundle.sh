@@ -13,7 +13,7 @@ fail() {
 [[ -f "$info_plist" ]] || fail "Info.plist is missing from the app bundle."
 
 read_plist() {
-  /usr/libexec/PlistBuddy -c "Print :$1" "$info_plist"
+  /usr/libexec/PlistBuddy -c "Print :$1" "$info_plist" 2>/dev/null || true
 }
 
 [[ "$(read_plist CFBundleIdentifier)" == "$APP_BUNDLE_ID" ]] || fail "Bundle identifier does not match $APP_BUNDLE_ID."

@@ -134,14 +134,17 @@ mkdir -p "$appcast_dir"
 hdiutil create -ov -format UDZO -volname "$APP_NAME" -srcfolder "$app_path" "$dmg_path"
 codesign --force --timestamp --sign "$identity" "$dmg_path"
 codesign --verify --verbose=2 "$dmg_path"
-notary_key_path=$(mktemp "${TMPDIR:-/tmp}/notary-key.XXXXXX")
+notary_key_path=""
 notary_result="$release_dir/notary-result.json"
 notary_log="$release_dir/notary-log.json"
 cleanup() {
-  rm -f "$notary_key_path"
+  if [[ -n "$notary_key_path" ]]; then
+    rm -f "$notary_key_path"
+  fi
 }
 trap cleanup EXIT
 umask 077
+notary_key_path=$(mktemp "${TMPDIR:-/tmp}/notary-key.XXXXXX")
 printf '%s' "$APPLE_NOTARY_KEY_P8_BASE64" | base64 -D > "$notary_key_path"
 chmod 600 "$notary_key_path"
 
@@ -207,11 +210,14 @@ fi
 
 appcast="$appcast_dir/appcast.xml"
 [[ -s "$appcast" ]] || fail "Sparkle did not generate appcast.xml."
-feed_version=$(/usr/bin/xmllint --xpath 'string((//*[local-name()="item"])[1]/*[local-name()="version"])' "$appcast")
-feed_short_version=$(/usr/bin/xmllint --xpath 'string((//*[local-name()="item"])[1]/*[local-name()="shortVersionString"])' "$appcast")
-feed_url=$(/usr/bin/xmllint --xpath 'string((//*[local-name()="item"])[1]/*[local-name()="enclosure"]/@url)' "$appcast")
-feed_length=$(/usr/bin/xmllint --xpath 'string((//*[local-name()="item"])[1]/*[local-name()="enclosure"]/@length)' "$appcast")
-signature=$(/usr/bin/xmllint --xpath 'string(//*[local-name()="enclosure"]/@*[local-name()="edSignature"])' "$appcast")
+read_xpath() {
+  /usr/bin/xmllint --xpath "$1" "$appcast" 2>/dev/null || true
+}
+feed_version=$(read_xpath 'string((//*[local-name()="item"])[1]/*[local-name()="version"])')
+feed_short_version=$(read_xpath 'string((//*[local-name()="item"])[1]/*[local-name()="shortVersionString"])')
+feed_url=$(read_xpath 'string((//*[local-name()="item"])[1]/*[local-name()="enclosure"]/@url)')
+feed_length=$(read_xpath 'string((//*[local-name()="item"])[1]/*[local-name()="enclosure"]/@length)')
+signature=$(read_xpath 'string(//*[local-name()="enclosure"]/@*[local-name()="edSignature"])')
 [[ "$feed_version" == "$APP_BUILD_NUMBER" ]] || fail "Appcast sparkle:version does not match CFBundleVersion."
 [[ "$feed_short_version" == "$APP_VERSION" ]] || fail "Appcast short version does not match the marketing version."
 [[ "$feed_url" == "$download_prefix$APP_NAME-$APP_VERSION.zip" ]] || fail "Appcast enclosure does not point to this version's ZIP."
