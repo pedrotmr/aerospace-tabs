@@ -13,7 +13,6 @@ Start with the [main README](../README.md) for the project summary, requirements
 - [Specification](SPEC.md): behavior, scope, and limits.
 - [Project charter](CHARTER.md): scope and maintenance status.
 - [Third-party notices](THIRD-PARTY-NOTICES.md): notices and license for referenced third-party work.
-- [Screenshot capture notes](SCREENSHOT.md): how to replace the labeled placeholder with a real app capture.
 - [App icon](ICONS.md): original source, packaged icon, and bundle check.
 
 ## Release maintenance
