@@ -13,6 +13,8 @@ The cask uses a versioned ZIP URL and its real SHA-256. Do not use a draft URL o
 
 When Sparkle is enabled, the cask marks the app as Homebrew-managed. That app copy does not start Sparkle. Homebrew handles its updates. The cask clears only that marker when removed. Direct downloads use Sparkle.
 
+The cask requires macOS 14 or later. The app bundle and Sparkle feed carry the same minimum.
+
 Update Homebrew apps with `brew update && brew upgrade`. A named cask upgrade or a greedy upgrade can install the cask version over a newer Sparkle version. Use the ordinary `brew upgrade` command.
 
 The install command is ready only after a cask exists in the tap and points to a public, signed, notarized release.

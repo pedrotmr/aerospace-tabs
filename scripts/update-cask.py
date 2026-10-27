@@ -16,7 +16,41 @@ MACOS_RELEASE = {
     14: "sonoma",
     15: "sequoia",
     26: "tahoe",
+    27: "golden_gate",
 }
+
+
+def format_step_arguments(
+    arguments: list[str], *, trailing_comma: bool = True, align_args_key: bool = True
+) -> list[str]:
+    key_padding = "           " if align_args_key else " "
+    lines = [f"        args:{key_padding}["]
+    lines.extend(f"          {json.dumps(value)}," for value in arguments)
+    lines.append("        ]" + ("," if trailing_comma else ""))
+    return lines
+
+
+def minimum_macos_step(minimum_version: str) -> list[str]:
+    parts = tuple(int(part) for part in minimum_version.split("."))
+    if not any(parts[1:]):
+        return []
+
+    version = json.dumps(minimum_version)
+    message = json.dumps(f"Requires macOS {minimum_version} or later.")
+    arguments = [
+        "-e",
+        "set osVersion to system version of (system info)",
+        "-e",
+        "considering numeric strings",
+        "-e",
+        f"if osVersion < {version} then error {message} number 1",
+        "-e",
+        "end considering",
+    ]
+    lines = ["", "  preflight_steps do", '    run "/usr/bin/osascript",']
+    lines.extend(format_step_arguments(arguments, trailing_comma=False, align_args_key=False))
+    lines.append("  end")
+    return lines
 
 
 def main() -> None:
@@ -39,10 +73,18 @@ def main() -> None:
         raise SystemExit("error: version must be MAJOR.MINOR.PATCH")
     if not re.fullmatch(r"[0-9a-f]{64}", args.sha256):
         raise SystemExit("error: SHA-256 must be 64 lowercase hex characters")
+    if not re.fullmatch(r"\d+(?:\.\d+){0,2}", args.min_macos):
+        raise SystemExit("error: minimum macOS version must be numeric")
     major = int(args.min_macos.split(".", 1)[0])
     release = MACOS_RELEASE.get(major)
     if release is None:
         raise SystemExit(f"error: add a Homebrew macOS symbol for version {major} before using this module")
+
+    description = args.description.strip()
+    if description.endswith(".") and not description.endswith("etc."):
+        description = description.rstrip(".")
+    if not description:
+        raise SystemExit("error: description must not be empty")
 
     url = f"https://github.com/{args.owner}/{args.slug}/releases/download/v#{{version}}/{args.app_name}-#{{version}}.zip"
     lines = [
@@ -50,10 +92,9 @@ def main() -> None:
         f'  version "{args.version}"',
         f'  sha256 "{args.sha256}"',
         "",
-        f'  url {json.dumps(url)},',
-        f'      verified: "github.com/{args.owner}/{args.slug}/"',
+        f'  url {json.dumps(url)}',
         f'  name {json.dumps(args.app_display_name)}',
-        f'  desc {json.dumps(args.description)}',
+        f'  desc {json.dumps(description)}',
         f'  homepage "https://github.com/{args.owner}/{args.slug}"',
         "",
     ]
@@ -71,42 +112,33 @@ def main() -> None:
         "",
         f'  app "{args.app_name}.app"',
     ])
+    lines.extend(minimum_macos_step(args.min_macos))
     if args.sparkle == "yes":
-        lines.extend([
-            "",
-            "  postflight_steps do",
-            '    run "/usr/bin/defaults",',
-            f'        args:           ["write", "{args.bundle_id}.homebrew", "managedByHomebrew", "-bool", "true"],',
-            '        writable_paths: ["Library/Preferences"],',
-            "        writable_base:  :home",
-            '    run "/usr/bin/defaults",',
-            f'        args:           ["write", "{args.bundle_id}.homebrew", "managedByHomebrewVersion", "-string", "{args.version}"],',
-            '        writable_paths: ["Library/Preferences"],',
-            "        writable_base:  :home",
-            '    run "/usr/bin/defaults",',
-            f'        args:           ["write", "{args.bundle_id}.homebrew", "managedByHomebrewBundlePath", "-string", "#{{appdir}}/{args.app_name}.app"],',
-            '        writable_paths: ["Library/Preferences"],',
-            "        writable_base:  :home",
-            "  end",
-            "",
-            "  uninstall_postflight_steps do",
-            '    run "/usr/bin/defaults",',
-            f'        args:           ["delete", "{args.bundle_id}.homebrew", "managedByHomebrew"],',
-            "        must_succeed:   false,",
-            '        writable_paths: ["Library/Preferences"],',
-            "        writable_base:  :home",
-            '    run "/usr/bin/defaults",',
-            f'        args:           ["delete", "{args.bundle_id}.homebrew", "managedByHomebrewBundlePath"],',
-            "        must_succeed:   false,",
-            '        writable_paths: ["Library/Preferences"],',
-            "        writable_base:  :home",
-            '    run "/usr/bin/defaults",',
-            f'        args:           ["delete", "{args.bundle_id}.homebrew", "managedByHomebrewVersion"],',
-            "        must_succeed:   false,",
-            '        writable_paths: ["Library/Preferences"],',
-            "        writable_base:  :home",
-            "  end",
-        ])
+        lines.extend(["", "  postflight_steps do"])
+        for arguments in (
+            ["write", f"{args.bundle_id}.homebrew", "managedByHomebrew", "-bool", "true"],
+            ["write", f"{args.bundle_id}.homebrew", "managedByHomebrewVersion", "-string", args.version],
+            [
+                "write",
+                f"{args.bundle_id}.homebrew",
+                "managedByHomebrewBundlePath",
+                "-string",
+                f"{{{{appdir}}}}/{args.app_name}.app",
+            ],
+        ):
+            lines.append('    run "/usr/bin/defaults",')
+            lines.extend(format_step_arguments(arguments))
+            lines.extend(['        writable_paths: ["Library/Preferences"],', "        writable_base:  :home"])
+        lines.extend(["  end", "", "  uninstall_postflight_steps do"])
+        for key in ("managedByHomebrew", "managedByHomebrewBundlePath", "managedByHomebrewVersion"):
+            lines.append('    run "/usr/bin/defaults",')
+            lines.extend(format_step_arguments(["delete", f"{args.bundle_id}.homebrew", key]))
+            lines.extend([
+                "        must_succeed:   false,",
+                '        writable_paths: ["Library/Preferences"],',
+                "        writable_base:  :home",
+            ])
+        lines.append("  end")
     lines.extend(["end", ""])
 
     cask_dir = args.tap_dir / "Casks"
