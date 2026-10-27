@@ -9,9 +9,9 @@
   </p>
 </div>
 
-![Screenshot placeholder for the AeroSpaceTabs workspace overview](Screenshots/aerospace-tabs-workspaces-placeholder.svg)
+[![AeroSpaceTabs demo showing the tab strip and workspace overview](Media/aerospace-tabs-demo-preview.gif)](Media/aerospace-tabs-demo.mp4)
 
-_This is a placeholder, not an app screenshot. See the [capture notes](docs/SCREENSHOT.md)._
+[Open the full demo video (MP4)](Media/aerospace-tabs-demo.mp4).
 
 ## ✨ Features
 
