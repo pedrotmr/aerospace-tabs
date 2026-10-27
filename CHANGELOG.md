@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/pedrotmr/aerospace-tabs/compare/v0.2.1...v0.2.2) (2026-10-27)
+
+
+### Bug Fixes
+
+* restore window previews and limit prompts ([#57](https://github.com/pedrotmr/aerospace-tabs/issues/57)) ([05229ce](https://github.com/pedrotmr/aerospace-tabs/commit/05229cec76bf50e6d9b9d54b161e6e150f4f5fa8))
+
 ## [0.2.1](https://github.com/pedrotmr/aerospace-tabs/compare/v0.2.0...v0.2.1) (2026-10-27)
 
 
