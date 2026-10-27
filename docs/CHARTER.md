@@ -1,6 +1,6 @@
-# Aerospace Tabs — Charter
+# AeroSpaceTabs — Charter
 
-Aerospace Tabs is a **companion** for people who already run [AeroSpace](https://github.com/nikitabobko/AeroSpace). AeroSpace tiles; this app lists and focuses windows, keeps a local tab order, and provides a visual overview grouped by AeroSpace workspace that can replace Mission Control in the user’s workflow.
+AeroSpaceTabs is a **companion** for people who already run [AeroSpace](https://github.com/nikitabobko/AeroSpace). AeroSpace tiles; this app lists and focuses windows, keeps a local tab order, and provides a visual overview grouped by AeroSpace workspace that can replace Mission Control in the user’s workflow.
 
 ## What it is not
 

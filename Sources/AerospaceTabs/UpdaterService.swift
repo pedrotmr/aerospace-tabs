@@ -30,7 +30,7 @@ final class UpdaterService {
             let updateCommand = "brew update && brew upgrade --cask --greedy-auto-updates pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs"
             let alert = NSAlert()
             alert.messageText = "Updates are managed by Homebrew"
-            alert.informativeText = "To update Aerospace Tabs, copy and run this command in Terminal:\n\n\(updateCommand)"
+            alert.informativeText = "To update AeroSpaceTabs, copy and run this command in Terminal:\n\n\(updateCommand)"
             alert.addButton(withTitle: "Copy Command")
             alert.addButton(withTitle: "OK")
             if alert.runModal() == .alertFirstButtonReturn {

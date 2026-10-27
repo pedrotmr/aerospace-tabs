@@ -2,7 +2,7 @@ import AppKit
 import CoreFoundation
 import Foundation
 
-/// Temporarily gives the configured Aerospace Tabs triggers ownership of the
+/// Temporarily gives the configured AeroSpaceTabs triggers ownership of the
 /// matching macOS Mission Control gesture and hot corner.
 ///
 /// Original preferences are persisted before they are changed, so a force
@@ -134,7 +134,7 @@ final class NativeGestureOverrides {
             if CFPreferencesAppSynchronize(domain as CFString) {
                 synchronizedDomains.insert(domain)
             } else {
-                NSLog("Aerospace Tabs: Could not synchronize %@ preferences.", domain)
+                NSLog("AeroSpaceTabs: Could not synchronize %@ preferences.", domain)
             }
         }
 
@@ -188,16 +188,16 @@ final class NativeGestureOverrides {
             try process.run()
             guard exitSignal.wait(timeout: .now() + 2) == .success else {
                 if process.isRunning { process.terminate() }
-                NSLog("Aerospace Tabs: Dock restart timed out.")
+                NSLog("AeroSpaceTabs: Dock restart timed out.")
                 return false
             }
             guard process.terminationStatus == 0 else {
-                NSLog("Aerospace Tabs: Dock restart exited with status %d.", process.terminationStatus)
+                NSLog("AeroSpaceTabs: Dock restart exited with status %d.", process.terminationStatus)
                 return false
             }
             return true
         } catch {
-            NSLog("Aerospace Tabs: Could not restart Dock to apply gesture settings: %@", error.localizedDescription)
+            NSLog("AeroSpaceTabs: Could not restart Dock to apply gesture settings: %@", error.localizedDescription)
             return false
         }
     }

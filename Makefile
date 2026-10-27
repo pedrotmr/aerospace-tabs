@@ -35,7 +35,7 @@ run: build
 			sleep 0.2; attempt=$$((attempt + 1)); \
 		done; \
 		if /usr/bin/pgrep -x '$(APP_NAME)' >/dev/null 2>&1; then \
-			echo 'Aerospace Tabs did not quit. Close it before running the new build.' >&2; exit 1; \
+			echo 'AeroSpaceTabs did not quit. Close it before running the new build.' >&2; exit 1; \
 		fi; \
 	fi
 	@open -n "$(DEBUG_APP)"
