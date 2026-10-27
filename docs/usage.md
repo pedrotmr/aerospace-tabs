@@ -4,8 +4,8 @@
 
 1. Install and start [AeroSpace](https://github.com/nikitabobko/AeroSpace).
 2. Install AeroSpaceTabs from the [Homebrew tap](https://github.com/pedrotmr/homebrew-aerospace-tabs), then open it from Applications.
-3. Allow **Accessibility** in System Settings when prompted. It enables global shortcuts and Dock notification badges.
-4. **Screen Recording** is optional. It enables window previews; without it, the overview still focuses windows and uses app icons.
+3. Allow **Accessibility** in System Settings when prompted. It enables global shortcuts and Dock notification badges. If you dismissed the prompt, open Accessibility Settings from a strip's right-click menu.
+4. **Screen Recording** is optional. It enables window previews; without it, the overview still focuses windows and uses app icons. After granting access in System Settings, quit and reopen AeroSpaceTabs to start capture.
 
 The strip appears on a display when AeroSpace reports at least two windows there. Click a tab to focus its window; drag tabs to change their local order. Right-click a visible strip and choose **Open Window Overview**. In the overview, use the arrow keys and Return to select a window, or Escape to close.
 

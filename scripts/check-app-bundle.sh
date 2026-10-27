@@ -21,6 +21,7 @@ read_plist() {
 [[ "$(read_plist CFBundleVersion)" == "$APP_BUILD_NUMBER" ]] || fail "Build version does not match $APP_BUILD_NUMBER."
 [[ "$(read_plist LSMinimumSystemVersion)" == "$APP_MIN_SYSTEM_VERSION" ]] || fail "Minimum macOS version does not match $APP_MIN_SYSTEM_VERSION."
 [[ -n "$(read_plist NSHumanReadableCopyright)" ]] || fail "Copyright metadata is empty."
+[[ -n "$(read_plist NSScreenCaptureUsageDescription)" ]] || fail "Screen Recording usage description is missing."
 
 feed_url=$(read_plist SUFeedURL)
 [[ "${SPARKLE_ENABLED:-}" == YES ]] || fail "Sparkle must be enabled in Config/App.xcconfig."

@@ -25,7 +25,7 @@ The Window Overview gives AeroSpace users one place to find and focus windows ac
 ## Permissions
 
 - **Accessibility** supports global shortcuts and Dock notification badges.
-- **Screen Recording** enables window previews. The overview can request access and open the relevant System Settings pane. Without access, cards use app icons.
+- **Screen Recording** enables window previews. The overview can request access and open the relevant System Settings pane. Relaunch AeroSpaceTabs after granting access so capture can start. Without access, cards use app icons.
 
 ## Scope and design decisions
 
