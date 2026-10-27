@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/pedrotmr/aerospace-tabs/compare/v0.2.0...v0.2.1) (2026-10-27)
+
+
+### Bug Fixes
+
+* generate Homebrew-compatible casks ([#52](https://github.com/pedrotmr/aerospace-tabs/issues/52)) ([8b8b024](https://github.com/pedrotmr/aerospace-tabs/commit/8b8b024063e8ebcca76b3033a6b5e60d84aa46b5))
+* use AeroSpaceTabs name and target Homebrew updates ([#55](https://github.com/pedrotmr/aerospace-tabs/issues/55)) ([48dc48b](https://github.com/pedrotmr/aerospace-tabs/commit/48dc48b5b646b5345f1266d82c4be88ea096bdf3))
+
 ## [0.2.0](https://github.com/pedrotmr/aerospace-tabs/compare/v0.1.2...v0.2.0) (2026-10-27)
 
 
