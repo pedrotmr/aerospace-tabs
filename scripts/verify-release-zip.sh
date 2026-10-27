@@ -22,10 +22,14 @@ slug=$(setting Config/App.xcconfig RELEASE_SLUG)
 min_macos=$(setting Config/Project.xcconfig MACOSX_DEPLOYMENT_TARGET)
 expected_team=$(setting Config/Project.xcconfig DEVELOPMENT_TEAM)
 sparkle_enabled=$(setting Config/App.xcconfig SPARKLE_ENABLED)
-expected_feed=$(setting Config/App.xcconfig SPARKLE_FEED_URL)
+expected_feed_template=$(setting Config/App.xcconfig SPARKLE_FEED_URL)
 expected_public_key=$(setting Config/App.xcconfig SPARKLE_PUBLIC_ED_KEY)
 sparkle_keychain_account=$(setting Config/App.xcconfig RELEASE_SLUG)
 expected_version=${tag#v}
+expected_feed=$(printf '%s\n' "$expected_feed_template" \
+  | sed -e 's|/[$][(][)]/|//|g' \
+        -e "s|[$][(]RELEASE_OWNER[)]|$owner|g" \
+        -e "s|[$][(]RELEASE_SLUG[)]|$slug|g")
 [[ -n "$app_name" && -n "$bundle_id" && -n "$owner" && -n "$slug" && -n "$min_macos" && -n "$expected_team" ]] || {
   echo "error: app release settings are incomplete." >&2
   exit 1
@@ -34,6 +38,8 @@ expected_version=${tag#v}
   echo "error: Sparkle must be enabled with a feed and public key in Config/App.xcconfig." >&2
   exit 1
 }
+unresolved_xcode_setting="\$("
+[[ "$expected_feed" != *"$unresolved_xcode_setting"* ]] || { echo "error: Sparkle feed URL has an unresolved Xcode setting." >&2; exit 1; }
 
 temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/release-zip-check.XXXXXX")
 trap 'rm -rf "$temporary_dir"' EXIT

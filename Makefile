@@ -15,6 +15,7 @@ DERIVED_DATA := .build/DerivedData
 DEBUG_APP := $(DERIVED_DATA)/Build/Products/Debug/$(APP_NAME).app
 RELEASE_APP := $(DERIVED_DATA)/Build/Products/Release/$(APP_NAME).app
 XCODEBUILD ?= xcodebuild
+PYTHON ?= python3
 
 .PHONY: setup build run test bundle check release-check restore-gaps clean
 
@@ -43,6 +44,7 @@ test:
 	@$(XCODEBUILD) test -project $(PROJECT) -scheme $(SCHEME) -configuration Debug \
 		-derivedDataPath $(DERIVED_DATA) APP_MARKETING_VERSION=$(APP_VERSION) \
 		APP_BUILD_NUMBER=$(APP_BUILD_NUMBER) CODE_SIGNING_ALLOWED=NO
+	@$(PYTHON) -m unittest discover -s scripts/tests -p 'test_*.py'
 
 bundle:
 	@$(XCODEBUILD) build -project $(PROJECT) -scheme $(SCHEME) -configuration Release \
