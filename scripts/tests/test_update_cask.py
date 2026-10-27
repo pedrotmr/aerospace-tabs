@@ -50,10 +50,18 @@ class UpdateCaskTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             cask = (tap_dir / "Casks" / "demo-app.rb").read_text()
 
-        self.assertIn('"managedByHomebrewVersion", "-string", "1.2.3"', cask)
-        self.assertIn('"delete", "com.example.Demo.homebrew", "managedByHomebrewVersion"', cask)
-        self.assertIn('"managedByHomebrewBundlePath", "-string", "#{appdir}/Demo.app"', cask)
-        self.assertIn('"delete", "com.example.Demo.homebrew", "managedByHomebrewBundlePath"', cask)
+        self.assertIn('"managedByHomebrewVersion",\n          "-string",\n          "1.2.3"', cask)
+        self.assertIn(
+            '"delete",\n          "com.example.Demo.homebrew",\n          "managedByHomebrewVersion"',
+            cask,
+        )
+        self.assertIn('desc "A demo app"', cask)
+        self.assertIn('"managedByHomebrewBundlePath",\n          "-string",\n          "{{appdir}}/Demo.app"', cask)
+        self.assertNotIn("#{appdir}", cask)
+        self.assertIn(
+            '"delete",\n          "com.example.Demo.homebrew",\n          "managedByHomebrewBundlePath"',
+            cask,
+        )
 
 
 if __name__ == "__main__":

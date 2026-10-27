@@ -19,6 +19,13 @@ MACOS_RELEASE = {
 }
 
 
+def format_step_arguments(arguments: list[str]) -> list[str]:
+    lines = ["        args:           ["]
+    lines.extend(f"          {json.dumps(value)}," for value in arguments)
+    lines.append("        ],")
+    return lines
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--tap-dir", required=True, type=Path)
@@ -44,6 +51,12 @@ def main() -> None:
     if release is None:
         raise SystemExit(f"error: add a Homebrew macOS symbol for version {major} before using this module")
 
+    description = args.description.strip()
+    if description.endswith(".") and not description.endswith("etc."):
+        description = description[:-1]
+    if not description:
+        raise SystemExit("error: description must not be empty")
+
     url = f"https://github.com/{args.owner}/{args.slug}/releases/download/v#{{version}}/{args.app_name}-#{{version}}.zip"
     lines = [
         f'cask "{args.cask_token}" do',
@@ -53,7 +66,7 @@ def main() -> None:
         f'  url {json.dumps(url)},',
         f'      verified: "github.com/{args.owner}/{args.slug}/"',
         f'  name {json.dumps(args.app_display_name)}',
-        f'  desc {json.dumps(args.description)}',
+        f'  desc {json.dumps(description)}',
         f'  homepage "https://github.com/{args.owner}/{args.slug}"',
         "",
     ]
@@ -72,41 +85,31 @@ def main() -> None:
         f'  app "{args.app_name}.app"',
     ])
     if args.sparkle == "yes":
-        lines.extend([
-            "",
-            "  postflight_steps do",
-            '    run "/usr/bin/defaults",',
-            f'        args:           ["write", "{args.bundle_id}.homebrew", "managedByHomebrew", "-bool", "true"],',
-            '        writable_paths: ["Library/Preferences"],',
-            "        writable_base:  :home",
-            '    run "/usr/bin/defaults",',
-            f'        args:           ["write", "{args.bundle_id}.homebrew", "managedByHomebrewVersion", "-string", "{args.version}"],',
-            '        writable_paths: ["Library/Preferences"],',
-            "        writable_base:  :home",
-            '    run "/usr/bin/defaults",',
-            f'        args:           ["write", "{args.bundle_id}.homebrew", "managedByHomebrewBundlePath", "-string", "#{{appdir}}/{args.app_name}.app"],',
-            '        writable_paths: ["Library/Preferences"],',
-            "        writable_base:  :home",
-            "  end",
-            "",
-            "  uninstall_postflight_steps do",
-            '    run "/usr/bin/defaults",',
-            f'        args:           ["delete", "{args.bundle_id}.homebrew", "managedByHomebrew"],',
-            "        must_succeed:   false,",
-            '        writable_paths: ["Library/Preferences"],',
-            "        writable_base:  :home",
-            '    run "/usr/bin/defaults",',
-            f'        args:           ["delete", "{args.bundle_id}.homebrew", "managedByHomebrewBundlePath"],',
-            "        must_succeed:   false,",
-            '        writable_paths: ["Library/Preferences"],',
-            "        writable_base:  :home",
-            '    run "/usr/bin/defaults",',
-            f'        args:           ["delete", "{args.bundle_id}.homebrew", "managedByHomebrewVersion"],',
-            "        must_succeed:   false,",
-            '        writable_paths: ["Library/Preferences"],',
-            "        writable_base:  :home",
-            "  end",
-        ])
+        lines.extend(["", "  postflight_steps do"])
+        for arguments in (
+            ["write", f"{args.bundle_id}.homebrew", "managedByHomebrew", "-bool", "true"],
+            ["write", f"{args.bundle_id}.homebrew", "managedByHomebrewVersion", "-string", args.version],
+            [
+                "write",
+                f"{args.bundle_id}.homebrew",
+                "managedByHomebrewBundlePath",
+                "-string",
+                f"{{{{appdir}}}}/{args.app_name}.app",
+            ],
+        ):
+            lines.append('    run "/usr/bin/defaults",')
+            lines.extend(format_step_arguments(arguments))
+            lines.extend(['        writable_paths: ["Library/Preferences"],', "        writable_base:  :home"])
+        lines.extend(["  end", "", "  uninstall_postflight_steps do"])
+        for key in ("managedByHomebrew", "managedByHomebrewBundlePath", "managedByHomebrewVersion"):
+            lines.append('    run "/usr/bin/defaults",')
+            lines.extend(format_step_arguments(["delete", f"{args.bundle_id}.homebrew", key]))
+            lines.extend([
+                "        must_succeed:   false,",
+                '        writable_paths: ["Library/Preferences"],',
+                "        writable_base:  :home",
+            ])
+        lines.append("  end")
     lines.extend(["end", ""])
 
     cask_dir = args.tap_dir / "Casks"
