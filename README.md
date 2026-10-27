@@ -9,9 +9,11 @@
   </p>
 </div>
 
-[![AeroSpaceTabs demo showing the tab strip and workspace overview](Media/aerospace-tabs-demo-preview.gif)](Media/aerospace-tabs-demo.mp4)
 
-[Open the full demo video (MP4)](Media/aerospace-tabs-demo.mp4).
+
+https://github.com/user-attachments/assets/897eecb2-52ac-47a9-b0ab-bf15afaa26b7
+
+
 
 ## ✨ Features
 
