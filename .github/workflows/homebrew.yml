@@ -60,6 +60,7 @@ jobs:
       - name: Create and audit the cask
         id: update
         env:
+          HOMEBREW_GITHUB_API_TOKEN: ${{ github.token }}
           VERSION: ${{ env.RELEASE_VERSION }}
           SHA256: ${{ env.RELEASE_SHA256 }}
         run: |
