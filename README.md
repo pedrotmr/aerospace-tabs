@@ -11,7 +11,7 @@
 
 
 
-https://github.com/user-attachments/assets/897eecb2-52ac-47a9-b0ab-bf15afaa26b7
+[Watch the full video](https://github.com/user-attachments/assets/897eecb2-52ac-47a9-b0ab-bf15afaa26b7)
 
 
 
