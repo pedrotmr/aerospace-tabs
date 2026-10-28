@@ -17,21 +17,52 @@ Show HN: AeroSpaceTabs, a window tab strip and overview for AeroSpace
 **Texto**
 
 ```text
-I built AeroSpaceTabs for my AeroSpace setup. AeroSpace handles tiling; this macOS companion adds a tab strip for finding and focusing windows, plus a visual overview grouped by workspace.
+I use AeroSpace as my window manager, and I wanted an easier way to see which windows I had open across workspaces. So I built AeroSpaceTabs: it adds a tab strip for focusing windows and an overview grouped by workspace. AeroSpace still handles the tiling.
 
-It needs macOS 14 or later, AeroSpace running, and Accessibility permission. Screen Recording is optional for window previews. The app temporarily adjusts AeroSpace's top outer gap and normally restores the previous value when it quits. Trackpad swipe uses macOS's private MultitouchSupport framework, so it may break after a macOS update.
+The current release is v0.2.3: https://github.com/pedrotmr/aerospace-tabs/releases/tag/v0.2.3
 
-Try it: https://github.com/pedrotmr/aerospace-tabs/releases/latest
-The README has a demo video and Homebrew instructions: https://github.com/pedrotmr/aerospace-tabs#readme
+It needs macOS 14 or later, AeroSpace running, and Accessibility permission. Screen Recording is optional for window previews. The app adjusts AeroSpace's top gap while it runs and normally restores the old value when it quits. The trackpad gesture uses a private macOS framework, so it may break after a system update.
 
-I would be interested in how the strip and workspace overview fit your AeroSpace workflow. I can answer questions in this thread. Maintenance is best-effort, and future replies or releases are not promised.
+There's a short demo and install instructions in the README: https://github.com/pedrotmr/aerospace-tabs#readme
+
+I made this for my own setup, and I'm curious whether the strip or overview would be useful in yours. I'll be here to answer questions. I maintain the app when I can, but I don't have a release schedule.
 ```
 
-O título começa com `Show HN`, e o post leva a um app que o leitor pode instalar e testar, não a uma página de cadastro ou anúncio. O texto apresenta o que o autor construiu e como experimentar. Não pedir votos nem comentários a amigos. As regras também dizem que anúncios de versão e atualizações, por si só, não são um Show HN; por isso, apresentar o app e o problema que resolve, não a v0.2.3 como novidade. Fonte: [regras oficiais do Show HN](https://news.ycombinator.com/showhn.html).
+O título começa com `Show HN`, e o post leva a um app que o leitor pode instalar e testar. O primeiro parágrafo explica o motivo pessoal do app antes de falar da versão e dos requisitos. As regras dizem que um anúncio de versão, por si só, não é um Show HN. Não pedir votos nem comentários a amigos. Fonte: [regras oficiais do Show HN](https://news.ycombinator.com/showhn.html).
 
-Pré-condição: só publicar quando o autor puder acompanhar e responder no tópico. As regras esperam que o autor esteja disponível para conversar. O vídeo do README pode demonstrar o fluxo enquanto a captura real do issue #44 não existe; manter explícito que a imagem do README é placeholder.
+Só publicar quando o autor puder acompanhar o tópico e responder às perguntas. O README ainda tem um placeholder no lugar de uma captura real, conforme o [issue #44](https://github.com/pedrotmr/aerospace-tabs/issues/44); usar o vídeo de demonstração e não chamar o placeholder de screenshot.
 
-## 2. AeroSpace Goodies
+## 2. Reddit
+
+### r/macOS
+
+**Título**
+
+```text
+I made AeroSpaceTabs because I kept losing track of windows across AeroSpace workspaces
+```
+
+**Texto**
+
+```text
+Hi, I'm the developer of AeroSpaceTabs. I use AeroSpace every day and wanted a quicker way to see which windows I had open in each workspace.
+
+I made a small tab strip for switching to a window, plus a full-screen overview grouped by workspace. AeroSpace still does the tiling. The current release is v0.2.3: https://github.com/pedrotmr/aerospace-tabs/releases/tag/v0.2.3
+
+It needs macOS 14 or later, AeroSpace running, and Accessibility permission. Screen Recording is optional for window previews. There's a demo in the README: https://github.com/pedrotmr/aerospace-tabs#readme
+
+I built it for my own setup, but I'd like to hear whether it fits yours. I'm the developer and will answer questions here.
+```
+
+O texto abre com o motivo pessoal, depois explica o app e só então lista versão e requisitos. A regra atual de [r/macOS](https://www.reddit.com/r/MacOS/comments/1rsxzup/new_policy_introducing_developer_saturday/) permite promoção de apps aos sábados, no horário UTC, com um post promocional por pessoa na semana. Ela pede transparência sobre a relação com o app, contexto em vez de apenas um link, e recomenda uma captura de qualidade e participação nos comentários. Como o README ainda usa um placeholder de screenshot, usar o vídeo demonstrativo e, se possível, esperar uma captura real antes de postar.
+
+### r/MacApps
+
+Não usar o feed principal como primeiro destino. As regras atuais limitam promoções a uma por desenvolvedor a cada 30 dias e exigem pelo menos 10 pontos de karma na comunidade. A moderação descreve um caminho de confiança para projetos com histórico consistente e interesse público; para a megathread, cita um repositório com um ano de histórico ou 100 ou mais estrelas. Este repositório foi [criado em 5 de setembro de 2026](https://api.github.com/repos/pedrotmr/aerospace-tabs) e tem [0 estrelas](https://github.com/pedrotmr/aerospace-tabs), então ainda não alcança esses sinais. Há também um caminho de transparência que exige portfólio público com identidade e contato, além de site com política de privacidade e termos. Se esses requisitos não estiverem atendidos, a própria moderação direciona promoções ao megathread “The App Pile”. Conferir [as regras atuais](https://www.reddit.com/r/macapps/comments/1ryaeex/rmacapps_mods_went_too_far_whats-changing-phase_3/) no dia antes de decidir.
+
+Não copiar e colar o mesmo texto em vários subs. As regras de Reddit podem variar; escolher uma comunidade, ler as regras do momento e adaptar o texto. Os moderadores de r/macOS pedem um post por semana, e r/MacApps limita a promoção a uma vez por 30 dias.
+
+## 3. AeroSpace Goodies
 
 O [PR #35](https://github.com/pedrotmr/aerospace-tabs/pull/35) adicionou o trecho abaixo ao arquivo removido depois pelo [PR #46](https://github.com/pedrotmr/aerospace-tabs/pull/46). Reutilizar o snippet sem alterar o texto do produto:
 
@@ -62,7 +93,7 @@ The app requires Accessibility. Screen Recording is optional for window previews
 
 O documento anterior do PR #35 pedia validar uma instalação limpa antes de enviar. Atualizar essa etapa para a v0.2.3: instalar o ZIP atual, conceder Acessibilidade, confirmar strip e overview, sair e verificar a restauração de `gaps.outer.top`. Não abrir o PR upstream até esse teste estar registrado. A página Goodies convida contribuições por issue ou pull request, mas a decisão de aceitar é do mantenedor do AeroSpace.
 
-## 3. Homebrew oficial
+## 4. Homebrew oficial
 
 O caminho seria propor o cask em [`Homebrew/homebrew-cask`](https://github.com/Homebrew/homebrew-cask), mantendo o tap pessoal como rota de instalação enquanto isso. O [tap atual](https://github.com/pedrotmr/homebrew-aerospace-tabs) distribui o cask `pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs`; o [guia do projeto](../HOMEBREW.md) explica sua atualização automática a partir das releases estáveis.
 
@@ -72,4 +103,4 @@ Fontes: [Package Acceptance Policy](https://docs.brew.sh/Package-Acceptance-Poli
 
 ## Decisão
 
-**Goodies primeiro.** Depois de testar a v0.2.3 em uma instalação limpa, propor o snippet ao AeroSpace. Essa entrada alcança diretamente quem já usa AeroSpace e não exige apresentar um projeto em manutenção ativa a uma audiência ampla. Fazer Show HN numa etapa seguinte, apenas se o autor puder acompanhar a conversa e responder perguntas. Não tentar Homebrew oficial enquanto o projeto estiver pausado e abaixo do critério de notabilidade.
+**Posts públicos primeiro, Goodies depois.** Primeiro, validar a v0.2.3 em uma instalação limpa. Depois, publicar no Show HN quando o autor puder acompanhar a conversa; em seguida, escolher uma única comunidade no Reddit onde o post seja permitido e adaptar o texto às regras locais. Só então propor o snippet ao AeroSpace Goodies. A página atual convida contribuições por issue ou pull request, então não encontrei uma restrição contra esse tipo de entrada; a aceitação continua a critério do mantenedor. Não tentar Homebrew oficial enquanto o projeto estiver pausado e abaixo do critério de notabilidade.
