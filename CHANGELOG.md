@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0](https://github.com/pedrotmr/aerospace-tabs/compare/v0.2.3...v0.3.0) (2026-10-29)
+
+
+### Features
+
+* **updates:** offer in-app Homebrew updates ([e7662a7](https://github.com/pedrotmr/aerospace-tabs/commit/e7662a703fb5358ff4ddc6d98aa9b2f505c2285b))
+* **updates:** offer in-app Homebrew updates ([#64](https://github.com/pedrotmr/aerospace-tabs/issues/64)) ([b6764ef](https://github.com/pedrotmr/aerospace-tabs/commit/b6764ef54addc59007524230aa936fd79137752c))
+
+
+### Bug Fixes
+
+* **updates:** preserve Homebrew check behavior ([fef97e7](https://github.com/pedrotmr/aerospace-tabs/commit/fef97e7d8b23ca2637384274d853ae1e2400cd50))
+
 ## [0.2.3](https://github.com/pedrotmr/aerospace-tabs/compare/v0.2.2...v0.2.3) (2026-10-27)
 
 
