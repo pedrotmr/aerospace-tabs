@@ -1,4 +1,5 @@
 import XCTest
+import Sparkle
 @testable import AerospaceTabs
 
 final class HomebrewInstallDetectorTests: XCTestCase {
@@ -10,7 +11,6 @@ final class HomebrewInstallDetectorTests: XCTestCase {
 
         XCTAssertFalse(HomebrewInstallDetector.isManagedByHomebrew(
             bundleIdentifier: bundleIdentifier,
-            installedVersion: "1.0",
             bundleURL: bundleURL,
             defaults: marker
         ))
@@ -19,14 +19,13 @@ final class HomebrewInstallDetectorTests: XCTestCase {
         marker.set(bundleURL.path, forKey: HomebrewInstallDetector.bundlePathKey)
         XCTAssertTrue(HomebrewInstallDetector.isManagedByHomebrew(
             bundleIdentifier: bundleIdentifier,
-            installedVersion: "1.0",
             bundleURL: bundleURL,
             defaults: marker
         ))
         XCTAssertNil(UserDefaults(suiteName: bundleIdentifier)?.object(forKey: HomebrewInstallDetector.markerKey))
     }
 
-    func testInstalledAppVersionMustMatchHomebrewMarkerFromProductionDefaultsPath() throws {
+    func testHomebrewMarkerSurvivesAnInAppUpdateAtTheSameBundlePath() throws {
         let bundleIdentifier = "com.example.AeroTest.\(UUID().uuidString)"
         let markerDomain = HomebrewInstallDetector.preferencesDomain(for: bundleIdentifier)
         let marker = try XCTUnwrap(UserDefaults(suiteName: markerDomain))
@@ -37,20 +36,20 @@ final class HomebrewInstallDetectorTests: XCTestCase {
         let homebrewBundleURL = URL(fileURLWithPath: "/Applications/AeroTest.app")
         marker.set(homebrewBundleURL.path, forKey: HomebrewInstallDetector.bundlePathKey)
 
+        marker.set("2.0.0", forKey: HomebrewInstallDetector.versionKey)
         XCTAssertTrue(HomebrewInstallDetector.isManagedByHomebrew(
             bundleIdentifier: bundleIdentifier,
-            installedVersion: "1.0.0",
             bundleURL: homebrewBundleURL
         ))
         XCTAssertFalse(HomebrewInstallDetector.isManagedByHomebrew(
             bundleIdentifier: bundleIdentifier,
-            installedVersion: "1.0.1",
-            bundleURL: homebrewBundleURL
-        ))
-        XCTAssertFalse(HomebrewInstallDetector.isManagedByHomebrew(
-            bundleIdentifier: bundleIdentifier,
-            installedVersion: "1.0.0",
             bundleURL: URL(fileURLWithPath: "/Users/example/Downloads/AeroTest.app")
         ))
+    }
+
+    func testHomebrewUpdateChecksAllowManualChecksButBlockScheduledChecks() {
+        XCTAssertTrue(HomebrewUpdateCheckPolicy.allows(.updates, managedByHomebrew: true))
+        XCTAssertFalse(HomebrewUpdateCheckPolicy.allows(.updatesInBackground, managedByHomebrew: true))
+        XCTAssertTrue(HomebrewUpdateCheckPolicy.allows(.updatesInBackground, managedByHomebrew: false))
     }
 }

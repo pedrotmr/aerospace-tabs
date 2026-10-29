@@ -11,11 +11,13 @@ Before publishing a stable release:
 
 The cask uses a versioned ZIP URL and its real SHA-256. Do not use a draft URL or a made-up checksum. The cask does not delete app settings, files, or user repositories when it uninstalls.
 
-The cask marks the app as Homebrew-managed and clears only that marker when removed. The app does not start Sparkle for this copy. Direct downloads use Sparkle.
+The cask marks the app as Homebrew-managed and clears only that marker when removed. Direct downloads use Sparkle.
 
 The cask requires macOS 14 or later. The app bundle and Sparkle feed carry the same minimum.
 
-Homebrew manages updates for this copy. To update only this cask, run:
+On a Homebrew install, **Check for Updates…** checks the Sparkle feed. It stays quiet when there is no update. When an update is available, choose **Update in App** to install it with Sparkle or **Copy Homebrew Command** to use Homebrew in Terminal. If Sparkle cannot check or complete an update, its error alert offers the Homebrew command. In-app updates keep the Homebrew marker. Homebrew compares the app version before replacing a self-updated app.
+
+To update only this cask, run:
 
 ```sh
 brew update

@@ -11,7 +11,6 @@ enum HomebrewInstallDetector {
 
     static func isManagedByHomebrew(
         bundleIdentifier: String,
-        installedVersion: String,
         bundleURL: URL,
         defaults: UserDefaults? = nil
     ) -> Bool {
@@ -21,7 +20,6 @@ enum HomebrewInstallDetector {
             URL(fileURLWithPath: $0).standardizedFileURL.resolvingSymlinksInPath().path
         }
         return preferences?.bool(forKey: markerKey) == true
-            && preferences?.string(forKey: versionKey) == installedVersion
             && managedBundlePath == installedBundlePath
     }
 }

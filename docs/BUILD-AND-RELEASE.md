@@ -52,7 +52,7 @@ The direct ZIP contains the stapled app bundle; the ZIP itself is not stapled. T
 
 ## Update paths
 
-Homebrew users install and update the cask. The tap has a cask for the latest stable release:
+Homebrew users can update the cask in Terminal or choose an in-app Sparkle update when one is available. The tap has a cask for the latest stable release:
 
 ```sh
 brew install --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
@@ -60,7 +60,7 @@ brew update
 brew upgrade --cask --greedy-auto-updates pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
 ```
 
-The cask sets `auto_updates true`. Homebrew's [`--greedy-auto-updates` option](https://docs.brew.sh/Manpage#upgrade-options-installed_formulainstalled_cask-) includes this cask while the command targets only AeroSpaceTabs. The cask writes a Homebrew marker, and the app does not start Sparkle for that copy.
+The cask sets `auto_updates true`. Homebrew's [`--greedy-auto-updates` option](https://docs.brew.sh/Manpage#upgrade-options-installed_formulainstalled_cask-) includes this cask while the command targets only AeroSpaceTabs. The cask writes a Homebrew marker. Sparkle stays idle on launch, but **Check for Updates…** can probe the feed when requested.
 
 Direct downloads can check for updates from **Check for Updates…** in the app. The v0.1.2 direct build has no Sparkle updater, so users on that version must install v0.2.0 or later manually once. Later direct releases can update with Sparkle.
 
