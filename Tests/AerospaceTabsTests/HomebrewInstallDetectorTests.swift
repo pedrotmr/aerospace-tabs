@@ -1,4 +1,5 @@
 import XCTest
+import Sparkle
 @testable import AerospaceTabs
 
 final class HomebrewInstallDetectorTests: XCTestCase {
@@ -35,10 +36,7 @@ final class HomebrewInstallDetectorTests: XCTestCase {
         let homebrewBundleURL = URL(fileURLWithPath: "/Applications/AeroTest.app")
         marker.set(homebrewBundleURL.path, forKey: HomebrewInstallDetector.bundlePathKey)
 
-        XCTAssertTrue(HomebrewInstallDetector.isManagedByHomebrew(
-            bundleIdentifier: bundleIdentifier,
-            bundleURL: homebrewBundleURL
-        ))
+        marker.set("2.0.0", forKey: HomebrewInstallDetector.versionKey)
         XCTAssertTrue(HomebrewInstallDetector.isManagedByHomebrew(
             bundleIdentifier: bundleIdentifier,
             bundleURL: homebrewBundleURL
@@ -47,5 +45,11 @@ final class HomebrewInstallDetectorTests: XCTestCase {
             bundleIdentifier: bundleIdentifier,
             bundleURL: URL(fileURLWithPath: "/Users/example/Downloads/AeroTest.app")
         ))
+    }
+
+    func testHomebrewUpdateChecksAllowManualChecksButBlockScheduledChecks() {
+        XCTAssertTrue(HomebrewUpdateCheckPolicy.allows(.updates, managedByHomebrew: true))
+        XCTAssertFalse(HomebrewUpdateCheckPolicy.allows(.updatesInBackground, managedByHomebrew: true))
+        XCTAssertTrue(HomebrewUpdateCheckPolicy.allows(.updatesInBackground, managedByHomebrew: false))
     }
 }
