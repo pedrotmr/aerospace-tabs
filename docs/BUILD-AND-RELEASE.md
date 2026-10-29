@@ -56,11 +56,10 @@ Homebrew users can update the cask in Terminal or choose an in-app Sparkle updat
 
 ```sh
 brew install --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
-brew update
-brew upgrade --cask --greedy-auto-updates pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
+brew upgrade --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
 ```
 
-The cask sets `auto_updates true`. Homebrew's [`--greedy-auto-updates` option](https://docs.brew.sh/Manpage#upgrade-options-installed_formulainstalled_cask-) includes this cask while the command targets only AeroSpaceTabs. The cask writes a Homebrew marker. Sparkle stays idle on launch, but **Check for Updates…** can probe the feed when requested.
+The cask sets `auto_updates true`. Naming this versioned cask explicitly lets Homebrew compare the installed app version and upgrade it, while avoiding downgrades after a Sparkle update. The cask writes a Homebrew marker. Sparkle stays idle on launch, but **Check for Updates…** can probe the feed when requested.
 
 Direct downloads can check for updates from **Check for Updates…** in the app. The v0.1.2 direct build has no Sparkle updater, so users on that version must install v0.2.0 or later manually once. Later direct releases can update with Sparkle.
 

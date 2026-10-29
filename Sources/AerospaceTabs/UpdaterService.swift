@@ -27,7 +27,7 @@ final class UpdaterService {
         if managedByHomebrew {
             let userDriver = HomebrewUserDriver(
                 appName: "AeroSpaceTabs",
-                updateCommand: "brew update && brew upgrade --cask --greedy-auto-updates pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs",
+                updateCommand: "brew upgrade --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs",
                 hostBundle: bundle,
                 delegate: userDriverDelegate
             )

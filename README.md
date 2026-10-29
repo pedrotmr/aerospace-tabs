@@ -44,8 +44,7 @@ brew install --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
 Homebrew manages updates for this copy. **Check for Updates…** offers an in-app Sparkle update or a Homebrew command only when an update is available. To update only AeroSpaceTabs in Terminal:
 
 ```sh
-brew update
-brew upgrade --cask --greedy-auto-updates pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
+brew upgrade --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
 ```
 
 ### Option 2: Direct download

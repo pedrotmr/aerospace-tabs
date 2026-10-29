@@ -20,8 +20,7 @@ On a Homebrew install, **Check for Updates…** checks the Sparkle feed. It stay
 To update only this cask, run:
 
 ```sh
-brew update
-brew upgrade --cask --greedy-auto-updates pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
+brew upgrade --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
 ```
 
 Direct downloads use Sparkle. Do not use the Homebrew command to update a direct download.
