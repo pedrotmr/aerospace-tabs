@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/pedrotmr/aerospace-tabs/compare/v0.3.0...v0.3.1) (2026-10-29)
+
+
+### Bug Fixes
+
+* simplify Homebrew upgrade command ([#66](https://github.com/pedrotmr/aerospace-tabs/issues/66)) ([a529c1e](https://github.com/pedrotmr/aerospace-tabs/commit/a529c1ecc4cb3e48aaedf921b6de5209f88cbcf9))
+
 ## [0.3.0](https://github.com/pedrotmr/aerospace-tabs/compare/v0.2.3...v0.3.0) (2026-10-29)
 
 
