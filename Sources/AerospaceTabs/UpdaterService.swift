@@ -10,6 +10,14 @@ final class UpdaterService {
     private let homebrewUserDriver: HomebrewUserDriver?
     private let managedByHomebrew: Bool
     private var hasStartedHomebrewUpdater = false
+    private var backgroundCheckTask: Task<Void, Never>?
+    private var backgroundCheckInterval: TimeInterval?
+    private var probeSchedule = UpdateProbeSchedule()
+    private var automaticChecksObservation: NSKeyValueObservation?
+    var availableUpdateVersion: String? {
+        didSet { onUpdateAvailabilityChange?(availableUpdateVersion) }
+    }
+    var onUpdateAvailabilityChange: ((String?) -> Void)?
 
     init() {
         let bundle = Bundle.main
@@ -21,7 +29,7 @@ final class UpdaterService {
 
         let userDriverDelegate = UpdaterUserDriverDelegate()
         self.userDriverDelegate = userDriverDelegate
-        let updaterDelegate = UpdaterDelegate(managedByHomebrew: managedByHomebrew)
+        let updaterDelegate = UpdaterDelegate()
         self.updaterDelegate = updaterDelegate
 
         if managedByHomebrew {
@@ -43,14 +51,30 @@ final class UpdaterService {
             homebrewUserDriver = nil
             homebrewUpdater = nil
             controller = SPUStandardUpdaterController(
-                startingUpdater: true,
+                startingUpdater: false,
                 updaterDelegate: updaterDelegate,
                 userDriverDelegate: userDriverDelegate
             )
         }
+
+        updaterDelegate.onUpdateAvailable = { [weak self] item in
+            self?.availableUpdateVersion = UpdateAvailabilityPolicy.installableVersion(
+                isInformationOnlyUpdate: item.isInformationOnlyUpdate,
+                displayVersion: item.displayVersionString
+            )
+        }
+        updaterDelegate.onUpdateUnavailable = { [weak self] in
+            self?.availableUpdateVersion = nil
+        }
+        updaterDelegate.onUpdateCheckFinished = { [weak self] updateCheck, error in
+            guard updateCheck == .updateInformation else { return }
+            self?.scheduleNextBackgroundCheck(after: error)
+        }
+
+        startBackgroundUpdateChecks()
     }
 
-    @objc func checkForUpdates(_ sender: Any?) {
+    @objc func installAvailableUpdate(_ sender: Any?) {
         guard managedByHomebrew else {
             controller?.checkForUpdates(sender)
             return
@@ -69,30 +93,175 @@ final class UpdaterService {
 
         updater.checkForUpdates()
     }
+
+    private func startBackgroundUpdateChecks() {
+        guard let updater = managedByHomebrew ? homebrewUpdater : controller?.updater else { return }
+
+        if managedByHomebrew {
+            do {
+                try updater.start()
+                hasStartedHomebrewUpdater = true
+            } catch {
+                homebrewUserDriver?.showUpdaterStartError(error)
+                return
+            }
+        } else {
+            controller?.startUpdater()
+        }
+
+        backgroundCheckInterval = max(updater.updateCheckInterval, 3_600)
+        automaticChecksObservation = updater.observe(\.automaticallyChecksForUpdates, options: [.new]) { [weak self] _, change in
+            guard let isEnabled = change.newValue else { return }
+            Task { @MainActor [weak self] in
+                self?.automaticChecksPreferenceDidChange(isEnabled)
+            }
+        }
+
+        if updater.automaticallyChecksForUpdates {
+            checkForUpdateInformation()
+        }
+    }
+
+    private func automaticChecksPreferenceDidChange(_ isEnabled: Bool) {
+        guard backgroundCheckInterval != nil else { return }
+        if isEnabled {
+            checkForUpdateInformation()
+        } else {
+            stopBackgroundCheckSchedule()
+        }
+    }
+
+    private func scheduleNextBackgroundCheck(after error: Error?) {
+        guard let backgroundCheckInterval else { return }
+        guard let updater = managedByHomebrew ? homebrewUpdater : controller?.updater,
+              let delay = probeSchedule.nextInterval(
+                after: error,
+                normalInterval: backgroundCheckInterval,
+                automaticChecksEnabled: updater.automaticallyChecksForUpdates
+              ) else {
+            stopBackgroundCheckSchedule()
+            return
+        }
+        scheduleBackgroundCheck(after: delay)
+    }
+
+    private func scheduleBackgroundCheck(after delay: TimeInterval) {
+        guard let updater = managedByHomebrew ? homebrewUpdater : controller?.updater,
+              updater.automaticallyChecksForUpdates else {
+            stopBackgroundCheckSchedule()
+            return
+        }
+        backgroundCheckTask?.cancel()
+        backgroundCheckTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(delay))
+            } catch {
+                return
+            }
+            guard let self else { return }
+            self.checkForUpdateInformation()
+        }
+    }
+
+    private func checkForUpdateInformation() {
+        let updater = managedByHomebrew ? homebrewUpdater : controller?.updater
+        guard let updater else { return }
+        guard updater.automaticallyChecksForUpdates else {
+            stopBackgroundCheckSchedule()
+            return
+        }
+        guard !updater.sessionInProgress else {
+            scheduleBackgroundCheck(after: UpdateProbeSchedule.retryInterval)
+            return
+        }
+        updater.checkForUpdateInformation()
+    }
+
+    private func stopBackgroundCheckSchedule() {
+        backgroundCheckTask?.cancel()
+        backgroundCheckTask = nil
+        probeSchedule = UpdateProbeSchedule()
+    }
 }
 
-enum HomebrewUpdateCheckPolicy {
-    static func allows(_ updateCheck: SPUUpdateCheck, managedByHomebrew: Bool) -> Bool {
-        !managedByHomebrew || updateCheck != .updatesInBackground
+enum UpdateAvailabilityPolicy {
+    static func installableVersion(isInformationOnlyUpdate: Bool, displayVersion: String) -> String? {
+        isInformationOnlyUpdate ? nil : displayVersion
+    }
+}
+
+enum UpdateCheckPolicy {
+    static func allows(_ updateCheck: SPUUpdateCheck) -> Bool {
+        updateCheck != .updatesInBackground
+    }
+}
+
+struct UpdateProbeSchedule {
+    static let maximumRetries = 3
+    static let retryInterval: TimeInterval = 900
+
+    private(set) var consecutiveRetries = 0
+
+    mutating func nextInterval(
+        after error: Error?,
+        normalInterval: TimeInterval,
+        automaticChecksEnabled: Bool
+    ) -> TimeInterval? {
+        guard automaticChecksEnabled else {
+            consecutiveRetries = 0
+            return nil
+        }
+
+        guard let error, !Self.isNoUpdateError(error) else {
+            consecutiveRetries = 0
+            return normalInterval
+        }
+
+        guard consecutiveRetries < Self.maximumRetries else {
+            consecutiveRetries = 0
+            return normalInterval
+        }
+
+        consecutiveRetries += 1
+        return Self.retryInterval
+    }
+
+    private static func isNoUpdateError(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        return nsError.domain == SUSparkleErrorDomain && nsError.code == Int(SUError.noUpdateError.rawValue)
     }
 }
 
 @MainActor
 private final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
-    private let managedByHomebrew: Bool
-
-    init(managedByHomebrew: Bool) {
-        self.managedByHomebrew = managedByHomebrew
-    }
+    var onUpdateAvailable: ((SUAppcastItem) -> Void)?
+    var onUpdateUnavailable: (() -> Void)?
+    var onUpdateCheckFinished: ((SPUUpdateCheck, Error?) -> Void)?
 
     func updater(_ updater: SPUUpdater, mayPerform updateCheck: SPUUpdateCheck) throws {
-        guard HomebrewUpdateCheckPolicy.allows(updateCheck, managedByHomebrew: managedByHomebrew) else {
+        guard UpdateCheckPolicy.allows(updateCheck) else {
             throw NSError(
                 domain: "AeroSpaceTabs.UpdateService",
                 code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Scheduled update checks are disabled for Homebrew installations."]
+                userInfo: [NSLocalizedDescriptionKey: "Scheduled update checks are disabled."]
             )
         }
+    }
+
+    func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
+        onUpdateAvailable?(item)
+    }
+
+    func updaterDidNotFindUpdate(_ updater: SPUUpdater) {
+        onUpdateUnavailable?()
+    }
+
+    func updater(
+        _ updater: SPUUpdater,
+        didFinishUpdateCycleFor updateCheck: SPUUpdateCheck,
+        error: Error?
+    ) {
+        onUpdateCheckFinished?(updateCheck, error)
     }
 }
 
@@ -136,7 +305,7 @@ private final class HomebrewUserDriver: SPUStandardUserDriver {
                 return .dismiss
             case .alertSecondButtonReturn:
                 copyHomebrewCommand()
-                return .skip
+                return .dismiss
             default:
                 return cancellationChoice(for: state)
             }
@@ -153,7 +322,7 @@ private final class HomebrewUserDriver: SPUStandardUserDriver {
             return .install
         case .alertSecondButtonReturn:
             copyHomebrewCommand()
-            return .skip
+            return .dismiss
         default:
             return cancellationChoice(for: state)
         }

@@ -15,7 +15,7 @@ The cask marks the app as Homebrew-managed and clears only that marker when remo
 
 The cask requires macOS 14 or later. The app bundle and Sparkle feed carry the same minimum.
 
-On a Homebrew install, **Check for Updates…** checks the Sparkle feed. It stays quiet when there is no update. When an update is available, choose **Update in App** to install it with Sparkle or **Copy Homebrew Command** to use Homebrew in Terminal. If Sparkle cannot check or complete an update, its error alert offers the Homebrew command. In-app updates keep the Homebrew marker. The command below targets the version currently available in Homebrew's local tap, so use it after the tap contains the release you want.
+On a Homebrew install, AeroSpaceTabs checks the Sparkle feed quietly in the background when Sparkle automatic checks are enabled. When an installable update is available, the app menu and tab-strip menu show an update action. Choose it to install with Sparkle or copy the Homebrew command. If Sparkle cannot complete the update, its error alert offers the Homebrew command. In-app updates keep the Homebrew marker. The command below targets the version currently available in Homebrew's local tap, so use it after the tap contains the release you want.
 
 To update only this cask, run:
 

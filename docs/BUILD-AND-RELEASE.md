@@ -52,16 +52,16 @@ The direct ZIP contains the stapled app bundle; the ZIP itself is not stapled. T
 
 ## Update paths
 
-Homebrew users can update the cask in Terminal or choose an in-app Sparkle update when one is available. The tap has a cask for the latest stable release:
+Homebrew users can update the cask in Terminal or choose an in-app Sparkle update when one is available. When Sparkle automatic checks are enabled, AeroSpaceTabs checks the Sparkle feed quietly in the background and shows an update action only when an installable update is found. The tap has a cask for the latest stable release:
 
 ```sh
 brew install --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
 brew upgrade --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
 ```
 
-The cask sets `auto_updates true`. An untargeted `brew upgrade` can compare the installed app version with the cask version. The explicitly named command above targets the version currently available in Homebrew's local tap, so use it after the tap contains the release you want. The cask writes a Homebrew marker. Sparkle stays idle on launch, but **Check for Updates…** can probe the feed when requested.
+The cask sets `auto_updates true`. An untargeted `brew upgrade` can compare the installed app version with the cask version. The explicitly named command above targets the version currently available in Homebrew's local tap, so use it after the tap contains the release you want. The cask writes a Homebrew marker. When Sparkle automatic checks are enabled, Sparkle checks the feed quietly in the background; the app menu offers an update action only when an installable update is available.
 
-Direct downloads can check for updates from **Check for Updates…** in the app. The v0.1.2 direct build has no Sparkle updater, so users on that version must install v0.2.0 or later manually once. Later direct releases can update with Sparkle.
+When Sparkle automatic checks are enabled, direct downloads check for updates quietly in the background. The app menu offers an update action only when Sparkle finds an installable release. The v0.1.2 direct build has no Sparkle updater, so users on that version must install v0.2.0 or later manually once. Later direct releases can update with Sparkle.
 
 To switch the same app copy from Homebrew to a direct download, uninstall the cask first:
 
