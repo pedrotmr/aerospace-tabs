@@ -3,6 +3,12 @@ name: Sync Homebrew tap
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Published stable release tag to sync
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -13,7 +19,7 @@ concurrency:
 
 jobs:
   sync-cask:
-    if: github.event.release.draft == false && github.event.release.prerelease == false
+    if: github.event_name == 'workflow_dispatch' || (github.event.release.draft == false && github.event.release.prerelease == false)
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v7
@@ -21,14 +27,11 @@ jobs:
           ref: main
           persist-credentials: false
 
-      - name: Build Sparkle verification tools
-        run: make setup && make bundle
-
       - name: Check stable release and download ZIP
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.event.release.tag_name }}
         run: |
           set -euo pipefail
           if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
@@ -40,14 +43,35 @@ jobs:
             echo "::error::Only published stable releases can update the Homebrew tap."
             exit 1
           fi
+          latest_tag=$(gh release list --repo "$GH_REPO" --limit 1000 --json tagName,isLatest \
+            --jq '.[] | select(.isLatest == true) | .tagName')
+          if [[ "$latest_tag" != "$RELEASE_TAG" ]]; then
+            echo "::error::Only the GitHub Latest release can update the Homebrew tap."
+            exit 1
+          fi
+          comparison=$(gh api "repos/$GH_REPO/compare/main...$RELEASE_TAG" --jq '.status')
+          if [[ "$comparison" != "behind" && "$comparison" != "identical" ]]; then
+            echo "::error::The selected release tag must point to a commit already on main."
+            exit 1
+          fi
           version=${RELEASE_TAG#v}
           mkdir -p "$RUNNER_TEMP/release"
           gh release download "$RELEASE_TAG" --repo "pedrotmr/aerospace-tabs" \
             --pattern "AerospaceTabs-$version.zip" --dir "$RUNNER_TEMP/release"
-          archive="$RUNNER_TEMP/release/AerospaceTabs-$version.zip"
+          echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Build Sparkle verification tools
+        run: make setup && make bundle
+
+      - name: Verify the signed release ZIP
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.event.release.tag_name }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/release/AerospaceTabs-$RELEASE_VERSION.zip"
           scripts/verify-release-zip.sh "$archive" "$RELEASE_TAG"
           sha256=$(shasum -a 256 "$archive" | awk '{ print $1 }')
-          echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
           echo "RELEASE_SHA256=$sha256" >> "$GITHUB_ENV"
 
       - name: Check out tap
