@@ -105,14 +105,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func installApplicationMenu() {
         let appMenu = NSMenu()
-        let checkForUpdates = NSMenuItem(
-            title: "Check for Updates…",
-            action: #selector(UpdaterService.checkForUpdates(_:)),
+        let updateItem = NSMenuItem(
+            title: "Update AeroSpaceTabs…",
+            action: #selector(UpdaterService.installAvailableUpdate(_:)),
             keyEquivalent: ""
         )
-        checkForUpdates.target = updater
-        appMenu.addItem(checkForUpdates)
-        appMenu.addItem(.separator())
+        updateItem.target = updater
+        updateItem.isHidden = true
+        let updateSeparator = NSMenuItem.separator()
+        updateSeparator.isHidden = true
+        let updateAvailabilityChanged: (String?) -> Void = { [weak updateItem, weak updateSeparator] version in
+            updateItem?.title = version.map { "Update AeroSpaceTabs to \($0)…" } ?? "Update AeroSpaceTabs…"
+            updateItem?.isHidden = version == nil
+            updateSeparator?.isHidden = version == nil
+        }
+        appMenu.addItem(updateItem)
+        appMenu.addItem(updateSeparator)
+        updater.onUpdateAvailabilityChange = updateAvailabilityChanged
+        updateAvailabilityChanged(updater.availableUpdateVersion)
 
         let quit = NSMenuItem(title: "Quit AeroSpaceTabs", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         quit.target = NSApp
@@ -180,8 +190,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     onOpenOverview: { [weak self] in
                         self?.overview.toggle()
                     },
-                    onCheckForUpdates: { [weak self] in
-                        self?.updater.checkForUpdates(nil)
+                    availableUpdateVersion: { [weak self] in
+                        self?.updater.availableUpdateVersion
+                    },
+                    onInstallAvailableUpdate: { [weak self] in
+                        self?.updater.installAvailableUpdate(nil)
                     },
                     onToggleSwipe: {
                         let settings = OverviewSettings.shared

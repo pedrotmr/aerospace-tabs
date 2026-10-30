@@ -47,9 +47,19 @@ final class HomebrewInstallDetectorTests: XCTestCase {
         ))
     }
 
-    func testHomebrewUpdateChecksAllowManualChecksButBlockScheduledChecks() {
+    func testHomebrewUpdatePolicyAllowsUpdateFlowsButBlocksScheduledChecks() {
         XCTAssertTrue(HomebrewUpdateCheckPolicy.allows(.updates, managedByHomebrew: true))
         XCTAssertFalse(HomebrewUpdateCheckPolicy.allows(.updatesInBackground, managedByHomebrew: true))
         XCTAssertTrue(HomebrewUpdateCheckPolicy.allows(.updatesInBackground, managedByHomebrew: false))
+    }
+
+    func testOnlyInstallableUpdatesHaveAVisibleVersion() {
+        XCTAssertEqual(
+            UpdateAvailabilityPolicy.installableVersion(isInformationOnlyUpdate: false, displayVersion: "2.0.0"),
+            "2.0.0"
+        )
+        XCTAssertNil(
+            UpdateAvailabilityPolicy.installableVersion(isInformationOnlyUpdate: true, displayVersion: "2.0.0")
+        )
     }
 }
