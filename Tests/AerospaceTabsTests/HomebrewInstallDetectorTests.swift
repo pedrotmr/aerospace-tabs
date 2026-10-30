@@ -68,10 +68,16 @@ final class HomebrewInstallDetectorTests: XCTestCase {
         let error = NSError(domain: NSURLErrorDomain, code: NSURLErrorNotConnectedToInternet)
 
         for _ in 0..<UpdateProbeSchedule.maximumRetries {
-            XCTAssertEqual(schedule.nextInterval(after: error, normalInterval: 86_400), UpdateProbeSchedule.retryInterval)
+            XCTAssertEqual(
+                schedule.nextInterval(after: error, normalInterval: 86_400, automaticChecksEnabled: true),
+                .some(UpdateProbeSchedule.retryInterval)
+            )
         }
 
-        XCTAssertEqual(schedule.nextInterval(after: error, normalInterval: 86_400), 86_400)
+        XCTAssertEqual(
+            schedule.nextInterval(after: error, normalInterval: 86_400, automaticChecksEnabled: true),
+            .some(86_400)
+        )
         XCTAssertEqual(schedule.consecutiveRetries, 0)
     }
 
@@ -79,9 +85,27 @@ final class HomebrewInstallDetectorTests: XCTestCase {
         var schedule = UpdateProbeSchedule()
         let noUpdateError = NSError(domain: SUSparkleErrorDomain, code: Int(SUError.noUpdateError.rawValue))
         let transientError = NSError(domain: NSURLErrorDomain, code: NSURLErrorNotConnectedToInternet)
-        _ = schedule.nextInterval(after: transientError, normalInterval: 86_400)
+        _ = schedule.nextInterval(after: transientError, normalInterval: 86_400, automaticChecksEnabled: true)
 
-        XCTAssertEqual(schedule.nextInterval(after: noUpdateError, normalInterval: 86_400), 86_400)
+        XCTAssertEqual(
+            schedule.nextInterval(after: noUpdateError, normalInterval: 86_400, automaticChecksEnabled: true),
+            .some(86_400)
+        )
         XCTAssertEqual(schedule.consecutiveRetries, 0)
+    }
+
+    func testChangingAutomaticChecksOffStopsTheNextProbeAndTurningItBackOnResumes() {
+        var schedule = UpdateProbeSchedule()
+
+        XCTAssertEqual(
+            schedule.nextInterval(after: nil, normalInterval: 86_400, automaticChecksEnabled: true),
+            .some(86_400)
+        )
+        XCTAssertNil(schedule.nextInterval(after: nil, normalInterval: 86_400, automaticChecksEnabled: false))
+        XCTAssertEqual(schedule.consecutiveRetries, 0)
+        XCTAssertEqual(
+            schedule.nextInterval(after: nil, normalInterval: 86_400, automaticChecksEnabled: true),
+            .some(86_400)
+        )
     }
 }

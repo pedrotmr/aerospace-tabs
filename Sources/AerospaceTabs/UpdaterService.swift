@@ -13,6 +13,7 @@ final class UpdaterService {
     private var backgroundCheckTask: Task<Void, Never>?
     private var backgroundCheckInterval: TimeInterval?
     private var probeSchedule = UpdateProbeSchedule()
+    private var automaticChecksObservation: NSKeyValueObservation?
     var availableUpdateVersion: String? {
         didSet { onUpdateAvailabilityChange?(availableUpdateVersion) }
     }
@@ -95,7 +96,6 @@ final class UpdaterService {
 
     private func startBackgroundUpdateChecks() {
         guard let updater = managedByHomebrew ? homebrewUpdater : controller?.updater else { return }
-        guard updater.automaticallyChecksForUpdates else { return }
 
         if managedByHomebrew {
             do {
@@ -110,16 +110,47 @@ final class UpdaterService {
         }
 
         backgroundCheckInterval = max(updater.updateCheckInterval, 3_600)
-        checkForUpdateInformation()
+        automaticChecksObservation = updater.observe(\.automaticallyChecksForUpdates, options: [.new]) { [weak self] _, change in
+            guard let isEnabled = change.newValue else { return }
+            Task { @MainActor [weak self] in
+                self?.automaticChecksPreferenceDidChange(isEnabled)
+            }
+        }
+
+        if updater.automaticallyChecksForUpdates {
+            checkForUpdateInformation()
+        }
+    }
+
+    private func automaticChecksPreferenceDidChange(_ isEnabled: Bool) {
+        guard backgroundCheckInterval != nil else { return }
+        if isEnabled {
+            checkForUpdateInformation()
+        } else {
+            stopBackgroundCheckSchedule()
+        }
     }
 
     private func scheduleNextBackgroundCheck(after error: Error?) {
         guard let backgroundCheckInterval else { return }
-        let delay = probeSchedule.nextInterval(after: error, normalInterval: backgroundCheckInterval)
+        guard let updater = managedByHomebrew ? homebrewUpdater : controller?.updater,
+              let delay = probeSchedule.nextInterval(
+                after: error,
+                normalInterval: backgroundCheckInterval,
+                automaticChecksEnabled: updater.automaticallyChecksForUpdates
+              ) else {
+            stopBackgroundCheckSchedule()
+            return
+        }
         scheduleBackgroundCheck(after: delay)
     }
 
     private func scheduleBackgroundCheck(after delay: TimeInterval) {
+        guard let updater = managedByHomebrew ? homebrewUpdater : controller?.updater,
+              updater.automaticallyChecksForUpdates else {
+            stopBackgroundCheckSchedule()
+            return
+        }
         backgroundCheckTask?.cancel()
         backgroundCheckTask = Task { @MainActor [weak self] in
             do {
@@ -135,11 +166,21 @@ final class UpdaterService {
     private func checkForUpdateInformation() {
         let updater = managedByHomebrew ? homebrewUpdater : controller?.updater
         guard let updater else { return }
+        guard updater.automaticallyChecksForUpdates else {
+            stopBackgroundCheckSchedule()
+            return
+        }
         guard !updater.sessionInProgress else {
             scheduleBackgroundCheck(after: UpdateProbeSchedule.retryInterval)
             return
         }
         updater.checkForUpdateInformation()
+    }
+
+    private func stopBackgroundCheckSchedule() {
+        backgroundCheckTask?.cancel()
+        backgroundCheckTask = nil
+        probeSchedule = UpdateProbeSchedule()
     }
 }
 
@@ -161,7 +202,16 @@ struct UpdateProbeSchedule {
 
     private(set) var consecutiveRetries = 0
 
-    mutating func nextInterval(after error: Error?, normalInterval: TimeInterval) -> TimeInterval {
+    mutating func nextInterval(
+        after error: Error?,
+        normalInterval: TimeInterval,
+        automaticChecksEnabled: Bool
+    ) -> TimeInterval? {
+        guard automaticChecksEnabled else {
+            consecutiveRetries = 0
+            return nil
+        }
+
         guard let error, !Self.isNoUpdateError(error) else {
             consecutiveRetries = 0
             return normalInterval
