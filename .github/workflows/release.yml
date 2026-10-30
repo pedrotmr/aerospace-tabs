@@ -70,7 +70,7 @@ jobs:
             echo "::error::Use an existing vMAJOR.MINOR.PATCH draft release tag."
             exit 1
           fi
-          release_json=$(gh release view "$RELEASE_TAG" --json isDraft,isPrerelease,assets)
+          release_json=$(gh release view "$RELEASE_TAG" --json isPrerelease,assets)
           if [[ "$(jq -r '.isPrerelease' <<< "$release_json")" == "true" ]]; then
             echo "::error::The selected release must be stable."
             exit 1
@@ -217,7 +217,7 @@ jobs:
           done
 
           if [[ "$all_expected_assets_exist" == "true" ]]; then
-            echo "Release already has all expected assets; leaving them unchanged."
+            echo "Release already has all expected assets; verifying their contents."
           elif [[ "$asset_count" == "0" ]]; then
             echo "Release was published before assets were attached; adding the verified files."
             gh release upload "$RELEASE_TAG" "${release_files[@]}"
@@ -226,11 +226,14 @@ jobs:
             exit 1
           fi
 
-          release_json=$(gh release view "$RELEASE_TAG" --json isDraft,assets)
-          release_assets=$(jq -r '.assets[].name' <<< "$release_json")
-          for asset in "${expected_assets[@]}"; do
-            if ! grep -Fxq "$asset" <<< "$release_assets"; then
-              echo "::error::Release is missing $asset after upload."
+          remote_dir=$(mktemp -d "$RUNNER_TEMP/release-assets.XXXXXX")
+          for index in "${!expected_assets[@]}"; do
+            asset=${expected_assets[$index]}
+            file=${release_files[$index]}
+            gh release download "$RELEASE_TAG" --repo "$GH_REPO" \
+              --pattern "$asset" --dir "$remote_dir"
+            if ! cmp -s "$file" "$remote_dir/$asset"; then
+              echo "::error::Release asset $asset does not match the verified build artifact."
               exit 1
             fi
           done
