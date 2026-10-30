@@ -41,7 +41,7 @@ Choose one installation method:
 brew install --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
 ```
 
-Homebrew manages updates for this copy. The app checks for updates in the background and shows an **Update AeroSpaceTabs to…** action when one is available. Choose it to update with Sparkle or copy the Homebrew command. To update only AeroSpaceTabs in Terminal:
+Homebrew manages updates for this copy. When Sparkle automatic checks are enabled, AeroSpaceTabs checks for updates quietly in the background and shows an **Update AeroSpaceTabs to…** action only when an installable version is available. Choose it to update with Sparkle or copy the Homebrew command. To update only AeroSpaceTabs in Terminal:
 
 ```sh
 brew upgrade --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
@@ -53,7 +53,7 @@ brew upgrade --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs
 2. If you downloaded the DMG, open it. If you downloaded the ZIP, extract it.
 3. Drag `AerospaceTabs.app` to your Applications folder.
 
-The app checks for updates in the background and shows an **Update AeroSpaceTabs to…** action when a direct download can update with Sparkle. Versions before v0.2.0 need one manual update first.
+When Sparkle automatic checks are enabled, the app checks for updates quietly in the background and shows an **Update AeroSpaceTabs to…** action when a direct download can update with Sparkle. Versions before v0.2.0 need one manual update first.
 
 ## 🚀 First launch
 

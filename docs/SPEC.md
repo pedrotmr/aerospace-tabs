@@ -8,7 +8,7 @@ AeroSpaceTabs is a macOS companion for people who use AeroSpace.
 - Focuses windows from tabs and lets users reorder tabs locally.
 - Provides a full-screen overview grouped by workspace, with keyboard navigation and optional window previews.
 - Uses Accessibility to read and focus windows and run global shortcuts. Screen Recording is optional for previews.
-- Checks the Sparkle feed quietly in the background. When an installable update is available, the app offers an in-app update or, for Homebrew installs, a copyable Homebrew command.
+- When Sparkle automatic checks are enabled, checks the Sparkle feed quietly in the background. When an installable update is available, the app offers an in-app update or, for Homebrew installs, a copyable Homebrew command.
 
 ## Scope and limits
 
