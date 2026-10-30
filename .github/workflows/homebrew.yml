@@ -43,7 +43,8 @@ jobs:
             echo "::error::Only published stable releases can update the Homebrew tap."
             exit 1
           fi
-          latest_tag=$(gh api "repos/$GH_REPO/releases/latest" --jq '.tag_name')
+          latest_tag=$(gh release list --repo "$GH_REPO" --limit 1000 --json tagName,isLatest \
+            --jq '.[] | select(.isLatest == true) | .tagName')
           if [[ "$latest_tag" != "$RELEASE_TAG" ]]; then
             echo "::error::Only the GitHub Latest release can update the Homebrew tap."
             exit 1

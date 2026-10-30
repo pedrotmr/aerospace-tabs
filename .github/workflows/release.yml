@@ -70,7 +70,21 @@ jobs:
             echo "::error::Use an existing vMAJOR.MINOR.PATCH draft release tag."
             exit 1
           fi
-          release_json=$(gh release view "$RELEASE_TAG" --json isPrerelease,assets)
+          candidate_version=${RELEASE_TAG#v}
+          stable_tags=$(gh api "repos/$GH_REPO/releases" --paginate --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name')
+          highest_version=""
+          while IFS= read -r stable_tag; do
+            [[ "$stable_tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || continue
+            stable_version=${stable_tag#v}
+            if [[ -z "$highest_version" ]] || [[ "$(printf '%s\n%s\n' "$highest_version" "$stable_version" | sort -V | tail -n 1)" == "$stable_version" ]]; then
+              highest_version="$stable_version"
+            fi
+          done <<< "$stable_tags"
+          if [[ -n "$highest_version" ]] && [[ "$(printf '%s\n%s\n' "$highest_version" "$candidate_version" | sort -V | tail -n 1)" != "$candidate_version" ]]; then
+            echo "::error::Refusing to rebuild older release $RELEASE_TAG; newest stable version is $highest_version."
+            exit 1
+          fi
+          release_json=$(gh release view "$RELEASE_TAG" --json isDraft,isPrerelease,assets)
           if [[ "$(jq -r '.isPrerelease' <<< "$release_json")" == "true" ]]; then
             echo "::error::The selected release must be stable."
             exit 1
@@ -268,7 +282,8 @@ jobs:
           else
             gh release edit "$RELEASE_TAG" --latest
           fi
-          latest_tag=$(gh api "repos/$GH_REPO/releases/latest" --jq '.tag_name')
+          latest_tag=$(gh release list --repo "$GH_REPO" --limit 1000 --json tagName,isLatest \
+            --jq '.[] | select(.isLatest == true) | .tagName')
           if [[ "$latest_tag" != "$RELEASE_TAG" ]]; then
             echo "::error::GitHub latest release is $latest_tag, expected $RELEASE_TAG."
             exit 1
