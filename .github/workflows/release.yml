@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Existing draft release tag to rebuild, for example v0.1.3
+        description: Draft or published empty stable tag to rebuild, for example v0.1.3
         required: true
         type: string
 
@@ -58,7 +58,7 @@ jobs:
             gh workflow run ci.yml --ref "$release_branch"
           fi
 
-      - name: Validate that the selected release is still a draft
+      - name: Validate the selected release for rebuilding
         if: github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -70,14 +70,20 @@ jobs:
             echo "::error::Use an existing vMAJOR.MINOR.PATCH draft release tag."
             exit 1
           fi
-          release_json=$(gh release view "$RELEASE_TAG" --json isDraft)
-          if [[ "$(jq -r '.isDraft' <<< "$release_json")" != "true" ]]; then
-            echo "::error::The selected release must still be a draft."
+          release_json=$(gh release view "$RELEASE_TAG" --json isDraft,isPrerelease,assets)
+          if [[ "$(jq -r '.isPrerelease' <<< "$release_json")" == "true" ]]; then
+            echo "::error::The selected release must be stable."
+            exit 1
+          fi
+          is_draft=$(jq -r '.isDraft' <<< "$release_json")
+          asset_count=$(jq '.assets | length' <<< "$release_json")
+          if [[ "$is_draft" != "true" && "$asset_count" != "0" ]]; then
+            echo "::error::Select a draft or a published release with no assets."
             exit 1
           fi
           comparison=$(gh api "repos/$GH_REPO/compare/main...$RELEASE_TAG" --jq '.status')
           if [[ "$comparison" != "behind" && "$comparison" != "identical" ]]; then
-            echo "::error::The selected draft tag must point to a commit already on main."
+            echo "::error::The selected release tag must point to a commit already on main."
             exit 1
           fi
 
@@ -165,6 +171,7 @@ jobs:
     needs: [prepare-release, build-release]
     runs-on: ubuntu-latest
     permissions:
+      actions: write
       contents: write
     steps:
       - uses: actions/download-artifact@v8
@@ -172,37 +179,101 @@ jobs:
           name: aerospace-tabs-release-${{ github.run_number }}
           path: .build/release
 
-      - name: Confirm the release is a draft and attach assets
+      - name: Attach verified assets without replacing published files
+        id: attach
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ needs.prepare-release.outputs.tag_name }}
         run: |
           set -euo pipefail
-          release_json=$(gh release view "$RELEASE_TAG" --json isDraft)
-          if [[ "$(jq -r '.isDraft' <<< "$release_json")" != "true" ]]; then
-            echo "::error::Refusing to replace assets on a published release."
+          release_json=$(gh release view "$RELEASE_TAG" --json isDraft,isPrerelease,assets)
+          if [[ "$(jq -r '.isPrerelease' <<< "$release_json")" == "true" ]]; then
+            echo "::error::Refusing to attach stable release assets to a prerelease."
             exit 1
           fi
-          shasum -a 256 .build/release/AerospaceTabs-*.zip .build/release/AerospaceTabs-*.dmg
-          gh release upload "$RELEASE_TAG" \
-            .build/release/AerospaceTabs-*.zip \
-            .build/release/AerospaceTabs-*.dmg \
-            .build/release/appcast/appcast.xml --clobber
-
-      - name: Confirm draft assets are present
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ needs.prepare-release.outputs.tag_name }}
-        run: |
-          set -euo pipefail
-          release_assets=$(gh release view "$RELEASE_TAG" --json isDraft,assets \
-            --jq 'select(.isDraft == true) | .assets[].name')
           version=${RELEASE_TAG#v}
-          for asset in "AerospaceTabs-$version.zip" "AerospaceTabs-$version.dmg" appcast.xml; do
-            if ! grep -Fxq "$asset" <<< "$release_assets"; then
-              echo "::error::Draft release is missing $asset."
+          release_files=(
+            ".build/release/AerospaceTabs-$version.zip"
+            ".build/release/AerospaceTabs-$version.dmg"
+            ".build/release/appcast/appcast.xml"
+          )
+          expected_assets=("AerospaceTabs-$version.zip" "AerospaceTabs-$version.dmg" appcast.xml)
+          for file in "${release_files[@]}"; do
+            if [[ ! -s "$file" ]]; then
+              echo "::error::Verified release file is missing: $file"
               exit 1
             fi
           done
+          shasum -a 256 "${release_files[@]}"
+
+          existing_assets=$(jq -r '.assets[].name' <<< "$release_json")
+          asset_count=$(jq '.assets | length' <<< "$release_json")
+          all_expected_assets_exist=true
+          for asset in "${expected_assets[@]}"; do
+            if ! grep -Fxq "$asset" <<< "$existing_assets"; then
+              all_expected_assets_exist=false
+            fi
+          done
+
+          if [[ "$all_expected_assets_exist" == "true" ]]; then
+            echo "Release already has all expected assets; leaving them unchanged."
+          elif [[ "$asset_count" == "0" ]]; then
+            echo "Release was published before assets were attached; adding the verified files."
+            gh release upload "$RELEASE_TAG" "${release_files[@]}"
+          else
+            echo "::error::Release has a partial asset set; refusing to replace or mix files."
+            exit 1
+          fi
+
+          release_json=$(gh release view "$RELEASE_TAG" --json isDraft,assets)
+          release_assets=$(jq -r '.assets[].name' <<< "$release_json")
+          for asset in "${expected_assets[@]}"; do
+            if ! grep -Fxq "$asset" <<< "$release_assets"; then
+              echo "::error::Release is missing $asset after upload."
+              exit 1
+            fi
+          done
+      - name: Publish verified release as latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.prepare-release.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::Stable release tag must be vMAJOR.MINOR.PATCH: $RELEASE_TAG"
+            exit 1
+          fi
+          candidate_version=${RELEASE_TAG#v}
+          stable_tags=$(gh api "repos/$GH_REPO/releases" --paginate --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name')
+          highest_version=""
+          while IFS= read -r stable_tag; do
+            [[ "$stable_tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || continue
+            stable_version=${stable_tag#v}
+            if [[ -z "$highest_version" ]] || [[ "$(printf '%s\n%s\n' "$highest_version" "$stable_version" | sort -V | tail -n 1)" == "$stable_version" ]]; then
+              highest_version="$stable_version"
+            fi
+          done <<< "$stable_tags"
+          if [[ -n "$highest_version" ]] && [[ "$(printf '%s\n%s\n' "$highest_version" "$candidate_version" | sort -V | tail -n 1)" != "$candidate_version" ]]; then
+            echo "::error::Refusing to mark older release $RELEASE_TAG as Latest; newest stable version is $highest_version."
+            exit 1
+          fi
+          is_draft=$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft')
+          if [[ "$is_draft" == "true" ]]; then
+            gh release edit "$RELEASE_TAG" --draft=false --latest
+          else
+            gh release edit "$RELEASE_TAG" --latest
+          fi
+          latest_tag=$(gh api "repos/$GH_REPO/releases/latest" --jq '.tag_name')
+          if [[ "$latest_tag" != "$RELEASE_TAG" ]]; then
+            echo "::error::GitHub latest release is $latest_tag, expected $RELEASE_TAG."
+            exit 1
+          fi
+
+      - name: Sync Homebrew after publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.prepare-release.outputs.tag_name }}
+        run: gh workflow run homebrew.yml --repo "$GH_REPO" --ref main --field release_tag="$RELEASE_TAG"
