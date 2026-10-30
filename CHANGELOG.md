@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/pedrotmr/aerospace-tabs/compare/v0.4.0...v0.4.1) (2026-10-30)
+
+
+### Bug Fixes
+
+* **release:** prevent incomplete releases ([#70](https://github.com/pedrotmr/aerospace-tabs/issues/70)) ([abed07e](https://github.com/pedrotmr/aerospace-tabs/commit/abed07ea44346faf8c1b182217e28a4ce929b246))
+
 ## [0.4.0](https://github.com/pedrotmr/aerospace-tabs/compare/v0.3.1...v0.4.0) (2026-10-30)
 
 
