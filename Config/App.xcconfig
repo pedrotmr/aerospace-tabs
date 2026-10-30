@@ -2,7 +2,7 @@
 // These defaults keep the Xcode project runnable during local debugging.
 #include "Project.xcconfig"
 // x-release-please-start-version
-APP_MARKETING_VERSION = 0.3.1
+APP_MARKETING_VERSION = 0.4.0
 // x-release-please-end
 APP_BUILD_NUMBER = 1
 

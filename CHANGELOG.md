@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/pedrotmr/aerospace-tabs/compare/v0.3.1...v0.4.0) (2026-10-30)
+
+
+### Features
+
+* discover updates in the background ([#68](https://github.com/pedrotmr/aerospace-tabs/issues/68)) ([0dd3e9d](https://github.com/pedrotmr/aerospace-tabs/commit/0dd3e9d0fd1ed9d8e8ea3e06789c41ba2efb1fbf))
+
 ## [0.3.1](https://github.com/pedrotmr/aerospace-tabs/compare/v0.3.0...v0.3.1) (2026-10-29)
 
 
