@@ -2,7 +2,7 @@
 
 Estado verificado em 28 de outubro de 2026. A versão publicada mais recente é [v0.2.3](https://github.com/pedrotmr/aerospace-tabs/releases/tag/v0.2.3). O repositório tem [0 estrelas](https://github.com/pedrotmr/aerospace-tabs). Os contadores dos assets nas releases somam [110 downloads](https://github.com/pedrotmr/aerospace-tabs/releases), incluindo ZIP, DMG e `appcast.xml`. Isso mede downloads de arquivos, não instalações ou pessoas; as contagens também incluem arquivos usados pelo Sparkle e versões antigas.
 
-O README já mostra um vídeo de demonstração e oferece instalação pelo tap pessoal ou download direto. A captura de tela ainda é um placeholder, conforme o [issue #44](https://github.com/pedrotmr/aerospace-tabs/issues/44). O [issue #10](https://github.com/pedrotmr/aerospace-tabs/issues/10) registra uma verificação de instalação da v0.1.2 e ainda não confirma o funcionamento do strip, do overview ou da restauração de gaps. Antes de divulgar a v0.2.3, repetir essa verificação com a release atual em um Mac com AeroSpace.
+O README já mostra um vídeo de demonstração e oferece instalação pelo tap pessoal ou download direto. O vídeo apresenta melhor o funcionamento do app do que uma captura estática; a decisão de não produzir uma captura para o README está registrada no [issue #44](https://github.com/pedrotmr/aerospace-tabs/issues/44). O [issue #10](https://github.com/pedrotmr/aerospace-tabs/issues/10) registra uma verificação de instalação da v0.1.2 e ainda não confirma o funcionamento do strip, do overview ou da restauração de gaps. Antes de divulgar a v0.2.3, repetir essa verificação com a release atual em um Mac com AeroSpace.
 
 ## 1. Show HN
 
@@ -30,7 +30,7 @@ I made this for my own setup, and I'm curious whether the strip or overview woul
 
 O título começa com `Show HN`, e o post leva a um app que o leitor pode instalar e testar. O primeiro parágrafo explica o motivo pessoal do app antes de falar da versão e dos requisitos. As regras dizem que um anúncio de versão, por si só, não é um Show HN. Não pedir votos nem comentários a amigos. Fonte: [regras oficiais do Show HN](https://news.ycombinator.com/showhn.html).
 
-Só publicar quando o autor puder acompanhar o tópico e responder às perguntas. O README ainda tem um placeholder no lugar de uma captura real, conforme o [issue #44](https://github.com/pedrotmr/aerospace-tabs/issues/44); usar o vídeo de demonstração e não chamar o placeholder de screenshot.
+Só publicar quando o autor puder acompanhar o tópico e responder às perguntas. Manter o vídeo de demonstração do README como apresentação principal; o [issue #44](https://github.com/pedrotmr/aerospace-tabs/issues/44) registra a decisão de não esperar por uma captura estática.
 
 ## 2. Reddit
 
@@ -54,7 +54,7 @@ It needs macOS 14 or later, AeroSpace running, and Accessibility permission. Scr
 I built it for my own setup, but I'd like to hear whether it fits yours. I'm the developer and will answer questions here.
 ```
 
-O texto abre com o motivo pessoal, depois explica o app e só então lista versão e requisitos. A regra atual de [r/macOS](https://www.reddit.com/r/MacOS/comments/1rsxzup/new_policy_introducing_developer_saturday/) permite promoção de apps aos sábados, no horário UTC, com um post promocional por pessoa na semana. Ela pede transparência sobre a relação com o app, contexto em vez de apenas um link, e recomenda uma captura de qualidade e participação nos comentários. Como o README ainda usa um placeholder de screenshot, usar o vídeo demonstrativo e, se possível, esperar uma captura real antes de postar.
+O texto abre com o motivo pessoal, depois explica o app e só então lista versão e requisitos. A regra atual de [r/macOS](https://www.reddit.com/r/MacOS/comments/1rsxzup/new_policy_introducing_developer_saturday/) permite promoção de apps aos sábados, no horário UTC, com um post promocional por pessoa na semana. Ela pede transparência sobre a relação com o app, contexto em vez de apenas um link, e recomenda uma captura de qualidade e participação nos comentários. Para o AeroSpaceTabs, usar o vídeo demonstrativo, que mostra melhor como o app funciona, sem esperar por uma captura estática.
 
 ### r/MacApps
 
