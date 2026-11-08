@@ -233,6 +233,7 @@ final class WindowPreviewStore: ObservableObject {
                 await MainActor.run { [weak self] in
                     guard let self else { return }
                     self.inFlight.remove(id)
+                    defer { self.releaseTransientResourcesIfIdle() }
                     guard token == self.generation,
                           self.windows[id]?.bundleID == window.bundleID, !self.needsScreenRecording else {
                         self.pump()
@@ -248,7 +249,6 @@ final class WindowPreviewStore: ObservableObject {
                     let elapsed = Int(Date().timeIntervalSince(started) * 1000)
                     self.logger.debug("Preview \(id): \(captured != nil ? "ready" : "unavailable") in \(elapsed) ms")
                     self.pump()
-                    self.releaseTransientResourcesIfIdle()
                 }
             }
         }
