@@ -38,7 +38,7 @@ jobs:
             echo "::error::Only vMAJOR.MINOR.PATCH releases can update Homebrew."
             exit 1
           fi
-          release_json=$(gh release view "$RELEASE_TAG" --repo "pedrotmr/aerospace-tabs" --json isDraft,isPrerelease)
+          release_json=$(gh release view "$RELEASE_TAG" --repo "$GH_REPO" --json isDraft,isPrerelease)
           if [[ "$(jq -r '.isDraft' <<< "$release_json")" != false || "$(jq -r '.isPrerelease' <<< "$release_json")" != false ]]; then
             echo "::error::Only published stable releases can update the Homebrew tap."
             exit 1
@@ -55,9 +55,11 @@ jobs:
             exit 1
           fi
           version=${RELEASE_TAG#v}
+          app_name=$(sed -n 's/^PRODUCT_NAME = //p' Config/App.xcconfig)
+          echo "APP_NAME=$app_name" >> "$GITHUB_ENV"
           mkdir -p "$RUNNER_TEMP/release"
-          gh release download "$RELEASE_TAG" --repo "pedrotmr/aerospace-tabs" \
-            --pattern "AerospaceTabs-$version.zip" --dir "$RUNNER_TEMP/release"
+          gh release download "$RELEASE_TAG" --repo "$GH_REPO" \
+            --pattern "$app_name-$version.zip" --dir "$RUNNER_TEMP/release"
           echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
 
       - name: Build Sparkle verification tools
@@ -69,7 +71,7 @@ jobs:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
           set -euo pipefail
-          archive="$RUNNER_TEMP/release/AerospaceTabs-$RELEASE_VERSION.zip"
+          archive="$RUNNER_TEMP/release/$APP_NAME-$RELEASE_VERSION.zip"
           scripts/verify-release-zip.sh "$archive" "$RELEASE_TAG"
           sha256=$(shasum -a 256 "$archive" | awk '{ print $1 }')
           echo "RELEASE_SHA256=$sha256" >> "$GITHUB_ENV"
@@ -96,30 +98,25 @@ jobs:
           python3 scripts/update-cask.py \
             --tap-dir tap \
             --version "$VERSION" \
-            --sha256 "$SHA256" \
-            --owner "pedrotmr" \
-            --slug "aerospace-tabs" \
-            --cask-token "pedrotmr-aerospace-tabs" \
-            --bundle-id "com.pedrotmr.AerospaceTabs" \
-            --app-name "AerospaceTabs" \
-            --app-display-name "AeroSpaceTabs" \
-            --description "Window tabs and overview for AeroSpace" \
-            --min-macos "14.0" \
-            --sparkle "yes"
+            --sha256 "$SHA256"
           cd tap
-          tap_name="pedrotmr/aerospace-tabs"
+          release_owner=$(sed -n 's/^RELEASE_OWNER = //p' ../Config/App.xcconfig)
+          release_slug=$(sed -n 's/^RELEASE_SLUG = //p' ../Config/App.xcconfig)
+          cask_token=$(sed -n 's/^HOMEBREW_CASK_TOKEN = //p' ../Config/App.xcconfig | sed -E 's/[[:space:]]+\/\/.*$//')
+          display_name=$(sed -n 's/^APP_DISPLAY_NAME = //p' ../Config/App.xcconfig)
+          tap_name="$release_owner/$release_slug"
           brew tap --custom-remote "$tap_name" "file://$PWD"
           tap_dir=$(brew --repository "$tap_name")
           mkdir -p "$tap_dir/Casks"
-          cp "Casks/pedrotmr-aerospace-tabs.rb" "$tap_dir/Casks/pedrotmr-aerospace-tabs.rb"
-          brew trust --cask "$tap_name/pedrotmr-aerospace-tabs"
-          brew style --cask "$tap_name/pedrotmr-aerospace-tabs"
-          brew audit --cask --strict --online "$tap_name/pedrotmr-aerospace-tabs"
+          cp "Casks/$cask_token.rb" "$tap_dir/Casks/$cask_token.rb"
+          brew trust --cask "$tap_name/$cask_token"
+          brew style --cask "$tap_name/$cask_token"
+          brew audit --cask --strict --online "$tap_name/$cask_token"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "Casks/pedrotmr-aerospace-tabs.rb"
+          git add "Casks/$cask_token.rb"
           if ! git diff --cached --quiet; then
-            git commit -m "Update AeroSpaceTabs to $VERSION"
+            git commit -m "Update $display_name to $VERSION"
             echo "updated=true" >> "$GITHUB_OUTPUT"
           fi
 

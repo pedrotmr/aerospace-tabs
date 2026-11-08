@@ -26,6 +26,11 @@ struct OverviewWorkspaceGroup: Identifiable {
     var id: String { workspace }
 }
 
+struct OverviewScreenLayout: Equatable {
+    let screenIndex: Int
+    let frames: [Int: CGRect]
+}
+
 /// Choose the row count that gives real window images the most screen area.
 struct WindowOverviewGridPlan {
     struct Row: Identifiable {
@@ -140,7 +145,13 @@ final class WindowOverviewModel: ObservableObject {
         let focusChanged = self.focusedID != focusedID
         if self.windows != windows {
             let windowIDs = Set(windows.map(\.id))
-            windowFrames = windowFrames.filter { windowIDs.contains($0.key) }
+            for screenIndex in Array(layouts.keys) {
+                guard let layout = layouts[screenIndex] else { continue }
+                layouts[screenIndex] = OverviewScreenLayout(
+                    screenIndex: screenIndex,
+                    frames: layout.frames.filter { windowIDs.contains($0.key) }
+                )
+            }
             self.windows = windows
         }
         if focusChanged { self.focusedID = focusedID }
@@ -192,12 +203,10 @@ final class WindowOverviewModel: ObservableObject {
         }
     }
 
-    private var windowFrames: [Int: CGRect] = [:]
+    private var layouts: [Int: OverviewScreenLayout] = [:]
 
-    func setFrames(_ frames: [Int: CGRect], screenIndex: Int) {
-        let displayIDs = Set(displayWindows(on: screenIndex).map(\.id))
-        windowFrames = windowFrames.filter { !displayIDs.contains($0.key) }
-        windowFrames.merge(frames) { _, new in new }
+    func updateLayout(_ layout: OverviewScreenLayout) {
+        layouts[layout.screenIndex] = layout
     }
 
     func select(_ id: Int) {
@@ -207,11 +216,12 @@ final class WindowOverviewModel: ObservableObject {
 
     func moveSelection(_ direction: OverviewNavigationDirection) {
         guard let current = windows.first(where: { $0.id == selectedID }),
-              let origin = windowFrames[current.id] else { return }
+              let layout = layouts[current.screenIndex],
+              let origin = layout.frames[current.id] else { return }
         let horizontal = direction == .left || direction == .right
         let sign: CGFloat = direction == .left || direction == .up ? -1 : 1
         let candidates = displayWindows(on: current.screenIndex).compactMap { window -> (Int, CGFloat)? in
-            guard window.id != current.id, let frame = windowFrames[window.id] else { return nil }
+            guard window.id != current.id, let frame = layout.frames[window.id] else { return nil }
             let dx = frame.midX - origin.midX
             let dy = frame.midY - origin.midY
             let forward = (horizontal ? dx : dy) * sign
@@ -276,7 +286,10 @@ struct WindowOverviewScreen: View {
                         availableSize: availableSize,
                         aspectRatioForWindow: previews.aspectRatio(for:)
                     )
-                    let frames = plan.frames()
+                    let layout = OverviewScreenLayout(
+                        screenIndex: display.screenIndex,
+                        frames: plan.frames()
+                    )
 
                     ScrollView {
                         VStack(spacing: 0) {
@@ -315,11 +328,11 @@ struct WindowOverviewScreen: View {
                     .scrollIndicators(.hidden)
                     .onAppear {
                         model.select(model.selectedID ?? model.focusedID ?? model.navigationWindows.first?.id ?? -1)
-                        model.setFrames(frames, screenIndex: display.screenIndex)
+                        model.updateLayout(layout)
                         updatePriorityPreview()
                     }
-                    .onChange(of: frames) { _, frames in
-                        model.setFrames(frames, screenIndex: display.screenIndex)
+                    .onChange(of: layout) { _, layout in
+                        model.updateLayout(layout)
                     }
                     .onChange(of: model.selectedID) { _, selectedID in
                         updatePriorityPreview()

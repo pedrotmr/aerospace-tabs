@@ -14,39 +14,24 @@ final class ConfigGapTests: XCTestCase {
     }
 
     func testAppliedDeltaDefaultsPathOnlyMarkerToStripHeight() {
-        XCTAssertEqual(GapBoost.appliedDelta(fromActiveMarker: nil), GapBoost.stripHeight)
-        XCTAssertEqual(
-            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\n"),
-            GapBoost.stripHeight
-        )
-        XCTAssertEqual(
-            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\n40\n"),
-            40
-        )
-        XCTAssertEqual(
-            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\n0\n"),
-            GapBoost.stripHeight
-        )
-        XCTAssertEqual(
-            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\n1\n"),
-            GapBoost.stripHeight
-        )
-        XCTAssertEqual(
-            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\n99999\n"),
-            GapBoost.stripHeight
-        )
-        XCTAssertEqual(
-            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\nnan\n"),
-            GapBoost.stripHeight
-        )
-        XCTAssertEqual(
-            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\n-1\n"),
-            GapBoost.stripHeight
-        )
-        XCTAssertEqual(
-            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\ninf\n"),
-            GapBoost.stripHeight
-        )
+        let allowedValues = [GapBoost.stripHeight, GapBoost.boostAmount]
+        func appliedDelta(_ marker: String?) -> CGFloat {
+            GapBoostRecoveryState.appliedDelta(
+                fromActiveMarker: marker,
+                allowedValues: allowedValues,
+                legacyDefault: GapBoost.stripHeight
+            )
+        }
+
+        XCTAssertEqual(appliedDelta(nil), GapBoost.stripHeight)
+        XCTAssertEqual(appliedDelta("/tmp/aerospace.toml\n"), GapBoost.stripHeight)
+        XCTAssertEqual(appliedDelta("/tmp/aerospace.toml\n40\n"), 40)
+        XCTAssertEqual(appliedDelta("/tmp/aerospace.toml\n0\n"), GapBoost.stripHeight)
+        XCTAssertEqual(appliedDelta("/tmp/aerospace.toml\n1\n"), GapBoost.stripHeight)
+        XCTAssertEqual(appliedDelta("/tmp/aerospace.toml\n99999\n"), GapBoost.stripHeight)
+        XCTAssertEqual(appliedDelta("/tmp/aerospace.toml\nnan\n"), GapBoost.stripHeight)
+        XCTAssertEqual(appliedDelta("/tmp/aerospace.toml\n-1\n"), GapBoost.stripHeight)
+        XCTAssertEqual(appliedDelta("/tmp/aerospace.toml\ninf\n"), GapBoost.stripHeight)
     }
 
     func testEditedLegacyBoostSubtractsPersistedStripHeightNotCurrentBoost() throws {
@@ -56,8 +41,12 @@ final class ConfigGapTests: XCTestCase {
         try original.write(to: fixture.target, atomically: true, encoding: .utf8)
         let location = fixture.locator.location()
 
-        let backup = AerospaceGapBackup(configURL: fixture.target, originalBlock: "outer.top = 10")
-        try backup.serialized.write(to: location.backupURL, atomically: true, encoding: .utf8)
+        let backup = GapBoostRecoveryState(
+            configURL: fixture.target,
+            originalBlock: "outer.top = 10",
+            appliedDelta: GapBoost.stripHeight
+        )
+        try XCTUnwrap(backup.serializedBackup).write(to: location.backupURL, atomically: true, encoding: .utf8)
         // Path-only active marker from a pre-clearance build (implicit delta 34).
         try fixture.target.path.write(to: location.activeURL, atomically: true, encoding: .utf8)
         // Live value was 44 (10+34), then edited +5 while still boosted.
@@ -78,8 +67,12 @@ final class ConfigGapTests: XCTestCase {
         try original.write(to: fixture.target, atomically: true, encoding: .utf8)
         let location = fixture.locator.location()
 
-        let backup = AerospaceGapBackup(configURL: fixture.target, originalBlock: "outer.top = 10")
-        try backup.serialized.write(to: location.backupURL, atomically: true, encoding: .utf8)
+        let backup = GapBoostRecoveryState(
+            configURL: fixture.target,
+            originalBlock: "outer.top = 10",
+            appliedDelta: GapBoost.boostAmount
+        )
+        try XCTUnwrap(backup.serializedBackup).write(to: location.backupURL, atomically: true, encoding: .utf8)
         try "\(fixture.target.path)\n40\n".write(to: location.activeURL, atomically: true, encoding: .utf8)
         // Live was 50 (10+40); user edited to 44, which equals a legacy 10+34 candidate.
         try "[gaps]\nouter.top = 44\n".write(to: fixture.target, atomically: true, encoding: .utf8)

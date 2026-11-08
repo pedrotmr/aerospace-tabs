@@ -14,8 +14,7 @@ setting() {
   sed -n "s/^${key} = //p" "$file" | head -n 1
 }
 
-app_name=$(setting Config/App.xcconfig APP_EXECUTABLE_NAME)
-if [[ -z "$app_name" ]]; then app_name=$(setting Config/App.xcconfig PRODUCT_NAME); fi
+app_name=$(setting Config/App.xcconfig PRODUCT_NAME)
 bundle_id=$(setting Config/App.xcconfig PRODUCT_BUNDLE_IDENTIFIER)
 owner=$(setting Config/App.xcconfig RELEASE_OWNER)
 slug=$(setting Config/App.xcconfig RELEASE_SLUG)

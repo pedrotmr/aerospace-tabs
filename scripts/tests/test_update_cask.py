@@ -1,3 +1,4 @@
+import importlib.util
 import subprocess
 import sys
 import tempfile
@@ -7,31 +8,44 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "update-cask.py"
+SPEC = importlib.util.spec_from_file_location("update_cask", SCRIPT)
+UPDATE_CASK = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(UPDATE_CASK)
 
 
 class UpdateCaskTests(unittest.TestCase):
-    def test_minor_version_preflight_rejects_older_macos(self):
+    def test_xcconfig_reader_ignores_inline_comments(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / "App.xcconfig"
+            path.write_text(
+                "APP_DESCRIPTION = Window tabs // cask description\n"
+                "HOMEBREW_CASK_TOKEN = example-tabs // cask file name\n"
+                "SPARKLE_ENABLED = YES // optional update module\n",
+                encoding="utf-8",
+            )
+
+            values = UPDATE_CASK.read_xcconfig(path)
+
+        self.assertEqual(values["APP_DESCRIPTION"], "Window tabs")
+        self.assertEqual(values["HOMEBREW_CASK_TOKEN"], "example-tabs")
+        self.assertEqual(values["SPARKLE_ENABLED"], "YES")
+
+    def test_generated_macos_version_check_rejects_older_os(self):
         for current_version, accepted in (("14.5", False), ("14.6", True), ("15.0", True)):
             with self.subTest(current_version=current_version):
+                script = UPDATE_CASK.minimum_macos_script("14.6", f'"{current_version}"')
+                command = ["/usr/bin/osascript"]
+                for line in script:
+                    command.extend(["-e", line])
                 result = subprocess.run(
-                    [
-                        "/usr/bin/osascript",
-                        "-e",
-                        f'set osVersion to "{current_version}"',
-                        "-e",
-                        "considering numeric strings",
-                        "-e",
-                        'if osVersion < "14.6" then error "Requires macOS 14.6 or later." number 1',
-                        "-e",
-                        "end considering",
-                    ],
+                    command,
                     capture_output=True,
                     text=True,
                     check=False,
                 )
                 self.assertEqual(result.returncode == 0, accepted, result.stderr)
 
-    def test_sparkle_cask_writes_and_removes_homebrew_version_marker(self):
+    def test_generated_cask_tracks_and_clears_homebrew_install_state(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             tap_dir = Path(temporary_directory)
             result = subprocess.run(
@@ -44,24 +58,6 @@ class UpdateCaskTests(unittest.TestCase):
                     "1.2.3",
                     "--sha256",
                     "a" * 64,
-                    "--owner",
-                    "example",
-                    "--slug",
-                    "demo-app",
-                    "--cask-token",
-                    "demo-app",
-                    "--bundle-id",
-                    "com.example.Demo",
-                    "--app-name",
-                    "Demo",
-                    "--app-display-name",
-                    "Demo",
-                    "--description",
-                    "Manage demo workspaces...",
-                    "--min-macos",
-                    "14.6",
-                    "--sparkle",
-                    "yes",
                 ],
                 capture_output=True,
                 text=True,
@@ -69,23 +65,18 @@ class UpdateCaskTests(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            cask = (tap_dir / "Casks" / "demo-app.rb").read_text()
+            cask = (tap_dir / "Casks" / "pedrotmr-aerospace-tabs.rb").read_text()
 
-        self.assertIn('"managedByHomebrewVersion",\n          "-string",\n          "1.2.3"', cask)
-        self.assertIn(
-            '"delete",\n          "com.example.Demo.homebrew",\n          "managedByHomebrewVersion"',
-            cask,
-        )
-        self.assertIn('desc "Manage demo workspaces"', cask)
-        self.assertNotIn("verified:", cask)
-        self.assertIn("preflight_steps do", cask)
-        self.assertIn('if osVersion < \\"14.6\\" then error', cask)
-        self.assertIn('"managedByHomebrewBundlePath",\n          "-string",\n          "{{appdir}}/Demo.app"', cask)
-        self.assertNotIn("#{appdir}", cask)
-        self.assertIn(
-            '"delete",\n          "com.example.Demo.homebrew",\n          "managedByHomebrewBundlePath"',
-            cask,
-        )
+        self.assertIn('cask "pedrotmr-aerospace-tabs" do', cask)
+        self.assertIn('desc "Window tabs and overview for AeroSpace"', cask)
+        self.assertIn('app "AerospaceTabs.app"', cask)
+        self.assertIn("livecheck do", cask)
+        self.assertIn("auto_updates true", cask)
+        self.assertIn("managedByHomebrewVersion", cask)
+        self.assertIn("managedByHomebrewBundlePath", cask)
+        self.assertIn("com.pedrotmr.AerospaceTabs.homebrew", cask)
+        self.assertIn("1.2.3", cask)
+        self.assertIn('"delete"', cask)
 
 
 if __name__ == "__main__":

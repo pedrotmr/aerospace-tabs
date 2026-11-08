@@ -2,48 +2,6 @@ import Foundation
 import os
 import SessionPolicy
 
-struct WindowRow: Decodable {
-    let windowId: Int
-    let windowTitle: String?
-    let appName: String?
-    let appBundleId: String?
-    let appBundlePath: String?
-    let workspace: String?
-    let workspaceIsFocused: Bool?
-    let workspaceIsVisible: Bool?
-    let monitorAppkitNsscreenScreensId: Int?
-    let windowParentContainerLayout: String?
-
-    enum CodingKeys: String, CodingKey {
-        case windowId = "window-id"
-        case windowTitle = "window-title"
-        case appName = "app-name"
-        case appBundleId = "app-bundle-id"
-        case appBundlePath = "app-bundle-path"
-        case workspace
-        case workspaceIsFocused = "workspace-is-focused"
-        case workspaceIsVisible = "workspace-is-visible"
-        case monitorAppkitNsscreenScreensId = "monitor-appkit-nsscreen-screens-id"
-        case windowParentContainerLayout = "window-parent-container-layout"
-    }
-
-    var asWin: Win? {
-        guard windowId != 0 else { return nil }
-        return Win(
-            id: windowId,
-            title: windowTitle ?? "",
-            appName: appName ?? "",
-            bundleID: appBundleId ?? "",
-            bundlePath: appBundlePath ?? "",
-            workspace: workspace ?? "",
-            screenIndex: monitorAppkitNsscreenScreensId ?? 1,
-            parentLayout: windowParentContainerLayout ?? "",
-            workspaceIsFocused: workspaceIsFocused ?? false,
-            workspaceIsVisible: workspaceIsVisible ?? false
-        )
-    }
-}
-
 final class Session {
     private let client = AerospaceClient()
     private let logger = Logger(subsystem: "com.pedrotmr.AerospaceTabs", category: "Session")
@@ -116,16 +74,35 @@ final class Session {
             onChange?()
         }
         focusing = true
-        client.focus(windowID: id) { [weak self] in
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                self?.focusing = false
+        client.focus(windowID: id) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success:
+                self.refreshNow()
+            case .failure(let error):
+                self.focusFailed(error)
             }
         }
     }
 
     private func focus(workspace: String) {
         focusedWorkspace = workspace
-        client.focus(workspace: workspace) { }
+        focusing = true
+        client.focus(workspace: workspace) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success:
+                self.refreshNow()
+            case .failure(let error):
+                self.focusFailed(error)
+            }
+        }
+    }
+
+    private func focusFailed(_ error: Error) {
+        focusing = false
+        logger.error("AeroSpace focus command failed: \(String(describing: error), privacy: .public)")
+        scheduleRefresh()
     }
 
     func reorder(ids: [Int], workspace: String) {
@@ -199,6 +176,7 @@ final class Session {
     }
 
     func markUnavailable(_ error: Error) {
+        focusing = false
         let description = String(describing: error)
         guard description != lastRefreshError else { return }
         logger.error("Window refresh failed: \(description, privacy: .public)")
@@ -210,6 +188,7 @@ final class Session {
     }
 
     func apply(_ snapshot: Snapshot) {
+        focusing = false
         let recovered = isAerospaceUnavailable
         lastRefreshError = nil
         let sorted = order.apply(snapshot.windows)

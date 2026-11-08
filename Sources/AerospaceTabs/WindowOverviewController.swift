@@ -11,7 +11,6 @@ final class WindowOverviewController {
     private let previews = WindowPreviewStore()
     private var panels: [CGDirectDisplayID: OverviewPanel] = [:]
     private var keyMonitor: Any?
-    private var liveStart: DispatchWorkItem?
     private var previousApplication: NSRunningApplication?
     private var appearanceObserver: NSObjectProtocol?
     private var windows: [Win] = []
@@ -71,6 +70,7 @@ final class WindowOverviewController {
         onPresentationChange?(true)
         installKeyMonitor()
         for panel in panels.values { panel.show(animated: true) }
+        previews.startLivePreviews()
         if let focusedScreen = model.focusedScreenIndex,
            let screen = NSScreen.screens.first(where: { $0.aerospaceScreenIndex == focusedScreen }),
            let panel = panels[screen.displayID]
@@ -79,20 +79,11 @@ final class WindowOverviewController {
         } else {
             panels.values.first?.activateKeyWindow()
         }
-        let start = DispatchWorkItem { [weak self] in
-            guard let self, self.isPresented else { return }
-            self.previews.startLivePreviews()
-            self.liveStart = nil
-        }
-        liveStart = start
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.09, execute: start)
     }
 
     func dismiss(restorePrevious: Bool = true) {
         guard isPresented else { return }
         isPresented = false
-        liveStart?.cancel()
-        liveStart = nil
         removeKeyMonitor()
         previews.endSession()
         for panel in panels.values { panel.close() }

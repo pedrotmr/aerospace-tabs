@@ -247,12 +247,14 @@ final class TabStrip {
         view = TabStripView()
         view.onPick = onPick
         view.onReorder = onReorder
-        view.onOpenOverview = onOpenOverview
-        view.availableUpdateVersion = availableUpdateVersion
-        view.onInstallAvailableUpdate = onInstallAvailableUpdate
-        view.onToggleSwipe = onToggleSwipe
-        view.isSwipeAvailable = isSwipeAvailable
-        view.onQuit = onQuit
+        view.contextMenu = TabStripContextMenu(
+            onOpenOverview: onOpenOverview,
+            availableUpdateVersion: availableUpdateVersion,
+            onInstallAvailableUpdate: onInstallAvailableUpdate,
+            onToggleSwipe: onToggleSwipe,
+            isSwipeAvailable: isSwipeAvailable,
+            onQuit: onQuit
+        )
 
         glass = NSVisualEffectView()
         glass.state = .active
@@ -415,11 +417,7 @@ final class TabStrip {
 }
 
 final class TabStripView: NSView {
-    var onOpenOverview: (() -> Void)?
-    var availableUpdateVersion: (() -> String?)?
-    var onInstallAvailableUpdate: (() -> Void)?
-    var onToggleSwipe: (() -> Void)?
-    var isSwipeAvailable: (() -> Bool)?
+    var contextMenu: TabStripContextMenu?
 
     static let chromeRadius: CGFloat = 12
     private static let tabRadius: CGFloat = 9
@@ -428,7 +426,6 @@ final class TabStripView: NSView {
 
     var onPick: ((Int) -> Void)?
     var onReorder: (([Int], String) -> Void)?
-    var onQuit: (() -> Void)?
     var rimAlpha: CGFloat = StripTheme.glass.chrome.rimAlpha
 
     private var windows: [Win] = []
@@ -670,204 +667,7 @@ final class TabStripView: NSView {
     }
 
     override func rightMouseDown(with event: NSEvent) {
-        let menu = NSMenu()
-
-        let overviewItem = menu.addItem(
-            withTitle: "Open Window Overview",
-            action: #selector(openOverview),
-            keyEquivalent: ""
-        )
-        overviewItem.target = self
-
-        let activation = NSMenu(title: "Activation")
-        let swipeEnabled = OverviewSettings.shared.swipeEnabled
-        let swipeAvailable = !swipeEnabled || (isSwipeAvailable?() ?? true)
-        let swipe = activation.addItem(
-            withTitle: swipeAvailable ? "Three-Finger Swipe" : "Three-Finger Swipe (Waiting for Trackpad)",
-            action: #selector(toggleThreeFingerSwipe),
-            keyEquivalent: ""
-        )
-        swipe.target = self
-        swipe.isEnabled = true
-        swipe.state = swipeEnabled ? .on : .off
-        swipe.toolTip = "Swipe up to open the overview and down to close it. Temporarily replaces the macOS Mission Control swipe."
-
-        let cornerMenu = NSMenu(title: "Hot Corner")
-        let selectedCorner = OverviewSettings.shared.hotCorner
-        let off = cornerMenu.addItem(
-            withTitle: "Off",
-            action: #selector(selectHotCorner(_:)),
-            keyEquivalent: ""
-        )
-        off.target = self
-        off.representedObject = "off"
-        off.state = selectedCorner == nil ? .on : .off
-        cornerMenu.addItem(.separator())
-        for corner in OverviewHotCorner.allCases {
-            let item = cornerMenu.addItem(
-                withTitle: corner.title,
-                action: #selector(selectHotCorner(_:)),
-                keyEquivalent: ""
-            )
-            item.target = self
-            item.representedObject = corner.rawValue
-            item.state = corner == selectedCorner ? .on : .off
-        }
-        let cornerItem = activation.addItem(withTitle: "Hot Corner", action: nil, keyEquivalent: "")
-        cornerItem.toolTip = "AeroSpaceTabs restores the selected macOS corner when the app quits."
-        activation.setSubmenu(cornerMenu, for: cornerItem)
-        let activationItem = menu.addItem(withTitle: "Activation", action: nil, keyEquivalent: "")
-        menu.setSubmenu(activation, for: activationItem)
-        menu.addItem(.separator())
-
-        let appearance = NSMenu(title: "Appearance")
-        let selected = AppearanceSettings.shared.theme
-        for theme in StripTheme.allCases {
-            let item = appearance.addItem(
-                withTitle: theme.title,
-                action: #selector(selectTheme(_:)),
-                keyEquivalent: ""
-            )
-            item.target = self
-            item.representedObject = theme.rawValue
-            item.state = theme == selected ? .on : .off
-        }
-        let appearanceItem = menu.addItem(withTitle: "Appearance", action: nil, keyEquivalent: "")
-        menu.setSubmenu(appearance, for: appearanceItem)
-
-        if !AXIsProcessTrusted() {
-            let accessibility = NSMenu(title: "Accessibility")
-            let explanation = accessibility.addItem(
-                withTitle: "Notification Badges Need Accessibility Access",
-                action: nil,
-                keyEquivalent: ""
-            )
-            explanation.isEnabled = false
-            let settings = accessibility.addItem(
-                withTitle: "Open Accessibility Settings…",
-                action: #selector(openAccessibilitySettings),
-                keyEquivalent: ""
-            )
-            settings.target = self
-            let accessibilityItem = menu.addItem(withTitle: "Accessibility", action: nil, keyEquivalent: "")
-            menu.setSubmenu(accessibility, for: accessibilityItem)
-        }
-
-        menu.addItem(.separator())
-        let aerospace = NSMenu(title: "AeroSpace")
-        aerospace.autoenablesItems = false
-        let reload = aerospace.addItem(
-            withTitle: "Reload Config",
-            action: #selector(reloadAerospaceConfig),
-            keyEquivalent: ""
-        )
-        reload.target = self
-        reload.isEnabled = FileManager.default.isExecutableFile(atPath: AerospaceClient.binaryURL.path)
-
-        let configURL = AerospaceConfigLocator.shared.location().configURL
-        let openConfig = aerospace.addItem(
-            withTitle: "Open Config",
-            action: #selector(openAerospaceConfig),
-            keyEquivalent: ""
-        )
-        openConfig.target = self
-        openConfig.isEnabled = FileManager.default.isReadableFile(atPath: configURL.path)
-        openConfig.toolTip = "Opens the config while keeping AeroSpaceTabs and its current gaps active."
-
-        let chooseEditor = aerospace.addItem(
-            withTitle: "Choose Config Editor…",
-            action: #selector(chooseConfigEditor),
-            keyEquivalent: ""
-        )
-        chooseEditor.target = self
-        if let editorName = AerospaceMenuActions.shared.selectedEditorName {
-            chooseEditor.toolTip = "Current editor: \(editorName)"
-        }
-
-        aerospace.addItem(.separator())
-        let quitAerospace = aerospace.addItem(
-            withTitle: "Quit AeroSpace",
-            action: #selector(quitAerospace),
-            keyEquivalent: ""
-        )
-        quitAerospace.target = self
-        quitAerospace.isEnabled = !NSRunningApplication.runningApplications(
-            withBundleIdentifier: AerospaceMenuActions.aerospaceBundleIdentifier
-        ).isEmpty
-        quitAerospace.toolTip = "Also quits AeroSpaceTabs, which requires AeroSpace to run."
-
-        let aerospaceItem = menu.addItem(withTitle: "AeroSpace", action: nil, keyEquivalent: "")
-        menu.setSubmenu(aerospace, for: aerospaceItem)
-
-        if let version = availableUpdateVersion?() {
-            menu.addItem(.separator())
-            let update = menu.addItem(
-                withTitle: "Update AeroSpaceTabs to \(version)…",
-                action: #selector(installAvailableUpdate),
-                keyEquivalent: ""
-            )
-            update.target = self
-        }
-        menu.addItem(.separator())
-        let quit = menu.addItem(withTitle: "Quit AeroSpaceTabs", action: #selector(quit), keyEquivalent: "")
-        quit.target = self
-        NSMenu.popUpContextMenu(menu, with: event, for: self)
-    }
-
-    @objc private func installAvailableUpdate() {
-        onInstallAvailableUpdate?()
-    }
-
-    @objc private func selectTheme(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String,
-              let theme = StripTheme(rawValue: raw)
-        else { return }
-        AppearanceSettings.shared.select(theme)
-    }
-
-    @objc private func openOverview() {
-        onOpenOverview?()
-    }
-
-    @objc private func toggleThreeFingerSwipe() {
-        onToggleSwipe?()
-    }
-
-    @objc private func selectHotCorner(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String else { return }
-        if raw == "off" {
-            OverviewSettings.shared.select(hotCorner: nil)
-        } else if let corner = OverviewHotCorner(rawValue: raw) {
-            OverviewSettings.shared.select(hotCorner: corner)
-        }
-    }
-
-    @objc private func reloadAerospaceConfig() {
-        AerospaceMenuActions.shared.reloadConfig()
-    }
-
-    @objc private func openAerospaceConfig() {
-        AerospaceMenuActions.shared.openConfig()
-    }
-
-    @objc private func chooseConfigEditor() {
-        AerospaceMenuActions.shared.chooseEditor()
-    }
-
-    @objc private func quitAerospace() {
-        AerospaceMenuActions.shared.quitAerospace()
-    }
-
-    @objc private func openAccessibilitySettings() {
-        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") else {
-            return
-        }
-        NSWorkspace.shared.open(url)
-    }
-
-    @objc private func quit() {
-        GapBoost.shared.deactivate()
-        onQuit?()
+        contextMenu?.show(for: self, event: event)
     }
 
     private func commitReorder() {
@@ -1003,7 +803,6 @@ final class TabStripView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        // Soft outer rim so the chrome reads against wallpaper.
         let rim = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: Self.chromeRadius, yRadius: Self.chromeRadius)
         NSColor(calibratedWhite: 1, alpha: rimAlpha).setStroke()
         rim.lineWidth = 1
@@ -1128,7 +927,6 @@ final class TabStripView: NSView {
         let radius = min(Self.tabRadius, rect.height / 2)
         let path = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
 
-        // Keep the neutral chip surface, then layer system selection and hover tints over it.
         NSColor(calibratedWhite: 0.28, alpha: 0.26).setFill()
         path.fill()
         if hoverAmount > 0 {

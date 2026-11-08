@@ -113,17 +113,19 @@ final class GapBoost {
         else { return }
 
         let original = String(text[range])
-        let backup = AerospaceGapBackup(
+        let recovery = GapBoostRecoveryState(
             configURL: location.configURL,
-            originalBlock: original
+            originalBlock: original,
+            appliedDelta: Self.boostAmount
         )
-        guard writeVerified(backup.serialized, to: location.backupURL) else { return }
+        guard let backup = recovery.serializedBackup,
+              writeVerified(backup, to: location.backupURL)
+        else { return }
 
         // Persist the resolved target + applied delta before changing it.
         // Recovery remains tied to this file even if a higher-priority candidate
         // appears or a symlink is retargeted while the app is running.
-        let activeMarker = "\(location.configURL.path)\n\(Self.boostAmount)\n"
-        guard writeVerified(activeMarker, to: location.activeURL) else { return }
+        guard writeVerified(recovery.serializedActiveMarker, to: location.activeURL) else { return }
 
         let boosted = Self.shiftNumbers(in: original, by: Self.boostAmount)
         text.replaceSubrange(range, with: boosted)
@@ -147,13 +149,16 @@ final class GapBoost {
         let activeContents = activeExists
             ? try? String(contentsOf: location.activeURL, encoding: .utf8)
             : nil
-        // Path-only markers from older builds default to pre-clearance stripHeight.
-        let appliedDelta = Self.appliedDelta(fromActiveMarker: activeContents)
+        let appliedDelta = GapBoostRecoveryState.appliedDelta(
+            fromActiveMarker: activeContents,
+            allowedValues: [Self.stripHeight, Self.boostAmount],
+            legacyDefault: Self.stripHeight
+        )
 
         let restored: String
         if backupExists {
             guard let contents = try? String(contentsOf: location.backupURL, encoding: .utf8),
-                  let backup = AerospaceGapBackup.originalBlock(from: contents)
+                  let backup = GapBoostRecoveryState.originalBlock(fromBackup: contents)
             else {
                 return false
             }
@@ -292,23 +297,6 @@ final class GapBoost {
         let lower = text.index(text.startIndex, offsetBy: lowerOffset)
         let upper = text.index(text.startIndex, offsetBy: min(upperOffset, text.count))
         return lower..<upper
-    }
-
-    /// Delta recorded in the active marker. Path-only legacy markers use `stripHeight`.
-    static func appliedDelta(fromActiveMarker contents: String?) -> CGFloat {
-        guard let contents else { return stripHeight }
-        let lines = contents
-            .split(whereSeparator: \.isNewline)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-        let allowed = [Double(stripHeight), Double(boostAmount)]
-        if lines.count >= 2,
-           let value = Double(lines[1]),
-           allowed.contains(value)
-        {
-            return CGFloat(value)
-        }
-        return stripHeight
     }
 
     /// True when `current` equals `backup` shifted by `delta`.

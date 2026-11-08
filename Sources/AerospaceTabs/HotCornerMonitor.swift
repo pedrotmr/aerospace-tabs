@@ -1,7 +1,6 @@
 import AppKit
 import Foundation
 
-/// Polls for the configured corner and fires once until the pointer leaves it.
 final class HotCornerMonitor {
   var onTrigger: (() -> Void)?
 

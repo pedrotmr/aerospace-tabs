@@ -3,12 +3,94 @@ import Foundation
 import SessionPolicy
 
 private struct FocusedWorkspaceRow: Decodable {
+    static let format = "%{workspace}%{monitor-appkit-nsscreen-screens-id}"
+
     let workspace: String?
     let monitorAppkitNsscreenScreensId: Int?
 
     enum CodingKeys: String, CodingKey {
         case workspace
         case monitorAppkitNsscreenScreensId = "monitor-appkit-nsscreen-screens-id"
+    }
+}
+
+private struct FocusedWindowRow: Decodable {
+    static let format = "%{window-id}%{workspace}%{monitor-appkit-nsscreen-screens-id}"
+
+    let windowId: Int
+    let workspace: String?
+    let monitorAppkitNsscreenScreensId: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case windowId = "window-id"
+        case workspace
+        case monitorAppkitNsscreenScreensId = "monitor-appkit-nsscreen-screens-id"
+    }
+}
+
+private struct WindowRow: Decodable {
+    static let format = "%{window-id}%{window-title}%{app-name}%{app-bundle-id}%{app-bundle-path}%{workspace}%{workspace-is-focused}%{workspace-is-visible}%{monitor-appkit-nsscreen-screens-id}%{window-parent-container-layout}"
+
+    let windowId: Int
+    let windowTitle: String?
+    let appName: String?
+    let appBundleId: String?
+    let appBundlePath: String?
+    let workspace: String?
+    let workspaceIsFocused: Bool?
+    let workspaceIsVisible: Bool?
+    let monitorAppkitNsscreenScreensId: Int?
+    let windowParentContainerLayout: String?
+
+    enum CodingKeys: String, CodingKey {
+        case windowId = "window-id"
+        case windowTitle = "window-title"
+        case appName = "app-name"
+        case appBundleId = "app-bundle-id"
+        case appBundlePath = "app-bundle-path"
+        case workspace
+        case workspaceIsFocused = "workspace-is-focused"
+        case workspaceIsVisible = "workspace-is-visible"
+        case monitorAppkitNsscreenScreensId = "monitor-appkit-nsscreen-screens-id"
+        case windowParentContainerLayout = "window-parent-container-layout"
+    }
+
+    var asWin: Win? {
+        guard windowId != 0 else { return nil }
+        return Win(
+            id: windowId,
+            title: windowTitle ?? "",
+            appName: appName ?? "",
+            bundleID: appBundleId ?? "",
+            bundlePath: appBundlePath ?? "",
+            workspace: workspace ?? "",
+            screenIndex: monitorAppkitNsscreenScreensId ?? 1,
+            parentLayout: windowParentContainerLayout ?? "",
+            workspaceIsFocused: workspaceIsFocused ?? false,
+            workspaceIsVisible: workspaceIsVisible ?? false
+        )
+    }
+}
+
+private struct WindowQuery {
+    let arguments: [String]
+
+    private init(_ command: [String], format: String) {
+        arguments = command + ["--format", format]
+    }
+
+    static let allWindows = Self(["list-windows", "--all", "--json"], format: WindowRow.format)
+    static let focusedWindow = Self(["list-windows", "--focused", "--json"], format: FocusedWindowRow.format)
+    static let focusedWorkspace = Self(["list-workspaces", "--focused", "--json"], format: FocusedWorkspaceRow.format)
+}
+
+enum AerospaceCommandError: LocalizedError, Equatable {
+    case rejected(code: Int, message: String)
+
+    var errorDescription: String? {
+        switch self {
+        case .rejected(_, let message): message
+        }
     }
 }
 
@@ -34,47 +116,29 @@ final class AerospaceClient {
     private var fd: Int32 = -1
     private let decoder = JSONDecoder()
 
-    private static let format =
-        "%{window-id}%{window-title}%{app-name}%{app-bundle-id}%{app-bundle-path}%{workspace}%{workspace-is-focused}%{workspace-is-visible}%{monitor-appkit-nsscreen-screens-id}%{window-parent-container-layout}"
-    private static let focusedWindowFormat =
-        "%{window-id}%{workspace}%{monitor-appkit-nsscreen-screens-id}"
-    private static let focusedWorkspaceFormat =
-        "%{workspace}%{monitor-appkit-nsscreen-screens-id}"
-
     /// Delivers success and failure results on the main queue.
     func listAllWindows(completion: @escaping (Result<Snapshot, Error>) -> Void) {
         queue.async { [weak self] in
             guard let self else { return }
             do {
-                let raw = try self.command([
-                    "list-windows",
-                    "--all",
-                    "--json",
-                    "--format", Self.format,
-                ])
+                let allWindows = WindowQuery.allWindows
+                let raw = try self.command(allWindows.arguments)
                 let rows = try self.decoder.decode([WindowRow].self, from: Data(raw.utf8))
                 let windows = rows.compactMap(\.asWin).filter { $0.bundleID != "com.pedrotmr.AerospaceTabs" }
                 var focused: Int?
                 var focusedWorkspace: String?
                 var focusedScreenIndex: Int?
-                if let focusedRaw = try? self.command([
-                    "list-windows",
-                    "--focused",
-                    "--json",
-                    "--format", Self.focusedWindowFormat,
-                ]), let focusedRows = try? self.decoder.decode([WindowRow].self, from: Data(focusedRaw.utf8)),
+                let focusedWindow = WindowQuery.focusedWindow
+                if let focusedRaw = try? self.command(focusedWindow.arguments),
+                   let focusedRows = try? self.decoder.decode([FocusedWindowRow].self, from: Data(focusedRaw.utf8)),
                    let focusedRow = focusedRows.first {
                     focused = focusedRow.windowId
                     focusedWorkspace = focusedRow.workspace
                     focusedScreenIndex = focusedRow.monitorAppkitNsscreenScreensId
                 }
+                let workspaceQuery = WindowQuery.focusedWorkspace
                 if focusedWorkspace == nil || focusedScreenIndex == nil,
-                   let workspaceRaw = try? self.command([
-                       "list-workspaces",
-                       "--focused",
-                       "--json",
-                       "--format", Self.focusedWorkspaceFormat,
-                   ]),
+                   let workspaceRaw = try? self.command(workspaceQuery.arguments),
                    let workspaceRows = try? self.decoder.decode([FocusedWorkspaceRow].self, from: Data(workspaceRaw.utf8)),
                    let focusedRow = workspaceRows.first {
                     focusedWorkspace = focusedWorkspace ?? focusedRow.workspace
@@ -96,17 +160,27 @@ final class AerospaceClient {
         }
     }
 
-    func focus(windowID: Int, completion: @escaping () -> Void) {
+    func focus(windowID: Int, completion: @escaping (Result<Void, Error>) -> Void) {
         queue.async { [weak self] in
-            _ = try? self?.command(["focus", "--window-id", String(windowID)])
-            DispatchQueue.main.async(execute: completion)
+            guard let self else { return }
+            do {
+                try self.command(["focus", "--window-id", String(windowID)])
+                DispatchQueue.main.async { completion(.success(())) }
+            } catch {
+                DispatchQueue.main.async { completion(.failure(error)) }
+            }
         }
     }
 
-    func focus(workspace: String, completion: @escaping () -> Void) {
+    func focus(workspace: String, completion: @escaping (Result<Void, Error>) -> Void) {
         queue.async { [weak self] in
-            _ = try? self?.command(["workspace", "--", workspace])
-            DispatchQueue.main.async(execute: completion)
+            guard let self else { return }
+            do {
+                try self.command(["workspace", "--", workspace])
+                DispatchQueue.main.async { completion(.success(())) }
+            } catch {
+                DispatchQueue.main.async { completion(.failure(error)) }
+            }
         }
     }
 
@@ -116,6 +190,8 @@ final class AerospaceClient {
             do {
                 try ensureConnected()
                 return try send(args)
+            } catch let error as AerospaceCommandError {
+                throw error
             } catch {
                 // Drop timed-out or otherwise broken sockets before retrying.
                 close()
@@ -140,7 +216,7 @@ final class AerospaceClient {
         let stdout = object?["stdout"] as? String ?? ""
         if code != 0 {
             let stderr = object?["stderr"] as? String ?? "aerospace error"
-            throw NSError(domain: "aerospace", code: code, userInfo: [NSLocalizedDescriptionKey: stderr])
+            throw AerospaceCommandError.rejected(code: code, message: stderr)
         }
         return stdout
     }

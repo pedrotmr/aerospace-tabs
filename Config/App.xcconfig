@@ -8,6 +8,9 @@ APP_BUILD_NUMBER = 1
 
 PRODUCT_NAME = AerospaceTabs
 PRODUCT_BUNDLE_IDENTIFIER = com.pedrotmr.AerospaceTabs
+APP_DISPLAY_NAME = AeroSpaceTabs
+APP_DESCRIPTION = Window tabs and overview for AeroSpace
+HOMEBREW_CASK_TOKEN = pedrotmr-aerospace-tabs
 MARKETING_VERSION = $(APP_MARKETING_VERSION)
 CURRENT_PROJECT_VERSION = $(APP_BUILD_NUMBER)
 INFOPLIST_FILE = Config/Info.plist
