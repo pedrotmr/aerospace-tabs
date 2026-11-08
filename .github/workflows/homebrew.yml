@@ -27,6 +27,12 @@ jobs:
           ref: main
           persist-credentials: false
 
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.event.release.tag_name }}
+          path: release-source
+          persist-credentials: false
+
       - name: Check stable release and download ZIP
         env:
           GH_TOKEN: ${{ github.token }}
@@ -55,7 +61,8 @@ jobs:
             exit 1
           fi
           version=${RELEASE_TAG#v}
-          app_name=$(sed -n 's/^PRODUCT_NAME = //p' Config/App.xcconfig)
+          metadata=$(python3 scripts/update-cask.py --config-root release-source --print-homebrew-settings)
+          app_name=$(jq -r '.app_name' <<< "$metadata")
           echo "APP_NAME=$app_name" >> "$GITHUB_ENV"
           mkdir -p "$RUNNER_TEMP/release"
           gh release download "$RELEASE_TAG" --repo "$GH_REPO" \
@@ -63,7 +70,7 @@ jobs:
           echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
 
       - name: Build Sparkle verification tools
-        run: make setup && make bundle
+        run: make -C release-source setup && make -C release-source bundle
 
       - name: Verify the signed release ZIP
         env:
@@ -72,7 +79,7 @@ jobs:
         run: |
           set -euo pipefail
           archive="$RUNNER_TEMP/release/$APP_NAME-$RELEASE_VERSION.zip"
-          scripts/verify-release-zip.sh "$archive" "$RELEASE_TAG"
+          release-source/scripts/verify-release-zip.sh "$archive" "$RELEASE_TAG"
           sha256=$(shasum -a 256 "$archive" | awk '{ print $1 }')
           echo "RELEASE_SHA256=$sha256" >> "$GITHUB_ENV"
 
@@ -95,15 +102,17 @@ jobs:
           trap 'rm -rf "$trust_config"' EXIT
           export XDG_CONFIG_HOME="$trust_config"
           export HOMEBREW_NO_AUTO_UPDATE=1
+          metadata=$(python3 scripts/update-cask.py --config-root release-source --print-homebrew-settings)
           python3 scripts/update-cask.py \
+            --config-root release-source \
             --tap-dir tap \
             --version "$VERSION" \
             --sha256 "$SHA256"
           cd tap
-          release_owner=$(sed -n 's/^RELEASE_OWNER = //p' ../Config/App.xcconfig)
-          release_slug=$(sed -n 's/^RELEASE_SLUG = //p' ../Config/App.xcconfig)
-          cask_token=$(sed -n 's/^HOMEBREW_CASK_TOKEN = //p' ../Config/App.xcconfig | sed -E 's/[[:space:]]+\/\/.*$//')
-          display_name=$(sed -n 's/^APP_DISPLAY_NAME = //p' ../Config/App.xcconfig)
+          release_owner=$(jq -r '.owner' <<< "$metadata")
+          release_slug=$(jq -r '.slug' <<< "$metadata")
+          cask_token=$(jq -r '.cask_token' <<< "$metadata")
+          display_name=$(jq -r '.app_display_name' <<< "$metadata")
           tap_name="$release_owner/$release_slug"
           brew tap --custom-remote "$tap_name" "file://$PWD"
           tap_dir=$(brew --repository "$tap_name")

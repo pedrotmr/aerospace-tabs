@@ -17,7 +17,6 @@ final class OverviewLivePreview: NSObject, SCStreamOutput, SCStreamDelegate, @un
     private var startInProgress = false
     private var captureStarted = false
     private var stopCompleted = false
-    private var startWaiters: [CheckedContinuation<Void, Never>] = []
     private var stopCompletions: [@MainActor () -> Void] = []
     private let onFailure: () -> Void
     private let onSnapshot: (CGImage) -> Void
@@ -55,7 +54,7 @@ final class OverviewLivePreview: NSObject, SCStreamOutput, SCStreamDelegate, @un
     func start(window: SCWindow) async throws {
         guard !stopped else { return }
         startInProgress = true
-        defer { finishStart() }
+        defer { startInProgress = false }
         let stream = SCStream(filter: SCContentFilter(desktopIndependentWindow: window),
                               configuration: configuration(), delegate: self)
         self.stream = stream
@@ -63,6 +62,9 @@ final class OverviewLivePreview: NSObject, SCStreamOutput, SCStreamDelegate, @un
         logger.debug("Window \(self.windowID): stream resolution \(Int(self.pixelSize.width)) × \(Int(self.pixelSize.height))")
         try await stream.startCapture()
         captureStarted = true
+        if stopped {
+            await stopCapture(stream)
+        }
     }
 
     @MainActor
@@ -118,15 +120,7 @@ final class OverviewLivePreview: NSObject, SCStreamOutput, SCStreamDelegate, @un
             logger.debug("Window \(self.windowID): stopped after \(frames) frames")
         }
         Task { @MainActor in
-            await waitForStart()
-            if captureStarted, let stream {
-                do {
-                    try await stream.stopCapture()
-                } catch {
-                    logger.error("Window \(self.windowID): could not stop capture: \(error.localizedDescription, privacy: .public)")
-                }
-                captureStarted = false
-            }
+            if let stream, captureStarted || startInProgress { await stopCapture(stream) }
             await withCheckedContinuation { continuation in
                 outputQueue.async { continuation.resume() }
             }
@@ -138,17 +132,16 @@ final class OverviewLivePreview: NSObject, SCStreamOutput, SCStreamDelegate, @un
     }
 
     @MainActor
-    private func waitForStart() async {
-        guard startInProgress else { return }
-        await withCheckedContinuation { startWaiters.append($0) }
-    }
-
-    @MainActor
-    private func finishStart() {
-        startInProgress = false
-        let waiters = startWaiters
-        startWaiters.removeAll()
-        waiters.forEach { $0.resume() }
+    private func stopCapture(_ stream: SCStream) async {
+        do {
+            try await stream.stopCapture()
+            captureStarted = false
+        } catch {
+            // startCapture may still be pending; start() retries stop when it eventually returns.
+            if captureStarted {
+                logger.error("Window \(self.windowID): could not stop capture: \(error.localizedDescription, privacy: .public)")
+            }
+        }
     }
 
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer,

@@ -10,8 +10,7 @@ final class TabStripTests: XCTestCase {
 
         XCTAssertTrue(amount.isAnimating)
         let presentation = amount.presentationValue(at: 10.1, duration: 0.2)
-        XCTAssertGreaterThan(presentation, 0)
-        XCTAssertLessThan(presentation, 1)
+        XCTAssertEqual(presentation, 0.875, accuracy: 0.001)
         XCTAssertTrue(amount.advance(at: 10.1, duration: 0.2))
         XCTAssertFalse(amount.advance(at: 10.21, duration: 0.2))
         XCTAssertEqual(amount.value, 1)

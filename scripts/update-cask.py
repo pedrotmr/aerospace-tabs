@@ -59,7 +59,7 @@ def minimum_macos_script(minimum_version: str, current_version_expression: str) 
 def read_xcconfig(path: Path) -> dict[str, str]:
     values = {}
     for line in path.read_text(encoding="utf-8").splitlines():
-        line = re.sub(r"\s+//.*$", "", line)
+        line = re.sub(r"//.*$", "", line)
         match = re.match(r"^([A-Z0-9_]+)\s*=\s*(.*?)\s*$", line)
         if match:
             values[match.group(1)] = match.group(2)
@@ -82,16 +82,25 @@ def release_settings(root: Path) -> dict[str, str]:
     }
     if not all(settings[key] for key in settings if key != "sparkle"):
         raise SystemExit("error: Homebrew release metadata is incomplete in Config/*.xcconfig")
+    if any("$(" in value for value in settings.values() if isinstance(value, str)):
+        raise SystemExit("error: Homebrew release metadata must not contain xcconfig variable references")
     return settings
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--tap-dir", required=True, type=Path)
-    parser.add_argument("--version", required=True)
-    parser.add_argument("--sha256", required=True)
+    parser.add_argument("--config-root", type=Path)
+    parser.add_argument("--print-homebrew-settings", action="store_true")
+    parser.add_argument("--tap-dir", type=Path)
+    parser.add_argument("--version")
+    parser.add_argument("--sha256")
     args = parser.parse_args()
-    settings = release_settings(Path(__file__).resolve().parents[1])
+    settings = release_settings(args.config_root or Path(__file__).resolve().parents[1])
+    if args.print_homebrew_settings:
+        print(json.dumps(settings))
+        return
+    if not args.tap_dir or not args.version or not args.sha256:
+        parser.error("--tap-dir, --version, and --sha256 are required unless --print-homebrew-settings is used")
 
     if not re.fullmatch(r"\d+\.\d+\.\d+", args.version):
         raise SystemExit("error: version must be MAJOR.MINOR.PATCH")
