@@ -93,10 +93,19 @@ def release_settings(root: Path, fallback_root: Path | None = None) -> dict[str,
     }
     if not all(settings[key] for key in settings if key != "sparkle"):
         raise SystemExit("error: Homebrew release metadata is incomplete in Config/*.xcconfig")
-    if not re.fullmatch(r"[A-Za-z0-9._-]+", settings["cask_token"]):
-        raise SystemExit("error: Homebrew cask token must use letters, numbers, dots, underscores, or hyphens")
+    cask_token = settings["cask_token"]
+    if (
+        not re.fullmatch(r"[a-z0-9._-]+", cask_token)
+        or "--" in cask_token
+        or cask_token.startswith("-")
+        or cask_token.endswith("-")
+    ):
+        raise SystemExit("error: Homebrew cask token must be lowercase and must not use leading, trailing, or repeated hyphens")
     if any("$(" in value for value in settings.values() if isinstance(value, str)):
         raise SystemExit("error: Homebrew release metadata must not contain xcconfig variable references")
+    for key in ("owner", "slug"):
+        if not re.fullmatch(r"[A-Za-z0-9._-]+", settings[key]):
+            raise SystemExit(f"error: Homebrew release {key} must use letters, numbers, dots, underscores, or hyphens")
     return settings
 
 
