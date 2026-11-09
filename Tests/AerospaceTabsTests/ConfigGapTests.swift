@@ -26,6 +26,15 @@ final class ConfigGapTests: XCTestCase {
         XCTAssertEqual(appliedDelta(nil), GapBoost.stripHeight)
         XCTAssertEqual(appliedDelta("/tmp/aerospace.toml\n"), GapBoost.stripHeight)
         XCTAssertEqual(appliedDelta("/tmp/aerospace.toml\n40\n"), 40)
+        XCTAssertEqual(appliedDelta("relative/config.toml\n40\n"), 40)
+        XCTAssertEqual(
+            GapBoostRecoveryState.targetURL(
+                backupContents: nil,
+                activeMarkerContents: "relative/config.toml\n40\n",
+                fallbackURL: URL(fileURLWithPath: "/tmp/fallback.toml")
+            ),
+            URL(fileURLWithPath: "/tmp/fallback.toml")
+        )
         XCTAssertEqual(appliedDelta("/tmp/aerospace.toml\n0\n"), GapBoost.stripHeight)
         XCTAssertEqual(appliedDelta("/tmp/aerospace.toml\n1\n"), GapBoost.stripHeight)
         XCTAssertEqual(appliedDelta("/tmp/aerospace.toml\n99999\n"), GapBoost.stripHeight)
@@ -110,7 +119,7 @@ final class ConfigGapTests: XCTestCase {
         XCTAssertTrue(range.map { text[$0].hasPrefix("gaps.outer.top = 20") } == true)
     }
 
-    func testShiftNumbersLeavesIdentifierQuotedAndCommentDigitsAlone() {
+    func testShiftNumbersLeavesIdentifierQuotedAndCommentDigitsAlone() throws {
         let block = #"""
         outer.top = [
             { monitor.main2 = 10 },
@@ -119,14 +128,14 @@ final class ConfigGapTests: XCTestCase {
         ]
         """#
 
-        let shifted = GapBoost.shiftNumbers(in: block, by: 34)
+        let shifted = try XCTUnwrap(GapBoost.shiftNumbers(in: block, by: 34))
 
         XCTAssertTrue(shifted.contains("monitor.main2 = 44"))
         XCTAssertTrue(shifted.contains(#"monitor."Side 3" = 54"#))
         XCTAssertTrue(shifted.contains("38, # keep 99 in this comment"))
     }
 
-    func testShiftNumbersPreservesNumericMonitorKey() {
+    func testShiftNumbersPreservesNumericMonitorKey() throws {
         let block = """
         outer.top = [
             { monitor.2 = 10 },
@@ -134,7 +143,7 @@ final class ConfigGapTests: XCTestCase {
         ]
         """
 
-        let shifted = GapBoost.shiftNumbers(in: block, by: 34)
+        let shifted = try XCTUnwrap(GapBoost.shiftNumbers(in: block, by: 34))
 
         XCTAssertTrue(shifted.contains("monitor.2 = 44"))
         XCTAssertFalse(shifted.contains("monitor.36"))
@@ -215,6 +224,35 @@ final class ConfigGapTests: XCTestCase {
 
         boost.sync(shouldBoost: false)
         XCTAssertEqual(try String(contentsOf: fixture.target, encoding: .utf8), original)
+    }
+
+    func testGapParserRejectsNonFiniteNumbersAndBoostFailsSafely() throws {
+        XCTAssertNil(AerospaceConfigSyntax.parseGapNumber("1e999"))
+        XCTAssertNil(GapBoost.shiftNumbers(in: "outer.top = 1e999", by: 40))
+        XCTAssertNil(GapBoost.shiftNumbers(in: "outer.top = 1e308", by: .greatestFiniteMagnitude))
+
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let original = "[gaps]\nouter.top = 1e999\n"
+        try original.write(to: fixture.target, atomically: true, encoding: .utf8)
+
+        GapBoost(locator: fixture.locator, reloadHandler: {}).sync(shouldBoost: true)
+
+        XCTAssertEqual(try String(contentsOf: fixture.target, encoding: .utf8), original)
+        XCTAssertFalse(fixture.locator.location().hasRecoveryState())
+    }
+
+    func testRestoreKeepsRecoveryStateWhenNumericShiftIsUnsafe() throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let original = "[gaps]\nouter.top = 1e999\n"
+        try original.write(to: fixture.target, atomically: true, encoding: .utf8)
+        let location = fixture.locator.location()
+        try "\(fixture.target.path)\n40\n".write(to: location.activeURL, atomically: true, encoding: .utf8)
+
+        XCTAssertFalse(GapBoost(locator: fixture.locator, reloadHandler: {}).restoreIfNeeded(reload: false))
+        XCTAssertEqual(try String(contentsOf: fixture.target, encoding: .utf8), original)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: location.activeURL.path))
     }
 
     func testInvalidMonitorValueDoesNotLeakIntoArrayFallback() throws {

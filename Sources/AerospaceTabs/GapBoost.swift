@@ -113,6 +113,7 @@ final class GapBoost {
         else { return }
 
         let original = String(text[range])
+        guard let boosted = Self.shiftNumbers(in: original, by: Self.boostAmount) else { return }
         let recovery = GapBoostRecoveryState(
             configURL: location.configURL,
             originalBlock: original,
@@ -127,7 +128,6 @@ final class GapBoost {
         // appears or a symlink is retargeted while the app is running.
         guard writeVerified(recovery.serializedActiveMarker, to: location.activeURL) else { return }
 
-        let boosted = Self.shiftNumbers(in: original, by: Self.boostAmount)
         text.replaceSubrange(range, with: boosted)
         guard writeVerified(text, to: location.configURL) else { return }
         reloadAerospace()
@@ -176,12 +176,14 @@ final class GapBoost {
             if Self.isUneditedBoost(current: current, backup: backup, delta: appliedDelta) {
                 restored = backup
             } else if activeExists {
-                restored = Self.shiftNumbers(in: current, by: -appliedDelta)
+                guard let shifted = Self.shiftNumbers(in: current, by: -appliedDelta) else { return false }
+                restored = shifted
             } else {
                 restored = backup
             }
         } else if activeExists {
-            restored = Self.shiftNumbers(in: current, by: -appliedDelta)
+            guard let shifted = Self.shiftNumbers(in: current, by: -appliedDelta) else { return false }
+            restored = shifted
         } else {
             return false
         }
@@ -301,10 +303,11 @@ final class GapBoost {
 
     /// True when `current` equals `backup` shifted by `delta`.
     static func isUneditedBoost(current: String, backup: String, delta: CGFloat) -> Bool {
-        current == shiftNumbers(in: backup, by: delta)
+        guard let shifted = shiftNumbers(in: backup, by: delta) else { return false }
+        return current == shifted
     }
 
-    static func shiftNumbers(in block: String, by delta: CGFloat) -> String {
+    static func shiftNumbers(in block: String, by delta: CGFloat) -> String? {
         var result = ""
         var i = block.startIndex
         var quote: Character?
@@ -367,17 +370,18 @@ final class GapBoost {
                 let after = j < block.endIndex ? block[j] : nil
                 let attachedToIdentifier = before.map(Self.isIdentifierCharacter) == true
                     || after.map(Self.isIdentifierCharacter) == true
-                if !attachedToIdentifier,
-                   let value = AerospaceConfigSyntax.parseGapNumber(token)
-                {
-                    let shifted = max(0, value + Double(delta))
-                    if shifted == floor(shifted) {
-                        result += String(Int(shifted))
-                    } else {
-                        result += String(shifted)
-                    }
-                } else {
+                if attachedToIdentifier {
                     result += token
+                } else {
+                    guard let value = AerospaceConfigSyntax.parseGapNumber(token) else { return nil }
+                    let shifted = value + Double(delta)
+                    guard shifted.isFinite else { return nil }
+                    let nonnegative = max(0, shifted)
+                    if let integer = Int(exactly: nonnegative) {
+                        result += String(integer)
+                    } else {
+                        result += String(nonnegative)
+                    }
                 }
                 i = j
                 continue

@@ -3,13 +3,20 @@ import os
 import SessionPolicy
 
 final class Session {
-    private let client = AerospaceClient()
+    typealias SnapshotCompletion = (Result<Snapshot, Error>) -> Void
+    typealias CommandCompletion = (Result<Void, Error>) -> Void
+
+    private let listWindows: (@escaping SnapshotCompletion) -> Void
+    private let focusWindowCommand: (Int, @escaping CommandCompletion) -> Void
+    private let focusWorkspaceCommand: (String, @escaping CommandCompletion) -> Void
     private let logger = Logger(subsystem: "com.pedrotmr.AerospaceTabs", category: "Session")
     private var lastRefreshError: String?
     var isAerospaceUnavailable: Bool { lastRefreshError != nil }
     private let subscribe = SubscribePump()
     private let order = TabOrder()
     private var refreshQueued = false
+    private var refreshGeneration = 0
+    private var focusGeneration = 0
     private var focusing = false
     private var cycleWorkspace: String?
     private var focusedWorkspace: String?
@@ -19,6 +26,23 @@ final class Session {
     var onChange: (() -> Void)?
 
     var displayFocusedID: Int? { focusedID }
+
+    init(
+        listWindows: ((@escaping SnapshotCompletion) -> Void)? = nil,
+        focusWindow: ((Int, @escaping CommandCompletion) -> Void)? = nil,
+        focusWorkspace: ((String, @escaping CommandCompletion) -> Void)? = nil
+    ) {
+        let client = AerospaceClient()
+        self.listWindows = listWindows ?? { completion in
+            client.listAllWindows(completion: completion)
+        }
+        self.focusWindowCommand = focusWindow ?? { id, completion in
+            client.focus(windowID: id, completion: completion)
+        }
+        self.focusWorkspaceCommand = focusWorkspace ?? { workspace, completion in
+            client.focus(workspace: workspace, completion: completion)
+        }
+    }
 
     func start() {
         subscribe.onEvent = { [weak self] event in
@@ -65,6 +89,8 @@ final class Session {
     }
 
     func focus(_ id: Int) {
+        focusGeneration += 1
+        let requestGeneration = focusGeneration
         if let window = windows.first(where: { $0.id == id }) {
             focusedWorkspace = window.workspace
             focusedScreenIndex = window.screenIndex
@@ -74,32 +100,35 @@ final class Session {
             onChange?()
         }
         focusing = true
-        client.focus(windowID: id) { [weak self] result in
-            guard let self else { return }
+        focusWindowCommand(id) { [weak self] result in
+            guard let self, requestGeneration == self.focusGeneration else { return }
             switch result {
             case .success:
-                self.refreshNow()
+                self.refreshNow(forFocusGeneration: requestGeneration)
             case .failure(let error):
-                self.focusFailed(error)
+                self.focusFailed(error, requestGeneration: requestGeneration)
             }
         }
     }
 
     private func focus(workspace: String) {
+        focusGeneration += 1
+        let requestGeneration = focusGeneration
         focusedWorkspace = workspace
         focusing = true
-        client.focus(workspace: workspace) { [weak self] result in
-            guard let self else { return }
+        focusWorkspaceCommand(workspace) { [weak self] result in
+            guard let self, requestGeneration == self.focusGeneration else { return }
             switch result {
             case .success:
-                self.refreshNow()
+                self.refreshNow(forFocusGeneration: requestGeneration)
             case .failure(let error):
-                self.focusFailed(error)
+                self.focusFailed(error, requestGeneration: requestGeneration)
             }
         }
     }
 
-    private func focusFailed(_ error: Error) {
+    private func focusFailed(_ error: Error, requestGeneration: Int) {
+        guard requestGeneration == focusGeneration else { return }
         focusing = false
         logger.error("AeroSpace focus command failed: \(String(describing: error), privacy: .public)")
         scheduleRefresh()
@@ -155,6 +184,7 @@ final class Session {
     }
 
     private func scheduleRefresh() {
+        guard !focusing else { return }
         if refreshQueued { return }
         refreshQueued = true
         DispatchQueue.main.async { [weak self] in
@@ -163,9 +193,16 @@ final class Session {
         }
     }
 
-    private func refreshNow() {
-        client.listAllWindows { [weak self] result in
-            guard let self else { return }
+    func refreshNow(forFocusGeneration requestFocusGeneration: Int? = nil) {
+        guard !focusing || requestFocusGeneration != nil else { return }
+        refreshGeneration += 1
+        let requestGeneration = refreshGeneration
+        let focusRequestGeneration = requestFocusGeneration ?? focusGeneration
+        listWindows { [weak self] result in
+            guard let self,
+                  requestGeneration == self.refreshGeneration,
+                  focusRequestGeneration == self.focusGeneration
+            else { return }
             switch result {
             case .failure(let error):
                 self.markUnavailable(error)

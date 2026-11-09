@@ -19,7 +19,7 @@ class UpdateCaskTests(unittest.TestCase):
             path = Path(temporary_directory) / "App.xcconfig"
             path.write_text(
                 "APP_DESCRIPTION = Window tabs // cask description\n"
-                "HOMEBREW_CASK_TOKEN = example-tabs // cask file name\n"
+                "HOMEBREW_CASK_TOKEN   =   example-tabs   // cask file name\n"
                 "SPARKLE_ENABLED = YES// optional update module\n",
                 encoding="utf-8",
             )
@@ -79,6 +79,23 @@ class UpdateCaskTests(unittest.TestCase):
         self.assertIn("1.2.3", cask)
         self.assertIn('"delete"', cask)
 
+    def test_release_settings_use_product_name_over_executable_name(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            (root / "Config").mkdir()
+            (root / "Config" / "App.xcconfig").write_text(
+                "RELEASE_OWNER = pedrotmr\nRELEASE_SLUG = aerospace-tabs\n"
+                "HOMEBREW_CASK_TOKEN = demo-tabs\nPRODUCT_BUNDLE_IDENTIFIER = com.example.demo\n"
+                "APP_EXECUTABLE_NAME = LegacyExecutable\nPRODUCT_NAME = ReleaseProduct\n"
+                "APP_DISPLAY_NAME = Demo\nAPP_DESCRIPTION = Demo app\nSPARKLE_ENABLED = NO\n",
+                encoding="utf-8",
+            )
+            (root / "Config" / "Project.xcconfig").write_text("MACOSX_DEPLOYMENT_TARGET = 14.0\n", encoding="utf-8")
+
+            settings = UPDATE_CASK.release_settings(root)
+
+        self.assertEqual(settings["app_name"], "ReleaseProduct")
+
     def test_release_settings_reject_xcconfig_variable_references(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
@@ -86,7 +103,7 @@ class UpdateCaskTests(unittest.TestCase):
             (root / "Config" / "App.xcconfig").write_text(
                 "RELEASE_OWNER = pedrotmr\nRELEASE_SLUG = aerospace-tabs\n"
                 "HOMEBREW_CASK_TOKEN = demo-tabs\nPRODUCT_BUNDLE_IDENTIFIER = com.example.demo\n"
-                "PRODUCT_NAME = $(APP_PREFIX).App\nAPP_DISPLAY_NAME = Demo\n"
+                "APP_EXECUTABLE_NAME = LegacyExecutable\nPRODUCT_NAME = $(APP_PREFIX).App\nAPP_DISPLAY_NAME = Demo\n"
                 "APP_DESCRIPTION = Demo app\nSPARKLE_ENABLED = NO\n",
                 encoding="utf-8",
             )

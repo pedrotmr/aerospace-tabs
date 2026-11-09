@@ -91,6 +91,28 @@ final class SessionTests: XCTestCase {
         XCTAssertEqual(session.spaceCyclePool(), ["occupied-here"])
     }
 
+    func testOlderRefreshCannotReplaceARecentFocusRequest() {
+        var pendingRefreshes: [(Result<Snapshot, Error>) -> Void] = []
+        let session = Session(
+            listWindows: { completion in pendingRefreshes.append(completion) },
+            focusWindow: { _, completion in completion(.success(())) },
+            focusWorkspace: { _, completion in completion(.success(())) }
+        )
+        let first = makeWindow(id: 1, workspace: "main", screenIndex: 1)
+        let second = makeWindow(id: 2, workspace: "main", screenIndex: 1)
+        session.apply(Snapshot(windows: [first, second], focused: first.id))
+
+        session.refreshNow()
+        session.focus(second.id)
+
+        XCTAssertEqual(pendingRefreshes.count, 2)
+        pendingRefreshes[0](.success(Snapshot(windows: [first, second], focused: first.id)))
+        XCTAssertEqual(session.focusedID, second.id)
+
+        pendingRefreshes[1](.success(Snapshot(windows: [first, second], focused: second.id)))
+        XCTAssertEqual(session.focusedID, second.id)
+    }
+
     private func makeWindow(
         id: Int,
         workspace: String,

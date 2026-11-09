@@ -4,7 +4,10 @@ enum AerospaceConfigSyntax {
     static func parseGapNumber(_ literal: String) -> Double? {
         let pattern = #/^[+-]?[0-9](?:[0-9]|_[0-9])*(?:\.[0-9](?:[0-9]|_[0-9])*)?(?:[eE][+-]?[0-9](?:[0-9]|_[0-9])*)?$/#
         guard literal.wholeMatch(of: pattern) != nil else { return nil }
-        return Double(literal.replacingOccurrences(of: "_", with: ""))
+        guard let value = Double(literal.replacingOccurrences(of: "_", with: "")),
+              value.isFinite
+        else { return nil }
+        return value
     }
 
     static func isGapNumberCharacter(_ character: Character) -> Bool {

@@ -22,6 +22,14 @@ final class AerospaceClientTests: XCTestCase {
         XCTAssertEqual(noSIGPIPE, 1)
     }
 
+    @MainActor
+    func testHomebrewUpdateCommandUsesConfiguredCaskToken() {
+        XCTAssertEqual(
+            UpdaterService.homebrewUpdateCommand(caskToken: "custom-aerospace-tabs"),
+            "brew upgrade --cask pedrotmr/aerospace-tabs/custom-aerospace-tabs"
+        )
+    }
+
     func testSocketConfigurationSetsIOTimeouts() throws {
         let sockets = try makeSocketPair()
         defer {

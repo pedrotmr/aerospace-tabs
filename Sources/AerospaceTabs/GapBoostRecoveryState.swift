@@ -51,8 +51,7 @@ struct GapBoostRecoveryState {
         allowedValues: [CGFloat],
         legacyDefault: CGFloat
     ) -> CGFloat {
-        guard let marker = decodeActiveMarker(contents),
-              let value = marker.appliedDelta,
+        guard let value = decodeActiveMarker(contents)?.appliedDelta,
               allowedValues.contains(value)
         else {
             return legacyDefault
@@ -76,17 +75,19 @@ struct GapBoostRecoveryState {
         )
     }
 
-    private static func decodeActiveMarker(_ contents: String?) -> (configURL: URL, appliedDelta: CGFloat?)? {
+    private static func decodeActiveMarker(_ contents: String?) -> (configURL: URL?, appliedDelta: CGFloat?)? {
         guard let contents else { return nil }
         let lines = contents
             .split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
-        guard let first = lines.first, first.hasPrefix("/") else { return nil }
+        guard let first = lines.first else { return nil }
+        let configURL = first.hasPrefix("/") ? URL(fileURLWithPath: first).standardizedFileURL : nil
         let delta = lines.dropFirst().first.flatMap { line -> CGFloat? in
-            guard let value = Double(String(line)) else { return nil }
-            return CGFloat(value)
+            guard let value = Double(String(line)), value.isFinite else { return nil }
+            let converted = CGFloat(value)
+            return converted.isFinite ? converted : nil
         }
-        return (URL(fileURLWithPath: first).standardizedFileURL, delta)
+        return (configURL, delta)
     }
 }

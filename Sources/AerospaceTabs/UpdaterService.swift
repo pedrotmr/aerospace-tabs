@@ -33,9 +33,10 @@ final class UpdaterService {
         self.updaterDelegate = updaterDelegate
 
         if managedByHomebrew {
+            let caskToken = bundle.object(forInfoDictionaryKey: "HOMEBREW_CASK_TOKEN") as? String ?? "pedrotmr-aerospace-tabs"
             let userDriver = HomebrewUserDriver(
                 appName: "AeroSpaceTabs",
-                updateCommand: "brew upgrade --cask pedrotmr/aerospace-tabs/pedrotmr-aerospace-tabs",
+                updateCommand: Self.homebrewUpdateCommand(caskToken: caskToken),
                 hostBundle: bundle,
                 delegate: userDriverDelegate
             )
@@ -72,6 +73,10 @@ final class UpdaterService {
         }
 
         startBackgroundUpdateChecks()
+    }
+
+    static func homebrewUpdateCommand(caskToken: String) -> String {
+        "brew upgrade --cask pedrotmr/aerospace-tabs/\(caskToken)"
     }
 
     @objc func installAvailableUpdate(_ sender: Any?) {

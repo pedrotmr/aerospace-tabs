@@ -79,7 +79,10 @@ jobs:
         run: |
           set -euo pipefail
           archive="$RUNNER_TEMP/release/$APP_NAME-$RELEASE_VERSION.zip"
-          release-source/scripts/verify-release-zip.sh "$archive" "$RELEASE_TAG"
+          (
+            cd release-source
+            scripts/verify-release-zip.sh "$archive" "$RELEASE_TAG"
+          )
           sha256=$(shasum -a 256 "$archive" | awk '{ print $1 }')
           echo "RELEASE_SHA256=$sha256" >> "$GITHUB_ENV"
 
