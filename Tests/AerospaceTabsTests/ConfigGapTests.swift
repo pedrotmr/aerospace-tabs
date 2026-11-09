@@ -26,6 +26,7 @@ final class ConfigGapTests: XCTestCase {
         XCTAssertEqual(appliedDelta(nil), GapBoost.stripHeight)
         XCTAssertEqual(appliedDelta("/tmp/aerospace.toml\n"), GapBoost.stripHeight)
         XCTAssertEqual(appliedDelta("/tmp/aerospace.toml\n40\n"), 40)
+        XCTAssertEqual(appliedDelta("40\n"), 40)
         XCTAssertEqual(appliedDelta("relative/config.toml\n40\n"), 40)
         XCTAssertEqual(
             GapBoostRecoveryState.targetURL(
@@ -149,6 +150,14 @@ final class ConfigGapTests: XCTestCase {
         XCTAssertFalse(shifted.contains("monitor.36"))
     }
 
+    func testShiftNumbersPreservesWhitespaceAroundDottedKeys() throws {
+        let block = "outer.top = [{ monitor . main = 0 }, 0]"
+
+        let shifted = try XCTUnwrap(GapBoost.shiftNumbers(in: block, by: 40))
+
+        XCTAssertEqual(shifted, "outer.top = [{ monitor . main = 40 }, 40]")
+    }
+
     func testGapParserIgnoresCommentNumbersButKeepsHashesInsideQuotes() throws {
         let text = #"""
         [gaps]
@@ -242,17 +251,20 @@ final class ConfigGapTests: XCTestCase {
         XCTAssertFalse(fixture.locator.location().hasRecoveryState())
     }
 
-    func testRestoreKeepsRecoveryStateWhenNumericShiftIsUnsafe() throws {
+    func testRestorePreservesUnshiftableUserEditAndRestoresOtherValues() throws {
         let fixture = try Fixture()
         defer { fixture.remove() }
-        let original = "[gaps]\nouter.top = 1e999\n"
+        let original = "[gaps]\nouter.top = [10, 20]\n"
         try original.write(to: fixture.target, atomically: true, encoding: .utf8)
         let location = fixture.locator.location()
-        try "\(fixture.target.path)\n40\n".write(to: location.activeURL, atomically: true, encoding: .utf8)
+        let boost = GapBoost(locator: fixture.locator, reloadHandler: {})
+        boost.sync(shouldBoost: true)
+        try "[gaps]\nouter.top = [1e999, 62]\n".write(to: fixture.target, atomically: true, encoding: .utf8)
 
-        XCTAssertFalse(GapBoost(locator: fixture.locator, reloadHandler: {}).restoreIfNeeded(reload: false))
-        XCTAssertEqual(try String(contentsOf: fixture.target, encoding: .utf8), original)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: location.activeURL.path))
+        XCTAssertTrue(boost.restoreIfNeeded(reload: false))
+        XCTAssertEqual(try String(contentsOf: fixture.target, encoding: .utf8), "[gaps]\nouter.top = [1e999, 22]\n")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: location.activeURL.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: location.backupURL.path))
     }
 
     func testInvalidMonitorValueDoesNotLeakIntoArrayFallback() throws {
