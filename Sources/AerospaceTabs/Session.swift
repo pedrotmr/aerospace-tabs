@@ -16,6 +16,8 @@ final class Session {
     private let order = TabOrder()
     private var refreshQueued = false
     private var refreshGeneration = 0
+    private var activeRefreshGeneration: Int?
+    private var refreshPending = false
     private var focusGeneration = 0
     private var focusing = false
     private var cycleWorkspace: String?
@@ -51,8 +53,7 @@ final class Session {
         subscribe.start()
         scheduleRefresh()
         Timer.scheduledTimer(withTimeInterval: 0.8, repeats: true) { [weak self] _ in
-            guard let self, !self.focusing else { return }
-            self.scheduleRefresh()
+            self?.scheduleRefresh()
         }
     }
 
@@ -163,9 +164,13 @@ final class Session {
         )
     }
 
-    private func handle(_ event: AeroEvent) {
+    func handle(_ event: AeroEvent) {
         switch event.kind {
         case "focus-changed":
+            if focusing {
+                scheduleRefresh()
+                return
+            }
             if let id = event.windowId {
                 if windows.contains(where: { $0.id == id }) {
                     if focusedID != id {
@@ -184,32 +189,62 @@ final class Session {
     }
 
     private func scheduleRefresh() {
-        guard !focusing else { return }
+        guard !focusing, activeRefreshGeneration == nil else {
+            refreshPending = true
+            return
+        }
         if refreshQueued { return }
         refreshQueued = true
         DispatchQueue.main.async { [weak self] in
-            self?.refreshQueued = false
-            self?.refreshNow()
+            guard let self else { return }
+            self.refreshQueued = false
+            self.refreshNow()
         }
     }
 
     func refreshNow(forFocusGeneration requestFocusGeneration: Int? = nil) {
-        guard !focusing || requestFocusGeneration != nil else { return }
+        if let requestFocusGeneration {
+            guard requestFocusGeneration == focusGeneration else { return }
+            // The focus-triggered snapshot will include any events queued while focusing.
+            refreshPending = false
+        } else {
+            guard !focusing, activeRefreshGeneration == nil else {
+                refreshPending = true
+                return
+            }
+        }
         refreshGeneration += 1
         let requestGeneration = refreshGeneration
         let focusRequestGeneration = requestFocusGeneration ?? focusGeneration
+        activeRefreshGeneration = requestGeneration
         listWindows { [weak self] result in
-            guard let self,
-                  requestGeneration == self.refreshGeneration,
+            guard let self else { return }
+            guard requestGeneration == self.refreshGeneration,
                   focusRequestGeneration == self.focusGeneration
-            else { return }
+            else {
+                if self.activeRefreshGeneration == requestGeneration {
+                    self.activeRefreshGeneration = nil
+                    self.schedulePendingRefresh()
+                }
+                return
+            }
             switch result {
             case .failure(let error):
                 self.markUnavailable(error)
             case .success(let snapshot):
                 self.apply(snapshot)
             }
+            if self.activeRefreshGeneration == requestGeneration {
+                self.activeRefreshGeneration = nil
+                self.schedulePendingRefresh()
+            }
         }
+    }
+
+    private func schedulePendingRefresh() {
+        guard refreshPending, !focusing, activeRefreshGeneration == nil else { return }
+        refreshPending = false
+        scheduleRefresh()
     }
 
     func markUnavailable(_ error: Error) {
