@@ -83,7 +83,8 @@ struct GapBoostRecoveryState {
             .filter { !$0.isEmpty }
         guard let first = lines.first else { return nil }
         let configURL = first.hasPrefix("/") ? URL(fileURLWithPath: first).standardizedFileURL : nil
-        let delta = lines.dropFirst().first.flatMap { line -> CGFloat? in
+        let deltaLine = lines.dropFirst().first ?? (first.hasPrefix("/") ? nil : first)
+        let delta = deltaLine.flatMap { line -> CGFloat? in
             guard let value = Double(String(line)), value.isFinite else { return nil }
             let converted = CGFloat(value)
             return converted.isFinite ? converted : nil
