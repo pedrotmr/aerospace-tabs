@@ -76,17 +76,18 @@ def resolved_xcconfig_value(values: dict[str, str], key: str) -> str:
     return value
 
 
-def release_settings(root: Path) -> dict[str, str]:
+def release_settings(root: Path, fallback_root: Path | None = None) -> dict[str, str]:
     app = read_xcconfig(root / "Config" / "App.xcconfig")
     project = read_xcconfig(root / "Config" / "Project.xcconfig")
+    fallback_app = read_xcconfig(fallback_root / "Config" / "App.xcconfig") if fallback_root else {}
     settings = {
         "owner": app.get("RELEASE_OWNER", ""),
         "slug": app.get("RELEASE_SLUG", ""),
-        "cask_token": app.get("HOMEBREW_CASK_TOKEN", ""),
+        "cask_token": app.get("HOMEBREW_CASK_TOKEN", "") or fallback_app.get("HOMEBREW_CASK_TOKEN", ""),
         "bundle_id": app.get("PRODUCT_BUNDLE_IDENTIFIER", ""),
         "app_name": resolved_xcconfig_value(app, "PRODUCT_NAME"),
-        "app_display_name": app.get("APP_DISPLAY_NAME", ""),
-        "description": app.get("APP_DESCRIPTION", ""),
+        "app_display_name": app.get("APP_DISPLAY_NAME", "") or fallback_app.get("APP_DISPLAY_NAME", ""),
+        "description": app.get("APP_DESCRIPTION", "") or fallback_app.get("APP_DESCRIPTION", ""),
         "min_macos": project.get("MACOSX_DEPLOYMENT_TARGET", ""),
         "sparkle": app.get("SPARKLE_ENABLED", "NO").upper() == "YES",
     }
@@ -102,6 +103,7 @@ def release_settings(root: Path) -> dict[str, str]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config-root", type=Path)
+    parser.add_argument("--fallback-config-root", type=Path)
     parser.add_argument("--tap-dir", type=Path)
     parser.add_argument("--version")
     parser.add_argument("--sha256")
@@ -110,7 +112,10 @@ def main() -> None:
     args = parser.parse_args()
     if args.print_cask_token and args.print_homebrew_settings:
         parser.error("--print-cask-token and --print-homebrew-settings cannot be combined")
-    settings = release_settings(args.config_root or Path(__file__).resolve().parents[1])
+    settings = release_settings(
+        args.config_root or Path(__file__).resolve().parents[1],
+        args.fallback_config_root,
+    )
     if args.print_homebrew_settings:
         if args.tap_dir or args.version or args.sha256:
             parser.error("--print-homebrew-settings cannot be combined with release arguments")

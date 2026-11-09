@@ -61,7 +61,7 @@ jobs:
             exit 1
           fi
           version=${RELEASE_TAG#v}
-          metadata=$(python3 scripts/update-cask.py --config-root release-source --print-homebrew-settings)
+          metadata=$(python3 scripts/update-cask.py --config-root release-source --fallback-config-root . --print-homebrew-settings)
           app_name=$(jq -r '.app_name' <<< "$metadata")
           echo "APP_NAME=$app_name" >> "$GITHUB_ENV"
           mkdir -p "$RUNNER_TEMP/release"
@@ -105,9 +105,10 @@ jobs:
           trap 'rm -rf "$trust_config"' EXIT
           export XDG_CONFIG_HOME="$trust_config"
           export HOMEBREW_NO_AUTO_UPDATE=1
-          metadata=$(python3 scripts/update-cask.py --config-root release-source --print-homebrew-settings)
+          metadata=$(python3 scripts/update-cask.py --config-root release-source --fallback-config-root . --print-homebrew-settings)
           python3 scripts/update-cask.py \
             --config-root release-source \
+            --fallback-config-root . \
             --tap-dir tap \
             --version "$VERSION" \
             --sha256 "$SHA256"

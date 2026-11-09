@@ -112,6 +112,31 @@ class UpdateCaskTests(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "variable references"):
                 UPDATE_CASK.release_settings(root)
 
+    def test_release_settings_fall_back_for_legacy_tags(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory) / "legacy-release"
+            fallback_root = Path(temporary_directory) / "main"
+            (root / "Config").mkdir(parents=True)
+            (fallback_root / "Config").mkdir(parents=True)
+            (root / "Config" / "App.xcconfig").write_text(
+                "RELEASE_OWNER = pedrotmr\nRELEASE_SLUG = aerospace-tabs\n"
+                "PRODUCT_BUNDLE_IDENTIFIER = com.example.legacy\nPRODUCT_NAME = LegacyAero\nSPARKLE_ENABLED = YES\n",
+                encoding="utf-8",
+            )
+            (root / "Config" / "Project.xcconfig").write_text("MACOSX_DEPLOYMENT_TARGET = 14.0\n", encoding="utf-8")
+            (fallback_root / "Config" / "App.xcconfig").write_text(
+                "HOMEBREW_CASK_TOKEN = current-tabs\nAPP_DISPLAY_NAME = Current Aero\n"
+                "APP_DESCRIPTION = Current description\n",
+                encoding="utf-8",
+            )
+
+            settings = UPDATE_CASK.release_settings(root, fallback_root)
+
+        self.assertEqual(settings["app_name"], "LegacyAero")
+        self.assertEqual(settings["cask_token"], "current-tabs")
+        self.assertEqual(settings["app_display_name"], "Current Aero")
+        self.assertEqual(settings["description"], "Current description")
+
 
 if __name__ == "__main__":
     unittest.main()
