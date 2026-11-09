@@ -1,4 +1,5 @@
 import importlib.util
+import re
 import subprocess
 import sys
 import tempfile
@@ -136,6 +137,88 @@ class UpdateCaskTests(unittest.TestCase):
         self.assertEqual(settings["cask_token"], "current-tabs")
         self.assertEqual(settings["app_display_name"], "Current Aero")
         self.assertEqual(settings["description"], "Current description")
+
+    def test_homebrew_rejected_cask_tokens_are_invalid(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            (root / "Config").mkdir()
+            app_path = root / "Config/App.xcconfig"
+            original = (
+                "RELEASE_OWNER = pedrotmr\nRELEASE_SLUG = aerospace-tabs\n"
+                "HOMEBREW_CASK_TOKEN = demo-tabs\nPRODUCT_BUNDLE_IDENTIFIER = com.example.demo\n"
+                "PRODUCT_NAME = Demo\nAPP_DISPLAY_NAME = Demo\nAPP_DESCRIPTION = Demo app\nSPARKLE_ENABLED = NO\n"
+            )
+            app_path.write_text(original, encoding="utf-8")
+            (root / "Config/Project.xcconfig").write_text("MACOSX_DEPLOYMENT_TARGET = 14.0\n", encoding="utf-8")
+
+            for token in ("Uppercase", "-leading", "trailing-", "double--hyphen"):
+                with self.subTest(token=token):
+                    app_path.write_text(
+                        re.sub(r"(?m)^HOMEBREW_CASK_TOKEN\s*=.*$", f"HOMEBREW_CASK_TOKEN = {token}", original),
+                        encoding="utf-8",
+                    )
+                    with self.assertRaisesRegex(SystemExit, "cask token"):
+                        UPDATE_CASK.release_settings(root)
+
+    def test_print_cask_token_and_rejects_release_arguments(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            (root / "Config").mkdir()
+            (root / "Config/App.xcconfig").write_text(
+                "RELEASE_OWNER = pedrotmr\nRELEASE_SLUG = aerospace-tabs\n"
+                "HOMEBREW_CASK_TOKEN = demo-tabs\nPRODUCT_BUNDLE_IDENTIFIER = com.example.demo\n"
+                "PRODUCT_NAME = Demo\nAPP_DISPLAY_NAME = Demo\nAPP_DESCRIPTION = Demo app\nSPARKLE_ENABLED = NO\n",
+                encoding="utf-8",
+            )
+            (root / "Config/Project.xcconfig").write_text("MACOSX_DEPLOYMENT_TARGET = 14.0\n", encoding="utf-8")
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--config-root", str(root), "--print-cask-token"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), "demo-tabs")
+
+            incompatible = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--config-root", str(root),
+                    "--print-cask-token",
+                    "--tap-dir", str(root / "tap"),
+                    "--version", "1.2.3",
+                    "--sha256", "a" * 64,
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertNotEqual(incompatible.returncode, 0)
+            self.assertIn("cannot be combined", incompatible.stderr)
+
+    def test_unsafe_release_owner_and_slug_are_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            (root / "Config").mkdir()
+            app_path = root / "Config/App.xcconfig"
+            original = (
+                "RELEASE_OWNER = pedrotmr\nRELEASE_SLUG = aerospace-tabs\n"
+                "HOMEBREW_CASK_TOKEN = demo-tabs\nPRODUCT_BUNDLE_IDENTIFIER = com.example.demo\n"
+                "PRODUCT_NAME = Demo\nAPP_DISPLAY_NAME = Demo\nAPP_DESCRIPTION = Demo app\nSPARKLE_ENABLED = NO\n"
+            )
+            app_path.write_text(original, encoding="utf-8")
+            (root / "Config/Project.xcconfig").write_text("MACOSX_DEPLOYMENT_TARGET = 14.0\n", encoding="utf-8")
+
+            for key, label in (("RELEASE_OWNER", "owner"), ("RELEASE_SLUG", "slug")):
+                with self.subTest(key=key):
+                    app_path.write_text(
+                        re.sub(rf"(?m)^{key}\s*=.*$", f'{key} = invalid"metadata', original),
+                        encoding="utf-8",
+                    )
+                    with self.assertRaisesRegex(SystemExit, f"release {label}"):
+                        UPDATE_CASK.release_settings(root)
 
 
 if __name__ == "__main__":
