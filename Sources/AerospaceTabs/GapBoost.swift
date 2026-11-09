@@ -176,13 +176,21 @@ final class GapBoost {
             if Self.isUneditedBoost(current: current, backup: backup, delta: appliedDelta) {
                 restored = backup
             } else if activeExists {
-                guard let shifted = Self.shiftNumbers(in: current, by: -appliedDelta) else { return false }
+                guard let shifted = Self.shiftNumbers(
+                    in: current,
+                    by: -appliedDelta,
+                    preservingUnshiftableTokens: true
+                ) else { return false }
                 restored = shifted
             } else {
                 restored = backup
             }
         } else if activeExists {
-            guard let shifted = Self.shiftNumbers(in: current, by: -appliedDelta) else { return false }
+            guard let shifted = Self.shiftNumbers(
+                in: current,
+                by: -appliedDelta,
+                preservingUnshiftableTokens: true
+            ) else { return false }
             restored = shifted
         } else {
             return false
@@ -307,7 +315,11 @@ final class GapBoost {
         return current == shifted
     }
 
-    static func shiftNumbers(in block: String, by delta: CGFloat) -> String? {
+    static func shiftNumbers(
+        in block: String,
+        by delta: CGFloat,
+        preservingUnshiftableTokens: Bool = false
+    ) -> String? {
         var result = ""
         var i = block.startIndex
         var quote: Character?
@@ -370,12 +382,24 @@ final class GapBoost {
                 let after = j < block.endIndex ? block[j] : nil
                 let attachedToIdentifier = before.map(Self.isIdentifierCharacter) == true
                     || after.map(Self.isIdentifierCharacter) == true
-                if attachedToIdentifier {
+                if token == "." && Self.isDottedKeySeparator(in: block, at: i, after: j) {
+                    result += token
+                } else if attachedToIdentifier {
                     result += token
                 } else {
-                    guard let value = AerospaceConfigSyntax.parseGapNumber(token) else { return nil }
+                    guard let value = AerospaceConfigSyntax.parseGapNumber(token) else {
+                        guard preservingUnshiftableTokens else { return nil }
+                        result += token
+                        i = j
+                        continue
+                    }
                     let shifted = value + Double(delta)
-                    guard shifted.isFinite else { return nil }
+                    guard shifted.isFinite else {
+                        guard preservingUnshiftableTokens else { return nil }
+                        result += token
+                        i = j
+                        continue
+                    }
                     let nonnegative = max(0, shifted)
                     if let integer = Int(exactly: nonnegative) {
                         result += String(integer)
@@ -390,6 +414,24 @@ final class GapBoost {
             i = block.index(after: i)
         }
         return result
+    }
+
+    private static func isDottedKeySeparator(
+        in block: String,
+        at start: String.Index,
+        after end: String.Index
+    ) -> Bool {
+        var previous = start
+        while previous > block.startIndex {
+            previous = block.index(before: previous)
+            if !block[previous].isWhitespace { break }
+        }
+        var next = end
+        while next < block.endIndex, block[next].isWhitespace {
+            next = block.index(after: next)
+        }
+        guard previous < start, next < block.endIndex else { return false }
+        return isIdentifierCharacter(block[previous]) && isIdentifierCharacter(block[next])
     }
 
     private static func isIdentifierCharacter(_ character: Character) -> Bool {
