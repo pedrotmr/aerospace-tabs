@@ -32,6 +32,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+
       - name: Run the documented checks
         run: make check
 
@@ -48,6 +49,10 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+
+      - name: Read app artifact name
+        id: app
+        run: echo "name=$(sed -n 's/^PRODUCT_NAME = //p' Config/App.xcconfig)" >> "$GITHUB_OUTPUT"
 
       - name: Import Developer ID signing identity
         env:
@@ -99,8 +104,8 @@ jobs:
         with:
           name: aerospace-tabs-signed-check-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            .build/release/AerospaceTabs-*.zip
-            .build/release/AerospaceTabs-*.dmg
+            .build/release/${{ steps.app.outputs.name }}-*.zip
+            .build/release/${{ steps.app.outputs.name }}-*.dmg
             .build/release/appcast/appcast.xml
           if-no-files-found: error
           retention-days: 2

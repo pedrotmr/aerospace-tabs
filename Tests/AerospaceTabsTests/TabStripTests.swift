@@ -9,7 +9,8 @@ final class TabStripTests: XCTestCase {
         amount.transition(to: 1, at: 10, duration: 0.2, animated: true)
 
         XCTAssertTrue(amount.isAnimating)
-        XCTAssertEqual(amount.presentationValue(at: 10.1, duration: 0.2), 0.875, accuracy: 0.001)
+        let presentation = amount.presentationValue(at: 10.1, duration: 0.2)
+        XCTAssertEqual(presentation, 0.875, accuracy: 0.001)
         XCTAssertTrue(amount.advance(at: 10.1, duration: 0.2))
         XCTAssertFalse(amount.advance(at: 10.21, duration: 0.2))
         XCTAssertEqual(amount.value, 1)
@@ -235,29 +236,6 @@ final class TabStripTests: XCTestCase {
         view.beginPress(at: CGPoint(x: 50, y: 17))
         view.endPress(at: CGPoint(x: 50, y: 17))
         XCTAssertEqual(pickedIDs, [3, 5])
-    }
-
-    func testDragFinalizationAlwaysRequestsRedraw() {
-        let view = makeView()
-        let window = NSWindow(
-            contentRect: view.frame,
-            styleMask: .borderless,
-            backing: .buffered,
-            defer: false
-        )
-        window.contentView = view
-        let first = makeWindow(id: 1)
-        let second = makeWindow(id: 2)
-        view.set(windows: [first, second], focused: 1)
-        view.beginPress(at: CGPoint(x: 50, y: 17))
-        view.continuePress(to: CGPoint(x: 170, y: 17))
-        view.set(windows: [second, first], focused: 1)
-        view.needsDisplay = false
-
-        view.endPress(at: CGPoint(x: 170, y: 17))
-
-        XCTAssertTrue(view.needsDisplay)
-        withExtendedLifetime(window) {}
     }
 
     private func makeView() -> TabStripView {

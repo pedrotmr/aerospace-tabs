@@ -204,7 +204,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         self?.swipeMonitor.isAvailable ?? false
                     },
                     onQuit: {
-                        // applicationWillTerminate restores gaps once.
                         NSApp.terminate(nil)
                     }
                 )
@@ -212,8 +211,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return created
             }()
             let gaps = GapsConfig.shared.gaps(for: screen)
-            // Show an overview when this monitor has at least two occupied windows.
-            let showTabs = Self.shouldShowTabs(windows)
+            let showTabs = SessionPolicy.shouldShowTabs(windows)
             let showConnectionStatus = connectionUnavailable && (
                 showTabs || (connectionBannerOnPrimary && displayID == firstScreenDisplayID)
             )
@@ -271,10 +269,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Strip visibility: two or more windows across this monitor's occupied workspaces.
-    private static func shouldShowTabs(_ windows: [Win]) -> Bool {
-        SessionPolicy.shouldShowTabs(windows)
-    }
 }
 
 extension NSScreen {

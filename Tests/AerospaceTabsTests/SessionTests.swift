@@ -91,6 +91,76 @@ final class SessionTests: XCTestCase {
         XCTAssertEqual(session.spaceCyclePool(), ["occupied-here"])
     }
 
+    func testOlderRefreshCannotReplaceARecentFocusRequest() {
+        var pendingRefreshes: [(Result<Snapshot, Error>) -> Void] = []
+        let session = Session(
+            listWindows: { completion in pendingRefreshes.append(completion) },
+            focusWindow: { _, completion in completion(.success(())) },
+            focusWorkspace: { _, completion in completion(.success(())) }
+        )
+        let first = makeWindow(id: 1, workspace: "main", screenIndex: 1)
+        let second = makeWindow(id: 2, workspace: "main", screenIndex: 1)
+        session.apply(Snapshot(windows: [first, second], focused: first.id))
+
+        session.refreshNow()
+        session.focus(second.id)
+
+        XCTAssertEqual(pendingRefreshes.count, 2)
+        pendingRefreshes[0](.success(Snapshot(windows: [first, second], focused: first.id)))
+        XCTAssertEqual(session.focusedID, second.id)
+
+        pendingRefreshes[1](.success(Snapshot(windows: [first, second], focused: second.id)))
+        XCTAssertEqual(session.focusedID, second.id)
+    }
+
+    func testOrdinaryRefreshesCoalesceWhileAListingIsPending() {
+        var pendingRefreshes: [(Result<Snapshot, Error>) -> Void] = []
+        let session = Session(listWindows: { completion in pendingRefreshes.append(completion) })
+
+        session.refreshNow()
+        session.refreshNow()
+        session.refreshNow()
+
+        XCTAssertEqual(pendingRefreshes.count, 1)
+        pendingRefreshes[0](.success(Snapshot(windows: [], focused: nil)))
+
+        let followUpScheduled = expectation(description: "one coalesced refresh runs after the pending listing")
+        DispatchQueue.main.async {
+            XCTAssertEqual(pendingRefreshes.count, 2)
+            followUpScheduled.fulfill()
+        }
+        wait(for: [followUpScheduled], timeout: 1)
+    }
+
+    func testEventsDuringFocusQueueRefreshAndStaleFocusEventsDoNotChangeSelection() {
+        var pendingRefreshes: [(Result<Snapshot, Error>) -> Void] = []
+        var focusCompletion: Session.CommandCompletion?
+        let session = Session(
+            listWindows: { completion in pendingRefreshes.append(completion) },
+            focusWindow: { _, completion in focusCompletion = completion }
+        )
+        let first = makeWindow(id: 1, workspace: "main", screenIndex: 1)
+        let second = makeWindow(id: 2, workspace: "main", screenIndex: 1)
+        session.apply(Snapshot(windows: [first, second], focused: first.id))
+
+        session.focus(second.id)
+        session.handle(AeroEvent(kind: "focus-changed", windowId: first.id))
+        XCTAssertEqual(session.focusedID, second.id)
+
+        focusCompletion?(.success(()))
+        XCTAssertEqual(pendingRefreshes.count, 1)
+        session.handle(AeroEvent(kind: "window-detected", windowId: nil))
+        pendingRefreshes[0](.success(Snapshot(windows: [first, second], focused: second.id)))
+        XCTAssertEqual(session.focusedID, second.id)
+
+        let followUpScheduled = expectation(description: "queued event refresh runs after focus settles")
+        DispatchQueue.main.async {
+            XCTAssertEqual(pendingRefreshes.count, 2)
+            followUpScheduled.fulfill()
+        }
+        wait(for: [followUpScheduled], timeout: 1)
+    }
+
     private func makeWindow(
         id: Int,
         workspace: String,

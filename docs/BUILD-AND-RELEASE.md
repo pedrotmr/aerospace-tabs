@@ -13,7 +13,7 @@ The original ICNS and its bundle validation are documented in [App icon](ICONS.m
 
 ## Build system
 
-Xcode is the only app build system. SwiftPM is useful for portable libraries and command-line builds, but it does not own these apps' asset catalogs, app metadata, previews, test schemes, framework embedding, or macOS signing flow. Xcode handles those in one project; SwiftPM only resolves the exact Sparkle 2.10.1 dependency. The trade-off is that app development and builds require macOS and Xcode. The Makefile gives both apps the same local and CI commands, and each checkout keeps its build products under `.build/`.
+Xcode is the only app build system. SwiftPM is useful for portable libraries and command-line builds, but it does not own this app's asset catalogs, app metadata, previews, test schemes, framework embedding, or macOS signing flow. Xcode handles those in one project; SwiftPM only resolves the exact Sparkle 2.10.1 dependency. The trade-off is that app development and builds require macOS and Xcode. The Makefile provides the same local and CI commands, and build products stay under `.build/`.
 
 Xcode owns the app target, resources, Info.plist processing, tests, previews, Sparkle embedding, and code signing. There is no SwiftPM app package or second official build path. Shared compiler, architecture, team, and deployment settings live in `Config/Project.xcconfig`; product metadata lives in `Config/App.xcconfig` and `Config/Info.plist`.
 

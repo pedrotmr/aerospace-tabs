@@ -105,6 +105,8 @@ jobs:
     name: Build, sign, notarize, and stage update feed
     if: (needs.prepare-release.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     needs: prepare-release
+    outputs:
+      app_name: ${{ steps.app.outputs.name }}
     environment: signed-distribution
     runs-on: macos-26
     timeout-minutes: 120
@@ -116,6 +118,10 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
           ref: ${{ needs.prepare-release.outputs.tag_name }}
+
+      - name: Read app artifact name
+        id: app
+        run: echo "name=$(sed -n 's/^PRODUCT_NAME = //p' Config/App.xcconfig)" >> "$GITHUB_OUTPUT"
 
       - name: Run the documented checks
         run: make check APP_BUILD_NUMBER="${GITHUB_RUN_NUMBER}"
@@ -164,8 +170,8 @@ jobs:
         with:
           name: aerospace-tabs-release-${{ github.run_number }}
           path: |
-            .build/release/AerospaceTabs-*.zip
-            .build/release/AerospaceTabs-*.dmg
+            .build/release/${{ steps.app.outputs.name }}-*.zip
+            .build/release/${{ steps.app.outputs.name }}-*.dmg
             .build/release/appcast/appcast.xml
           if-no-files-found: error
           retention-days: 7
@@ -199,6 +205,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ needs.prepare-release.outputs.tag_name }}
+          APP_NAME: ${{ needs.build-release.outputs.app_name }}
         run: |
           set -euo pipefail
           release_json=$(gh release view "$RELEASE_TAG" --json isDraft,isPrerelease,assets)
@@ -208,11 +215,11 @@ jobs:
           fi
           version=${RELEASE_TAG#v}
           release_files=(
-            ".build/release/AerospaceTabs-$version.zip"
-            ".build/release/AerospaceTabs-$version.dmg"
+            ".build/release/$APP_NAME-$version.zip"
+            ".build/release/$APP_NAME-$version.dmg"
             ".build/release/appcast/appcast.xml"
           )
-          expected_assets=("AerospaceTabs-$version.zip" "AerospaceTabs-$version.dmg" appcast.xml)
+          expected_assets=("$APP_NAME-$version.zip" "$APP_NAME-$version.dmg" appcast.xml)
           for file in "${release_files[@]}"; do
             if [[ ! -s "$file" ]]; then
               echo "::error::Verified release file is missing: $file"

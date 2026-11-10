@@ -14,39 +14,34 @@ final class ConfigGapTests: XCTestCase {
     }
 
     func testAppliedDeltaDefaultsPathOnlyMarkerToStripHeight() {
-        XCTAssertEqual(GapBoost.appliedDelta(fromActiveMarker: nil), GapBoost.stripHeight)
+        let allowedValues = [GapBoost.stripHeight, GapBoost.boostAmount]
+        func appliedDelta(_ marker: String?) -> CGFloat {
+            GapBoostRecoveryState.appliedDelta(
+                fromActiveMarker: marker,
+                allowedValues: allowedValues,
+                legacyDefault: GapBoost.stripHeight
+            )
+        }
+
+        XCTAssertEqual(appliedDelta(nil), GapBoost.stripHeight)
+        XCTAssertEqual(appliedDelta("/tmp/aerospace.toml\n"), GapBoost.stripHeight)
+        XCTAssertEqual(appliedDelta("/tmp/aerospace.toml\n40\n"), 40)
+        XCTAssertEqual(appliedDelta("40\n"), 40)
+        XCTAssertEqual(appliedDelta("relative/config.toml\n40\n"), 40)
         XCTAssertEqual(
-            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\n"),
-            GapBoost.stripHeight
+            GapBoostRecoveryState.targetURL(
+                backupContents: nil,
+                activeMarkerContents: "relative/config.toml\n40\n",
+                fallbackURL: URL(fileURLWithPath: "/tmp/fallback.toml")
+            ),
+            URL(fileURLWithPath: "/tmp/fallback.toml")
         )
-        XCTAssertEqual(
-            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\n40\n"),
-            40
-        )
-        XCTAssertEqual(
-            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\n0\n"),
-            GapBoost.stripHeight
-        )
-        XCTAssertEqual(
-            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\n1\n"),
-            GapBoost.stripHeight
-        )
-        XCTAssertEqual(
-            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\n99999\n"),
-            GapBoost.stripHeight
-        )
-        XCTAssertEqual(
-            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\nnan\n"),
-            GapBoost.stripHeight
-        )
-        XCTAssertEqual(
-            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\n-1\n"),
-            GapBoost.stripHeight
-        )
-        XCTAssertEqual(
-            GapBoost.appliedDelta(fromActiveMarker: "/tmp/aerospace.toml\ninf\n"),
-            GapBoost.stripHeight
-        )
+        XCTAssertEqual(appliedDelta("/tmp/aerospace.toml\n0\n"), GapBoost.stripHeight)
+        XCTAssertEqual(appliedDelta("/tmp/aerospace.toml\n1\n"), GapBoost.stripHeight)
+        XCTAssertEqual(appliedDelta("/tmp/aerospace.toml\n99999\n"), GapBoost.stripHeight)
+        XCTAssertEqual(appliedDelta("/tmp/aerospace.toml\nnan\n"), GapBoost.stripHeight)
+        XCTAssertEqual(appliedDelta("/tmp/aerospace.toml\n-1\n"), GapBoost.stripHeight)
+        XCTAssertEqual(appliedDelta("/tmp/aerospace.toml\ninf\n"), GapBoost.stripHeight)
     }
 
     func testEditedLegacyBoostSubtractsPersistedStripHeightNotCurrentBoost() throws {
@@ -56,8 +51,12 @@ final class ConfigGapTests: XCTestCase {
         try original.write(to: fixture.target, atomically: true, encoding: .utf8)
         let location = fixture.locator.location()
 
-        let backup = AerospaceGapBackup(configURL: fixture.target, originalBlock: "outer.top = 10")
-        try backup.serialized.write(to: location.backupURL, atomically: true, encoding: .utf8)
+        let backup = GapBoostRecoveryState(
+            configURL: fixture.target,
+            originalBlock: "outer.top = 10",
+            appliedDelta: GapBoost.stripHeight
+        )
+        try XCTUnwrap(backup.serializedBackup).write(to: location.backupURL, atomically: true, encoding: .utf8)
         // Path-only active marker from a pre-clearance build (implicit delta 34).
         try fixture.target.path.write(to: location.activeURL, atomically: true, encoding: .utf8)
         // Live value was 44 (10+34), then edited +5 while still boosted.
@@ -78,8 +77,12 @@ final class ConfigGapTests: XCTestCase {
         try original.write(to: fixture.target, atomically: true, encoding: .utf8)
         let location = fixture.locator.location()
 
-        let backup = AerospaceGapBackup(configURL: fixture.target, originalBlock: "outer.top = 10")
-        try backup.serialized.write(to: location.backupURL, atomically: true, encoding: .utf8)
+        let backup = GapBoostRecoveryState(
+            configURL: fixture.target,
+            originalBlock: "outer.top = 10",
+            appliedDelta: GapBoost.boostAmount
+        )
+        try XCTUnwrap(backup.serializedBackup).write(to: location.backupURL, atomically: true, encoding: .utf8)
         try "\(fixture.target.path)\n40\n".write(to: location.activeURL, atomically: true, encoding: .utf8)
         // Live was 50 (10+40); user edited to 44, which equals a legacy 10+34 candidate.
         try "[gaps]\nouter.top = 44\n".write(to: fixture.target, atomically: true, encoding: .utf8)
@@ -117,7 +120,7 @@ final class ConfigGapTests: XCTestCase {
         XCTAssertTrue(range.map { text[$0].hasPrefix("gaps.outer.top = 20") } == true)
     }
 
-    func testShiftNumbersLeavesIdentifierQuotedAndCommentDigitsAlone() {
+    func testShiftNumbersLeavesIdentifierQuotedAndCommentDigitsAlone() throws {
         let block = #"""
         outer.top = [
             { monitor.main2 = 10 },
@@ -126,14 +129,14 @@ final class ConfigGapTests: XCTestCase {
         ]
         """#
 
-        let shifted = GapBoost.shiftNumbers(in: block, by: 34)
+        let shifted = try XCTUnwrap(GapBoost.shiftNumbers(in: block, by: 34))
 
         XCTAssertTrue(shifted.contains("monitor.main2 = 44"))
         XCTAssertTrue(shifted.contains(#"monitor."Side 3" = 54"#))
         XCTAssertTrue(shifted.contains("38, # keep 99 in this comment"))
     }
 
-    func testShiftNumbersPreservesNumericMonitorKey() {
+    func testShiftNumbersPreservesNumericMonitorKey() throws {
         let block = """
         outer.top = [
             { monitor.2 = 10 },
@@ -141,10 +144,18 @@ final class ConfigGapTests: XCTestCase {
         ]
         """
 
-        let shifted = GapBoost.shiftNumbers(in: block, by: 34)
+        let shifted = try XCTUnwrap(GapBoost.shiftNumbers(in: block, by: 34))
 
         XCTAssertTrue(shifted.contains("monitor.2 = 44"))
         XCTAssertFalse(shifted.contains("monitor.36"))
+    }
+
+    func testShiftNumbersPreservesWhitespaceAroundDottedKeys() throws {
+        let block = "outer.top = [{ monitor . main = 0 }, 0]"
+
+        let shifted = try XCTUnwrap(GapBoost.shiftNumbers(in: block, by: 40))
+
+        XCTAssertEqual(shifted, "outer.top = [{ monitor . main = 40 }, 40]")
     }
 
     func testGapParserIgnoresCommentNumbersButKeepsHashesInsideQuotes() throws {
@@ -222,6 +233,38 @@ final class ConfigGapTests: XCTestCase {
 
         boost.sync(shouldBoost: false)
         XCTAssertEqual(try String(contentsOf: fixture.target, encoding: .utf8), original)
+    }
+
+    func testGapParserRejectsNonFiniteNumbersAndBoostFailsSafely() throws {
+        XCTAssertNil(AerospaceConfigSyntax.parseGapNumber("1e999"))
+        XCTAssertNil(GapBoost.shiftNumbers(in: "outer.top = 1e999", by: 40))
+        XCTAssertNil(GapBoost.shiftNumbers(in: "outer.top = 1e308", by: .greatestFiniteMagnitude))
+
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let original = "[gaps]\nouter.top = 1e999\n"
+        try original.write(to: fixture.target, atomically: true, encoding: .utf8)
+
+        GapBoost(locator: fixture.locator, reloadHandler: {}).sync(shouldBoost: true)
+
+        XCTAssertEqual(try String(contentsOf: fixture.target, encoding: .utf8), original)
+        XCTAssertFalse(fixture.locator.location().hasRecoveryState())
+    }
+
+    func testRestorePreservesUnshiftableUserEditAndRestoresOtherValues() throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let original = "[gaps]\nouter.top = [10, 20]\n"
+        try original.write(to: fixture.target, atomically: true, encoding: .utf8)
+        let location = fixture.locator.location()
+        let boost = GapBoost(locator: fixture.locator, reloadHandler: {})
+        boost.sync(shouldBoost: true)
+        try "[gaps]\nouter.top = [1e999, 62]\n".write(to: fixture.target, atomically: true, encoding: .utf8)
+
+        XCTAssertTrue(boost.restoreIfNeeded(reload: false))
+        XCTAssertEqual(try String(contentsOf: fixture.target, encoding: .utf8), "[gaps]\nouter.top = [1e999, 22]\n")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: location.activeURL.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: location.backupURL.path))
     }
 
     func testInvalidMonitorValueDoesNotLeakIntoArrayFallback() throws {

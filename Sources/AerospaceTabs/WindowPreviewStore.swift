@@ -28,7 +28,9 @@ final class WindowPreviewStore: ObservableObject {
     private var isPresented = false
     private var liveEnabled = false
     private var timer: Timer?
-    private var resourceCleanup: DispatchWorkItem?
+    private var stoppingPreviews = 0
+    private var resourceReleasePending = false
+    private var resourcesReleased = true
     private let discovery = OverviewWindowDiscovery()
     private let screenRecordingAccess: () -> Bool
     private let captureSnapshot: @Sendable (Int) async -> CGImage?
@@ -61,7 +63,6 @@ final class WindowPreviewStore: ObservableObject {
 
     deinit {
         timer?.invalidate()
-        resourceCleanup?.cancel()
     }
 
     func aspectRatio(for id: Int) -> CGFloat { aspectRatios[id] ?? 1.66 }
@@ -70,7 +71,9 @@ final class WindowPreviewStore: ObservableObject {
         let latest = Dictionary(windows.map { ($0.id, $0) }) { first, _ in first }
         let membershipChanged = Set(latest.keys) != Set(self.windows.keys)
         for (id, previous) in self.windows where latest[id]?.bundleID != previous.bundleID {
-            livePreviews.removeValue(forKey: id)?.stop(keepSnapshot: false)
+            if let preview = livePreviews.removeValue(forKey: id) {
+                stopPreview(preview, keepSnapshot: false)
+            }
             targetSizes.removeValue(forKey: id)
             liveSizes.removeValue(forKey: id)
             liveRetryDates.removeValue(forKey: id)
@@ -88,11 +91,11 @@ final class WindowPreviewStore: ObservableObject {
 
     func beginSession() {
         guard !isPresented else { return }
-        resourceCleanup?.cancel()
-        resourceCleanup = nil
         generation += 1
         isPresented = true
         liveEnabled = false
+        resourceReleasePending = false
+        resourcesReleased = false
         liveRetryDates.removeAll()
         refreshScreenRecordingAccess()
         let access = needsScreenRecording ? "unavailable" : "available"
@@ -123,21 +126,9 @@ final class WindowPreviewStore: ObservableObject {
         visibleIDs.removeAll()
         targetSizes.removeAll()
         pending.removeAll()
-        stopLivePreviews()
-        let cleanup = DispatchWorkItem { [weak self] in
-            MainActor.assumeIsolated {
-                guard let self, !self.isPresented else { return }
-                self.resourceCleanup = nil
-                Task.detached(priority: .utility) {
-                    OverviewLivePreview.releaseTransientResources()
-                }
-            }
-        }
-        resourceCleanup?.cancel()
-        resourceCleanup = cleanup
-        // Let stream shutdown and final-frame callbacks release their buffers first.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: cleanup)
-        // Keep the last valid images in RAM for the next presentation.
+        resourceReleasePending = true
+        stopLivePreviews { [weak self] in self?.releaseTransientResourcesIfIdle() }
+        releaseTransientResourcesIfIdle()
     }
 
     func registerVisible(_ window: Win, size: CGSize, scale: CGFloat) {
@@ -151,7 +142,9 @@ final class WindowPreviewStore: ObservableObject {
 
     func unregisterVisible(_ window: Win) {
         visibleIDs.remove(window.id)
-        livePreviews.removeValue(forKey: window.id)?.stop()
+        if let preview = livePreviews.removeValue(forKey: window.id) {
+            stopPreview(preview)
+        }
         liveSizes.removeValue(forKey: window.id)
     }
 
@@ -240,6 +233,7 @@ final class WindowPreviewStore: ObservableObject {
                 await MainActor.run { [weak self] in
                     guard let self else { return }
                     self.inFlight.remove(id)
+                    defer { self.releaseTransientResourcesIfIdle() }
                     guard token == self.generation,
                           self.windows[id]?.bundleID == window.bundleID, !self.needsScreenRecording else {
                         self.pump()
@@ -255,27 +249,67 @@ final class WindowPreviewStore: ObservableObject {
                     let elapsed = Int(Date().timeIntervalSince(started) * 1000)
                     self.logger.debug("Preview \(id): \(captured != nil ? "ready" : "unavailable") in \(elapsed) ms")
                     self.pump()
-                    if !self.isPresented, self.inFlight.isEmpty {
-                        Task.detached(priority: .utility) {
-                            OverviewLivePreview.releaseTransientResources()
-                        }
-                    }
                 }
             }
         }
     }
 
-    private func stopLivePreviews(keepSnapshots: Bool = true) {
-        for preview in livePreviews.values { preview.stop(keepSnapshot: keepSnapshots) }
+    private func stopLivePreviews(
+        keepSnapshots: Bool = true,
+        completion: (@MainActor () -> Void)? = nil
+    ) {
+        let previews = Array(livePreviews.values)
         livePreviews.removeAll()
         liveSizes.removeAll()
+        guard !previews.isEmpty else {
+            completion?()
+            releaseTransientResourcesIfIdle()
+            return
+        }
+
+        var remaining = previews.count
+        for preview in previews {
+            stopPreview(preview, keepSnapshot: keepSnapshots) { [weak self] in
+                guard let self else { return }
+                remaining -= 1
+                if remaining == 0 { completion?() }
+            }
+        }
+    }
+
+    private func stopPreview(
+        _ preview: OverviewLivePreview,
+        keepSnapshot: Bool = true,
+        completion: (@MainActor () -> Void)? = nil
+    ) {
+        stoppingPreviews += 1
+        preview.stop(keepSnapshot: keepSnapshot) { [weak self] in
+            guard let self else { return }
+            self.stoppingPreviews -= 1
+            completion?()
+            self.releaseTransientResourcesIfIdle()
+        }
+    }
+
+    private func releaseTransientResourcesIfIdle() {
+        guard resourceReleasePending, !resourcesReleased, !isPresented,
+              inFlight.isEmpty, stoppingPreviews == 0
+        else {
+            return
+        }
+        resourcesReleased = true
+        Task.detached(priority: .utility) {
+            OverviewLivePreview.releaseTransientResources()
+        }
     }
 
     private func reconcileLivePreviews() {
         guard isPresented, liveEnabled, !needsScreenRecording else { return }
         let wanted = visibleIDs.intersection(windows.keys)
         for id in livePreviews.keys where !wanted.contains(id) {
-            livePreviews.removeValue(forKey: id)?.stop()
+            if let preview = livePreviews.removeValue(forKey: id) {
+                stopPreview(preview)
+            }
             liveSizes.removeValue(forKey: id)
         }
         // Bound the total video surface area across all displays, then let the
@@ -302,7 +336,9 @@ final class WindowPreviewStore: ObservableObject {
             let token = generation
             let preview = OverviewLivePreview(windowID: id, pixelSize: size, onFailure: { [weak self] in
                 guard let self, token == self.generation else { return }
-                self.livePreviews.removeValue(forKey: id)?.stop()
+                if let preview = self.livePreviews.removeValue(forKey: id) {
+                    self.stopPreview(preview)
+                }
                 self.liveSizes.removeValue(forKey: id)
                 self.liveRetryDates[id] = Date().addingTimeInterval(5)
             }, onSnapshot: { [weak self] image in
@@ -325,8 +361,8 @@ final class WindowPreviewStore: ObservableObject {
                     try await preview.start(window: captureWindow)
                 } catch {
                     guard self.livePreviews[id] === preview else { return }
-                    preview.stop()
                     self.livePreviews.removeValue(forKey: id)
+                    self.stopPreview(preview)
                     self.liveSizes.removeValue(forKey: id)
                     self.liveRetryDates[id] = Date().addingTimeInterval(5)
                     self.logger.error("Live preview unavailable for window \(id): \(error.localizedDescription, privacy: .public)")

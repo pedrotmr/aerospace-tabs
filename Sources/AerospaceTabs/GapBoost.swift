@@ -113,19 +113,21 @@ final class GapBoost {
         else { return }
 
         let original = String(text[range])
-        let backup = AerospaceGapBackup(
+        guard let boosted = Self.shiftNumbers(in: original, by: Self.boostAmount) else { return }
+        let recovery = GapBoostRecoveryState(
             configURL: location.configURL,
-            originalBlock: original
+            originalBlock: original,
+            appliedDelta: Self.boostAmount
         )
-        guard writeVerified(backup.serialized, to: location.backupURL) else { return }
+        guard let backup = recovery.serializedBackup,
+              writeVerified(backup, to: location.backupURL)
+        else { return }
 
         // Persist the resolved target + applied delta before changing it.
         // Recovery remains tied to this file even if a higher-priority candidate
         // appears or a symlink is retargeted while the app is running.
-        let activeMarker = "\(location.configURL.path)\n\(Self.boostAmount)\n"
-        guard writeVerified(activeMarker, to: location.activeURL) else { return }
+        guard writeVerified(recovery.serializedActiveMarker, to: location.activeURL) else { return }
 
-        let boosted = Self.shiftNumbers(in: original, by: Self.boostAmount)
         text.replaceSubrange(range, with: boosted)
         guard writeVerified(text, to: location.configURL) else { return }
         reloadAerospace()
@@ -147,13 +149,16 @@ final class GapBoost {
         let activeContents = activeExists
             ? try? String(contentsOf: location.activeURL, encoding: .utf8)
             : nil
-        // Path-only markers from older builds default to pre-clearance stripHeight.
-        let appliedDelta = Self.appliedDelta(fromActiveMarker: activeContents)
+        let appliedDelta = GapBoostRecoveryState.appliedDelta(
+            fromActiveMarker: activeContents,
+            allowedValues: [Self.stripHeight, Self.boostAmount],
+            legacyDefault: Self.stripHeight
+        )
 
         let restored: String
         if backupExists {
             guard let contents = try? String(contentsOf: location.backupURL, encoding: .utf8),
-                  let backup = AerospaceGapBackup.originalBlock(from: contents)
+                  let backup = GapBoostRecoveryState.originalBlock(fromBackup: contents)
             else {
                 return false
             }
@@ -171,12 +176,22 @@ final class GapBoost {
             if Self.isUneditedBoost(current: current, backup: backup, delta: appliedDelta) {
                 restored = backup
             } else if activeExists {
-                restored = Self.shiftNumbers(in: current, by: -appliedDelta)
+                guard let shifted = Self.shiftNumbers(
+                    in: current,
+                    by: -appliedDelta,
+                    preservingUnshiftableTokens: true
+                ) else { return false }
+                restored = shifted
             } else {
                 restored = backup
             }
         } else if activeExists {
-            restored = Self.shiftNumbers(in: current, by: -appliedDelta)
+            guard let shifted = Self.shiftNumbers(
+                in: current,
+                by: -appliedDelta,
+                preservingUnshiftableTokens: true
+            ) else { return false }
+            restored = shifted
         } else {
             return false
         }
@@ -294,29 +309,17 @@ final class GapBoost {
         return lower..<upper
     }
 
-    /// Delta recorded in the active marker. Path-only legacy markers use `stripHeight`.
-    static func appliedDelta(fromActiveMarker contents: String?) -> CGFloat {
-        guard let contents else { return stripHeight }
-        let lines = contents
-            .split(whereSeparator: \.isNewline)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-        let allowed = [Double(stripHeight), Double(boostAmount)]
-        if lines.count >= 2,
-           let value = Double(lines[1]),
-           allowed.contains(value)
-        {
-            return CGFloat(value)
-        }
-        return stripHeight
-    }
-
     /// True when `current` equals `backup` shifted by `delta`.
     static func isUneditedBoost(current: String, backup: String, delta: CGFloat) -> Bool {
-        current == shiftNumbers(in: backup, by: delta)
+        guard let shifted = shiftNumbers(in: backup, by: delta) else { return false }
+        return current == shifted
     }
 
-    static func shiftNumbers(in block: String, by delta: CGFloat) -> String {
+    static func shiftNumbers(
+        in block: String,
+        by delta: CGFloat,
+        preservingUnshiftableTokens: Bool = false
+    ) -> String? {
         var result = ""
         var i = block.startIndex
         var quote: Character?
@@ -379,17 +382,30 @@ final class GapBoost {
                 let after = j < block.endIndex ? block[j] : nil
                 let attachedToIdentifier = before.map(Self.isIdentifierCharacter) == true
                     || after.map(Self.isIdentifierCharacter) == true
-                if !attachedToIdentifier,
-                   let value = AerospaceConfigSyntax.parseGapNumber(token)
-                {
-                    let shifted = max(0, value + Double(delta))
-                    if shifted == floor(shifted) {
-                        result += String(Int(shifted))
-                    } else {
-                        result += String(shifted)
-                    }
-                } else {
+                if token == "." && Self.isDottedKeySeparator(in: block, at: i, after: j) {
                     result += token
+                } else if attachedToIdentifier {
+                    result += token
+                } else {
+                    guard let value = AerospaceConfigSyntax.parseGapNumber(token) else {
+                        guard preservingUnshiftableTokens else { return nil }
+                        result += token
+                        i = j
+                        continue
+                    }
+                    let shifted = value + Double(delta)
+                    guard shifted.isFinite else {
+                        guard preservingUnshiftableTokens else { return nil }
+                        result += token
+                        i = j
+                        continue
+                    }
+                    let nonnegative = max(0, shifted)
+                    if let integer = Int(exactly: nonnegative) {
+                        result += String(integer)
+                    } else {
+                        result += String(nonnegative)
+                    }
                 }
                 i = j
                 continue
@@ -398,6 +414,24 @@ final class GapBoost {
             i = block.index(after: i)
         }
         return result
+    }
+
+    private static func isDottedKeySeparator(
+        in block: String,
+        at start: String.Index,
+        after end: String.Index
+    ) -> Bool {
+        var previous = start
+        while previous > block.startIndex {
+            previous = block.index(before: previous)
+            if !block[previous].isWhitespace { break }
+        }
+        var next = end
+        while next < block.endIndex, block[next].isWhitespace {
+            next = block.index(after: next)
+        }
+        guard previous < start, next < block.endIndex else { return false }
+        return isIdentifierCharacter(block[previous]) && isIdentifierCharacter(block[next])
     }
 
     private static func isIdentifierCharacter(_ character: Character) -> Bool {
